@@ -34,6 +34,8 @@
   --color-graphite: 27 31 29;
   /* Неоновий зелений акцент — підсвітка та активний стан */
   --color-neon: 57 255 148;
+  /* Семантичний колір для помилок/видалення — однаковий у всіх темах */
+  --color-destructive: 239 68 68;
 
   /* Primary Brand Dynamic Variable */
   --color-primary: var(--color-forest-light);
