@@ -1371,19 +1371,6 @@ export function LiveMetroPage() {
           </div>
         )}
 
-        {/* Індикатор "метро зараз не працює" — без нього порожня схема (0
-            потягів) поза годинами 5:30–24:00 виглядає як зламана сторінка,
-            хоча насправді це просто нічна перерва в русі за розкладом. */}
-        {trains.length === 0 && !selectedTrain && !selectedStation && (
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[min(80vw,280px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border/10 bg-surface-raised/95 p-4 text-center shadow-2xl backdrop-blur-sm"
-          >
-            <TrainFront className="mx-auto h-7 w-7 text-ink-muted opacity-40" />
-            <p className="mt-2 text-sm font-bold text-ink-text">Метро зараз не курсує</p>
-            <p className="mt-1 text-xs text-ink-muted opacity-70">Рух поїздів — з 5:30 до 24:00 за розкладом</p>
-          </div>
-        )}
-
         {/* Картки інформації */}
         {selectedTrain && <TrainInfoCard train={selectedTrain} onClose={() => setSelectedTrainId(null)} />}
         {selectedStation && (
