@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main] # Перевірте, чи ваша головна гілка називається main (або master)
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Build
+        working-directory: frontend
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          # Секрети з Settings → Secrets and variables → Actions.
+          # Vite підхоплює лише змінні з префіксом VITE_.
+          VITE_TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
+          VITE_TELEGRAM_APP_NAME: ${{ vars.TELEGRAM_APP_NAME }}
+        run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
