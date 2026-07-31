@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, memo, startTransition, ComponentType } from 'react';
+import { Suspense, useState, useEffect, memo, startTransition } from 'react';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { BottomNav } from '@/components/BottomNav';
@@ -24,13 +24,7 @@ import { HomePage } from '@/pages/HomePage';
 const MapPage = lazyWithRetry(() => import('@/pages/MapPage').then((m) => ({ default: m.MapPage })), 'MapPage');
 const RoutesPage = lazyWithRetry(() => import('@/pages/RoutesPage').then((m) => ({ default: m.RoutesPage })), 'RoutesPage');
 const RouteDetailPage = lazyWithRetry(() => import('@/pages/RouteDetailPage').then((m) => ({ default: m.RouteDetailPage })), 'RouteDetailPage');
-
-// Виправлено типізацію для компонента з пропсом kind
-const TransportKindPage = lazyWithRetry(
-  () => import('@/pages/TransportKindPage').then((m) => ({ default: m.TransportKindPage as ComponentType<any> })),
-  'TransportKindPage'
-);
-
+const TransportKindPage = lazyWithRetry(() => import('@/pages/TransportKindPage').then((m) => ({ default: m.TransportKindPage })), 'TransportKindPage');
 const LiveMetroPage = lazyWithRetry(() => import('@/pages/LiveMetroPage').then((m) => ({ default: m.LiveMetroPage })), 'LiveMetroPage');
 const FavoritesPage = lazyWithRetry(() => import('@/pages/FavoritesPage').then((m) => ({ default: m.FavoritesPage })), 'FavoritesPage');
 const HistoryPage = lazyWithRetry(() => import('@/pages/HistoryPage').then((m) => ({ default: m.HistoryPage })), 'HistoryPage');
@@ -47,8 +41,6 @@ const RouteFallback = memo(function RouteFallback() {
     <div 
       className="flex min-h-dvh w-full items-center justify-center bg-bg p-4"
       role="status"
-      aria-live="polite"
-      aria-busy="true"
       aria-label="Завантаження сторінки..."
     >
       <div className="glass-surface relative w-full max-w-md overflow-hidden rounded-2xl p-6 shadow-lg backdrop-blur-xl will-change-transform">
@@ -90,12 +82,20 @@ export default function App() {
   const [splashMounted, setSplashMounted] = useState<boolean>(true);
   const location = useLocation();
 
+  // Вікно реєстрації показуємо лише коли: застосунок точно НЕ в Telegram
+  // (там профіль підтягується автоматично), користувач ще не проходив
+  // "знайомство" на цьому пристрої, і сплеш-екран вже пішов — щоб форма
+  // не блимала поверх анімації запуску.
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
   const showRegistration = telegramStatus === 'outside' && !hasCompletedOnboarding && !splashMounted;
 
+  // Карта — важкий компонент (ініціалізація MapLibre, завантаження стилю,
+  // тайлів, шрифтів). Щоб вона відкривалась миттєво щоразу після першого
+  // разу, а не перезавантажувалась заново на кожен вхід у "/map", ми не
+  // розмонтовуємо <MapPage /> при виході зі сторінки — лишаємо її живою
+  // в DOM (просто ховаємо через CSS) одразу після першого відвідування.
   const isMapRoute = location.pathname === '/map';
   const [mapMounted, setMapMounted] = useState(isMapRoute);
-
   useEffect(() => {
     if (isMapRoute) setMapMounted(true);
   }, [isMapRoute]);
@@ -107,6 +107,8 @@ export default function App() {
           <PageTransition pathKey={location.pathname}>
             <Routes location={location}>
               <Route path="/" element={<HomePage />} />
+              {/* MapPage рендериться окремо нижче — постійно змонтована, щоб не
+                  перезавантажуватись при кожному переході на цю сторінку. */}
               <Route path="/map" element={null} />
               <Route path="/routes" element={<RoutesPage />} />
               <Route path="/routes/:routeId" element={<RouteDetailPage />} />
@@ -129,7 +131,7 @@ export default function App() {
       </ErrorBoundary>
 
       {mapMounted && (
-        <div className={isMapRoute ? 'w-full min-h-dvh' : 'hidden'}>
+        <div className={isMapRoute ? 'contents' : 'hidden'}>
           <ErrorBoundary label="Карта">
             <Suspense fallback={<RouteFallback />}>
               <MapPage />

@@ -1,15 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /**
  * Шрифтова пара — Unbounded (заголовки, цифри маршрутів, дисплей) +
  * Inter (основний текст інтерфейсу). Обидва мають повну підтримку
  * кирилиці й читаються однаково чисто на всіх сторінках застосунку.
  * Підключено напряму через @import і CSS-змінні, а не лише через
  * tailwind.config, щоб пара гарантовано застосовувалась усюди.
+ *
+ * ВАЖЛИВО: @import має стояти першим у файлі (до будь-яких інших
+ * правил, включно з @tailwind) — інакше браузер тихо ігнорує імпорт
+ * і шрифти не підвантажуються.
  */
 @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --font-display: 'Unbounded', 'Inter', system-ui, -apple-system, sans-serif;

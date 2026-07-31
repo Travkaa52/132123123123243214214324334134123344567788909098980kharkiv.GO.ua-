@@ -37,7 +37,7 @@ function isChunkLoadError(error: unknown): boolean {
   );
 }
 
-export function lazyWithRetry<T extends ComponentType<unknown>>(
+export function lazyWithRetry<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
   chunkName: string
 ) {

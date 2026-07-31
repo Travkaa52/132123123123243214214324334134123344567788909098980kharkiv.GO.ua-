@@ -765,17 +765,48 @@ function getRunProfile(
     return list.map(timeStrToSec).sort((a, b) => a - b);
   });
 
-  const maxRuns = Math.max(0, ...perStationTimes.map((t) => t.length));
   // times[k] = масив часів (по станціях, у порядку маршруту) для k-го рейсу дня.
+  //
+  // ВАЖЛИВО: станції зіставляються не за позицією (k-ий запис на станції А —
+  // не обов'язково k-ий запис на станції Б), а хронологічним "зчепленням":
+  // беремо реальний час відправлення з початкової станції маршруту і для
+  // кожної наступної станції шукаємо найближчий НЕ РАНІШИЙ час у ЇЇ власному
+  // розкладі. Це потрібно, бо кількість записів на сусідніх станціях
+  // відрізняється на ±1-2 (артефакт розпізнавання фотографій табло), і
+  // зіставлення "за індексом" зрідка спарювало різні фізичні поїзди —
+  // час хибно "спадав" по маршруту, і такий рейс бракувався.
+  //
+  // Кінцева станція маршруту (термінал) фізично не публікує "відправлення у
+  // цьому ж напрямку" — на реальному табло там показані лише відправлення у
+  // зворотний бік, тому дані для неї в цьому напрямку завжди порожні. Це не
+  // зіпсовані дані — тому для неї оцінюємо час прибуття екстраполяцією
+  // тривалості останнього відомого перегону, а не бракуємо рейс.
   const times: number[][] = [];
-  for (let k = 0; k < maxRuns; k++) {
-    const row = perStationTimes.map((list) => (list.length ? list[Math.min(k, list.length - 1)] : NaN));
-    // Рейс валідний, лише якщо часи не спадають вздовж маршруту (захист від зіпсованих даних).
-    let valid = !row.some((v) => Number.isNaN(v));
-    for (let i = 1; valid && i < row.length; i++) {
-      if (row[i] < row[i - 1]) valid = false;
+  const originList = perStationTimes[0];
+  for (const startTime of originList) {
+    const row: number[] = [startTime];
+    let cursor = startTime;
+    let ok = true;
+
+    for (let i = 1; i < stations.length; i++) {
+      const list = perStationTimes[i];
+      if (list.length === 0) {
+        const prev = row[row.length - 1];
+        const prevGap = row.length >= 2 ? prev - row[row.length - 2] : 120;
+        row.push(prev + Math.max(30, prevGap));
+        cursor = row[row.length - 1];
+        continue;
+      }
+      const next = list.find((t) => t >= cursor);
+      if (next === undefined) {
+        ok = false;
+        break;
+      }
+      row.push(next);
+      cursor = next;
     }
-    if (valid) times.push(row);
+
+    if (ok) times.push(row);
   }
 
   const result = { times, stations };
