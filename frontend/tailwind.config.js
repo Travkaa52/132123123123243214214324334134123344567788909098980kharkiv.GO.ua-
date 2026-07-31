@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ['selector', '[data-theme="dark"]'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -22,14 +21,43 @@ export default {
         surface: {
           DEFAULT: 'rgb(var(--color-surface) / <alpha-value>)',
           soft: 'rgb(var(--color-surface-soft) / <alpha-value>)',
-          raised: 'rgb(var(--color-surface-raised) / <alpha-value>)'
+          raised: 'rgb(var(--color-surface-raised) / <alpha-value>)',
+          muted: 'rgb(var(--color-surface-soft) / <alpha-value>)'
         },
         border: 'rgb(var(--color-border))',
         ink: {
           text: 'rgb(var(--color-text) / <alpha-value>)',
           muted: 'rgb(var(--color-text-muted))',
-          inverted: 'rgb(var(--color-text-inverted) / <alpha-value>)'
-        }
+          inverted: 'rgb(var(--color-text-inverted) / <alpha-value>)',
+          border: 'rgb(var(--color-ink-border))',
+          surface: 'rgb(var(--color-ink-surface) / <alpha-value>)'
+        },
+        /**
+         * Ці кольори раніше використовувались у ~30 файлах (primary,
+         * primary-foreground, surface-muted, muted, destructive, neon,
+         * accent), але жодного з них не було в палітрі Tailwind — тому
+         * відповідні класи не генерувались і елементи ставали прозорими /
+         * нестильними, по-різному в кожній темі. Додано тут і прив'язано
+         * до тих самих CSS-змінних з tokens.css, щоб усі сторінки й
+         * модалки виглядали однаково в межах однієї теми.
+         */
+        primary: {
+          DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+          foreground: 'rgb(var(--color-text-inverted) / <alpha-value>)'
+        },
+        accent: {
+          DEFAULT: 'rgb(var(--color-gold) / <alpha-value>)',
+          foreground: 'rgb(var(--color-text-inverted) / <alpha-value>)'
+        },
+        muted: {
+          DEFAULT: 'rgb(var(--color-surface-soft) / <alpha-value>)',
+          foreground: 'rgb(var(--color-text-muted) / var(--color-text-muted-alpha))'
+        },
+        destructive: {
+          DEFAULT: 'rgb(var(--color-destructive) / <alpha-value>)',
+          foreground: 'rgb(var(--color-text-inverted) / <alpha-value>)'
+        },
+        neon: 'rgb(var(--color-neon) / <alpha-value>)'
       },
       fontFamily: {
         display: ['"Manrope"', 'system-ui', 'sans-serif'],
