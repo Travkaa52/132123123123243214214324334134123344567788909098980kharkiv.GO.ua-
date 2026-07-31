@@ -7,3 +7,4 @@ export { Sheet } from './Sheet';
 export { Toast } from './Toast';
 export { Emblem } from './Emblem';
 export { EmptyState } from './EmptyState';
+export { HintBubble } from './HintBubble';
