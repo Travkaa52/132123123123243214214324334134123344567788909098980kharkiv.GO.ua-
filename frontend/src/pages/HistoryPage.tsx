@@ -21,17 +21,25 @@ export function HistoryPage() {
       <PageHeader title="Історія" subtitle="Останні пошукові запити" />
       <div className="px-4">
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl2 bg-ink-surface/70 py-14 text-center">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="text-white/30">
-              <circle cx="12" cy="12" r="8" />
-              <path d="M12 8v4l3 2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <p className="text-sm text-white/50">Історія пошуку порожня.</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl2 bg-ink-surface/70 py-16 text-center px-6">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="8" />
+                <path d="M12 8v4l3 2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-ink-text">Історія пошуку порожня</p>
+            <p className="text-sm text-ink-muted max-w-[240px]">
+              Тут з'являтимуться ваші останні пошуки зупинок, маршрутів і адрес
+            </p>
           </div>
         ) : (
           <>
             <div className="mb-2 flex justify-end">
-              <button onClick={clear} className="rounded-lg px-2 py-1 text-xs text-white/40 transition hover:text-white/80">
+              <button
+                onClick={clear}
+                className="rounded-lg px-2 py-1 text-xs font-medium text-ink-muted transition hover:text-destructive"
+              >
                 Очистити все
               </button>
             </div>
@@ -47,15 +55,17 @@ export function HistoryPage() {
                     </svg>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-white">{entry.query}</p>
-                    <p className="text-xs text-white/40">{TYPE_LABELS[entry.type]}</p>
+                    <p className="truncate text-sm text-ink-text">{entry.query}</p>
+                    <p className="text-xs text-ink-muted">{TYPE_LABELS[entry.type]}</p>
                   </div>
                   <button
                     onClick={() => removeEntry(entry.id)}
                     aria-label="Видалити запис"
-                    className="shrink-0 rounded-full p-1.5 text-white/30 transition hover:bg-white/10 hover:text-white/80"
+                    className="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-destructive/10 hover:text-destructive"
                   >
-                    ✕
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                    </svg>
                   </button>
                 </li>
               ))}

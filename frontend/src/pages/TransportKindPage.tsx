@@ -310,7 +310,7 @@ export function TransportKindPage({ kind }: { kind: TransportKind }) {
               <p className="text-xs text-ink-muted max-w-xs mb-4">{errorMsg}</p>
               <button
                 onClick={loadRoutes}
-                className="inline-flex items-center gap-2 rounded-xl bg-bg px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-surface-raised active:scale-95 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:brightness-105 active:scale-95 transition-all"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Спробувати знову</span>
