@@ -1,0 +1,73 @@
+<svg viewBox="0 0 240 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Герб Харкова">
+  <defs>
+    <linearGradient id="coaGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E0C179"/>
+      <stop offset="1" stop-color="#A8842F"/>
+    </linearGradient>
+    <linearGradient id="coaGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12513D"/>
+      <stop offset="1" stop-color="#0B3B29"/>
+    </linearGradient>
+  </defs>
+
+  <!-- oak wreath -->
+  <g fill="url(#coaGold)" opacity="0.9">
+    <ellipse cx="34" cy="150" rx="10" ry="16"/>
+    <ellipse cx="30" cy="180" rx="11" ry="17"/>
+    <ellipse cx="36" cy="212" rx="10" ry="16"/>
+    <ellipse cx="206" cy="150" rx="10" ry="16"/>
+    <ellipse cx="210" cy="180" rx="11" ry="17"/>
+    <ellipse cx="204" cy="212" rx="10" ry="16"/>
+  </g>
+  <!-- ribbon -->
+  <path d="M40 226c20 14 140 14 160 0l-6 18c-24 12-124 12-148 0z" fill="#2C7BE5"/>
+
+  <!-- shield -->
+  <path d="M120 20 L204 46 V150 C204 206 168 244 120 268 C72 244 36 206 36 150 V46 Z"
+        fill="url(#coaGreen)" stroke="url(#coaGold)" stroke-width="6"/>
+
+  <!-- cogwheel top -->
+  <g fill="url(#coaGold)">
+    <circle cx="120" cy="44" r="20"/>
+    <circle cx="120" cy="44" r="11" fill="url(#coaGreen)"/>
+    <g>
+      <rect x="116" y="18" width="8" height="10"/>
+      <rect x="116" y="60" width="8" height="10"/>
+      <rect x="90" y="40" width="10" height="8"/>
+      <rect x="140" y="40" width="10" height="8"/>
+    </g>
+  </g>
+
+  <!-- open book + atom -->
+  <g transform="translate(120,78)" fill="url(#coaGold)">
+    <path d="M-22 0 C-14 -6 0 -6 0 0 C0 -6 14 -6 22 0 V10 C14 4 0 4 0 10 C0 4 -14 4 -22 10 Z"/>
+    <circle cx="0" cy="4" r="3"/>
+    <ellipse cx="0" cy="4" rx="14" ry="4" fill="none" stroke="url(#coaGold)" stroke-width="1.4"/>
+    <ellipse cx="0" cy="4" rx="14" ry="4" fill="none" stroke="url(#coaGold)" stroke-width="1.4" transform="rotate(60 0 4)"/>
+    <ellipse cx="0" cy="4" rx="14" ry="4" fill="none" stroke="url(#coaGold)" stroke-width="1.4" transform="rotate(120 0 4)"/>
+  </g>
+
+  <!-- rye stalks x4 -->
+  <g stroke="url(#coaGold)" stroke-width="2.5" fill="none" stroke-linecap="round">
+    <path d="M64 110 V190 M64 120 l-10 -8 M64 132 l10 -8 M64 144 l-10 -8 M64 156 l10 -8"/>
+    <path d="M84 100 V188 M84 110 l-10 -8 M84 122 l10 -8 M84 134 l-10 -8 M84 146 l10 -8"/>
+    <path d="M156 100 V188 M156 110 l10 -8 M156 122 l-10 -8 M156 134 l10 -8 M156 146 l-10 -8"/>
+    <path d="M176 110 V190 M176 120 l10 -8 M176 132 l-10 -8 M176 144 l10 -8 M176 156 l-10 -8"/>
+  </g>
+
+  <!-- caduceus + cornucopia, crossed -->
+  <g transform="translate(120,150)">
+    <!-- cornucopia -->
+    <path d="M-50 40 C-50 0 -10 -20 20 -14 C6 -6 -6 8 -10 30 C-12 44 -30 54 -50 40 Z"
+          fill="url(#coaGold)"/>
+    <circle cx="-40" cy="20" r="3" fill="url(#coaGreen)"/>
+    <circle cx="-30" cy="10" r="3" fill="url(#coaGreen)"/>
+    <circle cx="-20" cy="26" r="3" fill="url(#coaGreen)"/>
+
+    <!-- caduceus staff -->
+    <line x1="-20" y1="-46" x2="30" y2="44" stroke="url(#coaGold)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-20" cy="-46" r="7" fill="url(#coaGold)"/>
+    <path d="M-14 -38 C0 -30 0 -14 -10 -6 C-2 -12 8 -12 12 -2" fill="none" stroke="url(#coaGold)" stroke-width="3"/>
+    <path d="M-26 -32 C-38 -22 -36 -6 -24 2 C-30 -6 -22 -16 -12 -18" fill="none" stroke="url(#coaGold)" stroke-width="3"/>
+  </g>
+</svg>
