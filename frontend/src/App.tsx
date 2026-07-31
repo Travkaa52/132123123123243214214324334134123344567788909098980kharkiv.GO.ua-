@@ -3,6 +3,7 @@ import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { BottomNav } from '@/components/BottomNav';
 import { TelegramGate } from '@/components/TelegramGate';
 import { RegistrationModal } from '@/components/RegistrationModal';
+import { PageTransition } from '@/components/PageTransition';
 import { Toast } from '@/components/ui';
 import { SplashScreen } from '@/components/SplashScreen';
 import { useTelegramEnvironment } from '@/hooks/useTelegramEnvironment';
@@ -100,27 +101,29 @@ export default function App() {
   return (
     <div className="relative min-h-dvh w-full overflow-x-hidden bg-bg text-ink-text antialiased selection:bg-primary/20">
       <Suspense fallback={<RouteFallback />}>
-        <Routes location={location}>
-          <Route path="/" element={<HomePage />} />
-          {/* MapPage рендериться окремо нижче — постійно змонтована, щоб не
-              перезавантажуватись при кожному переході на цю сторінку. */}
-          <Route path="/map" element={null} />
-          <Route path="/routes" element={<RoutesPage />} />
-          <Route path="/routes/:routeId" element={<RouteDetailPage />} />
-          <Route path="/metro" element={<TransportKindPage kind="metro" />} />
-          <Route path="/metro/live" element={<LiveMetroPage />} />
-          <Route path="/trams" element={<TransportKindPage kind="tram" />} />
-          <Route path="/trolleybuses" element={<TransportKindPage kind="trolleybus" />} />
-          <Route path="/buses" element={<TransportKindPage kind="bus" />} />
-          <Route path="/reminders" element={<RemindersPage />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          
-          {/* Обробка невідомих URL та 404 */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <PageTransition pathKey={location.pathname}>
+          <Routes location={location}>
+            <Route path="/" element={<HomePage />} />
+            {/* MapPage рендериться окремо нижче — постійно змонтована, щоб не
+                перезавантажуватись при кожному переході на цю сторінку. */}
+            <Route path="/map" element={null} />
+            <Route path="/routes" element={<RoutesPage />} />
+            <Route path="/routes/:routeId" element={<RouteDetailPage />} />
+            <Route path="/metro" element={<TransportKindPage kind="metro" />} />
+            <Route path="/metro/live" element={<LiveMetroPage />} />
+            <Route path="/trams" element={<TransportKindPage kind="tram" />} />
+            <Route path="/trolleybuses" element={<TransportKindPage kind="trolleybus" />} />
+            <Route path="/buses" element={<TransportKindPage kind="bus" />} />
+            <Route path="/reminders" element={<RemindersPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+
+            {/* Обробка невідомих URL та 404 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </PageTransition>
       </Suspense>
 
       {mapMounted && (

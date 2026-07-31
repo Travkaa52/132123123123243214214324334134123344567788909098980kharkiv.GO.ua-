@@ -362,6 +362,42 @@ export function MapPage() {
     setMap(mapInstance);
   }, []);
 
+  // Застосовуємо ?route=<id> / ?stop=<id> з URL — саме сюди веде кнопка
+  // "Показати на карті" в RouteDetailContent (розділ "Маршрути"). Раніше
+  // MapPage читав з URL лише параметр "q" — посилання /map?route=... не
+  // оброблялося зовсім, тож карта відкривалася порожньою, без підсвіченого
+  // маршруту. Чекаємо готову карту (для fitBounds/flyTo), один раз
+  // застосовуємо параметри й одразу прибираємо їх з адресного рядка, щоб
+  // повторний вибір маршруту вручну не "затирався" назад цим самим URL.
+  useEffect(() => {
+    if (!map) return;
+    const routeId = searchParams.get('route');
+    const stopId = searchParams.get('stop');
+    if (!routeId && !stopId) return;
+
+    if (routeId) {
+      const route = localRoutes.getById(routeId);
+      if (route) {
+        // Якщо фільтр цього виду транспорту вимкнено — лінія й маркери
+        // просто не намалюються на карті, навіть після fitBounds.
+        setActiveFilterChips((prev) => (prev[route.kind] ? prev : { ...prev, [route.kind]: true }));
+        if (stopId) {
+          // Клік по конкретній зупинці всередині маршруту — летимо саме до неї.
+          handleStopSelect(stopId);
+        } else {
+          handleRouteSelect(routeId);
+        }
+      }
+    } else if (stopId) {
+      handleStopSelect(stopId);
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('route');
+    next.delete('stop');
+    setSearchParams(next, { replace: true });
+  }, [map, searchParams, setSearchParams, handleRouteSelect, handleStopSelect]);
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-bg text-ink-text font-sans antialiased selection:bg-primary selection:text-white">
       
