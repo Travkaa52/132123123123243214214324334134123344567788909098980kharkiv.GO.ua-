@@ -21,18 +21,47 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   const [closing, setClosing] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+  const closeTimeoutRef = useRef<number | null>(null);
 
+  const clearCloseTimeout = useCallback(() => {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Раніше closing скидався в false ДО виклику onClose, а mounted взагалі
+  // ніколи не ставав false — шторка "відскакувала" назад відкритою і її
+  // неможливо було закрити. Тепер mounted знімається лише після завершення
+  // анімації, а закриття завжди доводиться до кінця.
   const closeAnimated = useCallback(() => {
+    if (closing) return;
     setClosing(true);
-    window.setTimeout(() => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setMounted(false);
       setClosing(false);
       onClose();
     }, 220);
-  }, [onClose]);
+  }, [closing, clearCloseTimeout, onClose]);
 
   useEffect(() => {
-    if (open) setMounted(true);
+    if (open) {
+      clearCloseTimeout();
+      setMounted(true);
+      setClosing(false);
+    } else if (mounted && !closing) {
+      setClosing(true);
+      clearCloseTimeout();
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setMounted(false);
+        setClosing(false);
+      }, 220);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => () => clearCloseTimeout(), [clearCloseTimeout]);
 
   useEffect(() => {
     if (!mounted) return;

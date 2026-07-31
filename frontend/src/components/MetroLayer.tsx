@@ -3,6 +3,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { Train } from 'lucide-react';
 import { useMetroSimulation } from '@/hooks/useMetroSimulation';
 import type { MetroRenderFrame } from '@/metro/MetroRenderer';
+import { TransportSprite } from '@/components/TransportSprite';
 
 interface ScreenFrame {
   frame: MetroRenderFrame;
@@ -114,57 +115,46 @@ const MetroTrainMarker = memo(function MetroTrainMarker({ frame, x, y, selected,
   const isDwell = snapshot.phase === 'dwell';
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`Метро, лінія ${snapshot.lineNumber}, прямує до ${snapshot.headsign}, ${Math.round(snapshot.speedKmh)} км/год`}
-      className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 select-none transition-[left,top] duration-100 ease-linear will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    <div
+      className="pointer-events-none absolute h-0 w-0 transition-[left,top] duration-100 ease-linear will-change-transform"
       style={{ left: x, top: y, opacity: frame.opacity, zIndex: selected ? 30 : 20 }}
     >
-      <div className="relative flex flex-col items-center gap-1.5">
-        <div
-          data-placeholder="metro-train"
-          className={[
-            'relative flex items-center justify-center rounded-full border-2 border-white/90 font-display text-[11px] font-bold text-white transition-all duration-200 active:scale-95',
-            isDwell ? 'animate-pulse' : ''
-          ].join(' ')}
-          style={{
-            width: selected ? 32 : 26,
-            height: selected ? 32 : 26,
-            backgroundColor: snapshot.lineColor,
-            boxShadow: `0 0 12px ${snapshot.lineColor}80`,
-            transform: `scale(${selected ? 1.15 : 1})`
-          }}
-        >
-          {/* Стрілка напрямку руху */}
-          {!isDwell && (
-            <span
-              className="absolute -top-2.5 h-2.5 w-2.5 transition-transform duration-200"
-              style={{ transform: `rotate(${snapshot.headingDeg}deg)`, transformOrigin: '50% 15px' }}
-            >
-              <span
-                className="block h-full w-full"
-                style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', backgroundColor: snapshot.lineColor }}
-              />
-            </span>
-          )}
+      {/* Реальний спрайт потяга (сам себе центрує через translate(-50%,-50%) відносно left:0/top:0) */}
+      <TransportSprite
+        kind="metro"
+        routeNumber={snapshot.lineNumber.replace(/^M/, '')}
+        headsign={snapshot.headsign}
+        heading={snapshot.headingDeg}
+        speedKmh={snapshot.speedKmh}
+        x={0}
+        y={0}
+        state={isDwell ? 'stopped' : 'moving'}
+        selected={selected}
+        onClick={onClick}
+      />
 
-          <span className="drop-shadow-sm">{snapshot.lineNumber.replace(/^M/, '')}</span>
-        </div>
-
-        {/* Скляна картка детальної інформації при виборі */}
-        {selected && (
-          <div className="flex flex-col items-center rounded-xl border border-border/60 bg-surface/95 px-3 py-1.5 text-center shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
-            <span className="font-display text-[11px] font-bold text-ink-text flex items-center gap-1 whitespace-nowrap">
-              <Train className="h-3 w-3 text-primary" />
-              {snapshot.lineNumber} → {snapshot.headsign}
-            </span>
-            <span className="text-[10px] text-ink-muted whitespace-nowrap">
-              {isDwell ? 'На станції' : `${Math.round(snapshot.speedKmh)} км/год`} · далі: {snapshot.nextStation.name}
-            </span>
-          </div>
-        )}
+      {/* Кольоровий бейдж лінії над спрайтом */}
+      <div
+        className="pointer-events-none absolute left-0 top-0 -translate-x-1/2 rounded-full border-2 border-white/90 px-1.5 py-0.5 font-display text-[9px] font-bold leading-none text-white shadow"
+        style={{ backgroundColor: snapshot.lineColor, transform: `translate(-50%, -${(selected ? 32 : 26) + 14}px)` }}
+      >
+        {snapshot.lineNumber.replace(/^M/, '')}
       </div>
-    </button>
+
+      {/* Скляна картка детальної інформації при виборі */}
+      {selected && (
+        <div
+          className="pointer-events-none absolute left-0 top-0 flex -translate-x-1/2 translate-y-4 flex-col items-center whitespace-nowrap rounded-xl border border-border/60 bg-surface/95 px-3 py-1.5 text-center shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+        >
+          <span className="font-display text-[11px] font-bold text-ink-text flex items-center gap-1 whitespace-nowrap">
+            <Train className="h-3 w-3 text-primary" />
+            {snapshot.lineNumber} → {snapshot.headsign}
+          </span>
+          <span className="text-[10px] text-ink-muted whitespace-nowrap">
+            {isDwell ? 'На станції' : `${Math.round(snapshot.speedKmh)} км/год`} · далі: {snapshot.nextStation.name}
+          </span>
+        </div>
+      )}
+    </div>
   );
 });

@@ -24,20 +24,50 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
   const [closing, setClosing] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+  const closeTimeoutRef = useRef<number | null>(null);
 
+  const clearCloseTimeout = useCallback(() => {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Ініціює закриття: програє анімацію "з'їжджання" вниз, і лише ПІСЛЯ неї
+  // прибирає модалку з DOM і повідомляє батьківський компонент. Раніше тут
+  // closing одразу скидався у false ДО виклику onClose — через це модалка
+  // встигала "відскочити" назад у відкритий стан і її неможливо було закрити.
   const closeAnimated = useCallback(() => {
+    if (closing) return;
     setClosing(true);
-    window.setTimeout(() => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setMounted(false);
       setClosing(false);
       onClose();
     }, 220);
-  }, [onClose]);
+  }, [closing, clearCloseTimeout, onClose]);
 
   useEffect(() => {
     if (open) {
+      clearCloseTimeout();
       setMounted(true);
+      setClosing(false);
+    } else if (mounted && !closing) {
+      // Батько закрив модалку напряму (open=false), минаючи closeAnimated —
+      // все одно доганяємо коректне закриття з анімацією замість того, щоб
+      // залишити mounted=true назавжди (модалку неможливо було б закрити).
+      setClosing(true);
+      clearCloseTimeout();
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setMounted(false);
+        setClosing(false);
+      }, 220);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => () => clearCloseTimeout(), [clearCloseTimeout]);
 
   useEffect(() => {
     if (!mounted) return;
