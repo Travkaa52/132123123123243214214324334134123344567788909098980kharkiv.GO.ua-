@@ -227,9 +227,29 @@ function sampleTrainAt(route: DirectionRoute, elapsedSec: number): {
   };
 }
 
+/** Початок і кінець умовного "дня експлуатації" метро (05:30–24:00), в межах якого рухаються поїзди. */
+const OPERATING_START_SEC = 5 * 3600 + 30 * 60;
+const OPERATING_END_SEC = 24 * 3600;
+const OPERATING_DURATION_SEC = OPERATING_END_SEC - OPERATING_START_SEC;
+
+/**
+ * Симуляція завжди "жива": якщо реальний час поза годинами роботи метро (ніч),
+ * поїзди все одно рухаються по лінії за розкладом — час безперервно "закільцьовується"
+ * у вікно 05:30–24:00, прив'язаний до реального годинника (без стрибків/розривів
+ * анімації), щоб схема ніколи не показувала порожню карту.
+ */
+function effectiveOperatingSec(date: Date): number {
+  const realSec = secOfDay(date);
+  if (realSec >= OPERATING_START_SEC && realSec < OPERATING_END_SEC) return realSec;
+  // Безперервна шкала часу (мс з епохи, у секундах), щоб закільцьовування було
+  // плавним і однаковим для всіх клієнтів, а не залежало від моменту відкриття сторінки.
+  const continuousSec = date.getTime() / 1000;
+  return OPERATING_START_SEC + (continuousSec % OPERATING_DURATION_SEC);
+}
+
 /** Усі активні потяги (обидва напрямки, усі лінії) на момент `date`. Чиста функція часу — без GPS і випадковості. */
 export function getActiveTrains(date: Date): LiveMetroTrain[] {
-  const nowSec = secOfDay(date);
+  const nowSec = effectiveOperatingSec(date);
   const dayType = dayTypeOf(date);
   const trains: LiveMetroTrain[] = [];
 

@@ -12,7 +12,6 @@ import {
   DoorOpen,
 } from 'lucide-react';
 import { getStationPhoto } from '@/data/stationPhotos';
-import { HintBubble } from '@/components/ui/HintBubble';
 import { TIMETABLES } from '@/liveMetro/timetableData';
 import stopsData from '@/data/stops.json';
 
@@ -765,48 +764,17 @@ function getRunProfile(
     return list.map(timeStrToSec).sort((a, b) => a - b);
   });
 
+  const maxRuns = Math.max(0, ...perStationTimes.map((t) => t.length));
   // times[k] = масив часів (по станціях, у порядку маршруту) для k-го рейсу дня.
-  //
-  // ВАЖЛИВО: станції зіставляються не за позицією (k-ий запис на станції А —
-  // не обов'язково k-ий запис на станції Б), а хронологічним "зчепленням":
-  // беремо реальний час відправлення з початкової станції маршруту і для
-  // кожної наступної станції шукаємо найближчий НЕ РАНІШИЙ час у ЇЇ власному
-  // розкладі. Це потрібно, бо кількість записів на сусідніх станціях
-  // відрізняється на ±1-2 (артефакт розпізнавання фотографій табло), і
-  // зіставлення "за індексом" зрідка спарювало різні фізичні поїзди —
-  // час хибно "спадав" по маршруту, і такий рейс бракувався.
-  //
-  // Кінцева станція маршруту (термінал) фізично не публікує "відправлення у
-  // цьому ж напрямку" — на реальному табло там показані лише відправлення у
-  // зворотний бік, тому дані для неї в цьому напрямку завжди порожні. Це не
-  // зіпсовані дані — тому для неї оцінюємо час прибуття екстраполяцією
-  // тривалості останнього відомого перегону, а не бракуємо рейс.
   const times: number[][] = [];
-  const originList = perStationTimes[0];
-  for (const startTime of originList) {
-    const row: number[] = [startTime];
-    let cursor = startTime;
-    let ok = true;
-
-    for (let i = 1; i < stations.length; i++) {
-      const list = perStationTimes[i];
-      if (list.length === 0) {
-        const prev = row[row.length - 1];
-        const prevGap = row.length >= 2 ? prev - row[row.length - 2] : 120;
-        row.push(prev + Math.max(30, prevGap));
-        cursor = row[row.length - 1];
-        continue;
-      }
-      const next = list.find((t) => t >= cursor);
-      if (next === undefined) {
-        ok = false;
-        break;
-      }
-      row.push(next);
-      cursor = next;
+  for (let k = 0; k < maxRuns; k++) {
+    const row = perStationTimes.map((list) => (list.length ? list[Math.min(k, list.length - 1)] : NaN));
+    // Рейс валідний, лише якщо часи не спадають вздовж маршруту (захист від зіпсованих даних).
+    let valid = !row.some((v) => Number.isNaN(v));
+    for (let i = 1; valid && i < row.length; i++) {
+      if (row[i] < row[i - 1]) valid = false;
     }
-
-    if (ok) times.push(row);
+    if (valid) times.push(row);
   }
 
   const result = { times, stations };
@@ -993,6 +961,34 @@ export function LiveMetroPage() {
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
+  // Батчимо оновлення transform у requestAnimationFrame: без цього кожен
+  // "pointermove" одразу викликав setState, і на екранах/тачпадах зі
+  // швидкістю опитування 120–240 Гц React ре-рендерив частіше, ніж встигав
+  // намалювати кадр — звідси ривки замість плавного руху. rAF-петля сама
+  // підлаштовується під частоту оновлення дисплея (60/120 Гц), тож рух
+  // виходить плавним на будь-якому екрані.
+  const pendingTransformRef = useRef<Transform | null>(null);
+  const transformRafRef = useRef<number | null>(null);
+  const scheduleTransform = useCallback((updater: Transform | ((t: Transform) => Transform)) => {
+    const base = pendingTransformRef.current ?? transformRef.current;
+    const next = typeof updater === 'function' ? (updater as (t: Transform) => Transform)(base) : updater;
+    pendingTransformRef.current = next;
+    if (transformRafRef.current !== null) return;
+    transformRafRef.current = requestAnimationFrame(() => {
+      transformRafRef.current = null;
+      if (pendingTransformRef.current) {
+        setTransform(pendingTransformRef.current);
+        pendingTransformRef.current = null;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (transformRafRef.current !== null) cancelAnimationFrame(transformRafRef.current);
+    };
+  }, []);
+
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   // pinchState тепер утримує ще й екранну середину жесту та поточний зсув (x, y) на момент старту —
@@ -1110,7 +1106,7 @@ export function LiveMetroPage() {
       // Утримуємо нерухомою точку схеми, що була між пальцями на старті жесту —
       // саме тому масштабування раніше «зʼїжджало» в кут замість зуму в місці пальців.
       const scaleRatio = newScale / startScale;
-      setTransform({
+      scheduleTransform({
         x: midX - (midX - tx) * scaleRatio,
         y: midY - (midY - ty) * scaleRatio,
         scale: newScale
@@ -1124,10 +1120,10 @@ export function LiveMetroPage() {
       const dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 4) {
         isDraggingRef.current = true;
-        setTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
+        scheduleTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
       }
     }
-  }, []);
+  }, [scheduleTransform]);
 
   const endPointer = useCallback((e: PointerEvent<HTMLDivElement>) => {
     activePointers.current.delete(e.pointerId);
@@ -1337,14 +1333,10 @@ export function LiveMetroPage() {
 
         {/* Кнопки зума */}
         <div className="absolute right-3 top-3 flex flex-col gap-2" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-          <HintBubble hintKey="metro-zoom-in" text="Натисніть, щоб наблизити схему метро" side="left">
-            <ZoomButton label="+" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale * 1.25) }))} />
-          </HintBubble>
+          <ZoomButton label="+" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale * 1.25) }))} />
           <ZoomButton label="−" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale / 1.25) }))} />
           <ZoomButton label="⟲" onClick={resetView} small />
-          <HintBubble hintKey="metro-legend-toggle" text="Натисніть, щоб показати/сховати умовні позначення ліній" side="left">
-            <ZoomButton label="ⓘ" onClick={() => setShowLegend((v) => !v)} small />
-          </HintBubble>
+          <ZoomButton label="ⓘ" onClick={() => setShowLegend((v) => !v)} small />
         </div>
 
         {/* Умовні позначення — фіксований HTML-оверлей у лівому нижньому куті.
@@ -1372,9 +1364,9 @@ export function LiveMetroPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-2.5 border-t border-white/10 pt-2">
-              <div className="text-[11px] font-bold text-white/90">Працює з 5:30 до 24:00</div>
-              <div className="text-[9.5px] text-white/45">metro.kharkiv.ua · 0-800-505-685</div>
+            <div className="mt-2.5 border-t border-border/10 pt-2">
+              <div className="text-[11px] font-bold text-ink-text">Працює з 5:30 до 24:00</div>
+              <div className="text-[9.5px] text-ink-muted opacity-70">metro.kharkiv.ua · 0-800-505-685</div>
             </div>
           </div>
         )}
