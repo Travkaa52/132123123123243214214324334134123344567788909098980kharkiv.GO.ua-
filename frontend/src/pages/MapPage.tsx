@@ -31,6 +31,7 @@ import { getRouteBounds } from '@/lib/mapLayers';
 import { refineTripPlansWithOSM } from '@/lib/tripPlanRefine';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { TransportKind } from '@/types/transport';
+import { HintBubble } from '@/components/ui/HintBubble';
 
 const SUGGESTIONS_LIMIT = 6;
 const STORAGE_PREFIX = 'kharkiv_go_map_state_';
@@ -618,11 +619,15 @@ export function MapPage() {
         </button>
 
         <div className="rounded-[24px] overflow-hidden shadow-xl shadow-black/10">
-          <MapModeButton />
+          <HintBubble hintKey="map-3d-toggle" text="Натисніть, щоб перемкнути карту між 2D і 3D" side="left">
+            <MapModeButton />
+          </HintBubble>
         </div>
 
         <div className="rounded-[24px] overflow-hidden shadow-xl shadow-black/10">
-          <GpsButton onClick={locate} isLocating={isLocating} hasError={!!error} />
+          <HintBubble hintKey="map-gps" text="Натисніть, щоб знайти себе на карті" side="left">
+            <GpsButton onClick={locate} isLocating={isLocating} hasError={!!error} />
+          </HintBubble>
         </div>
       </div>
 

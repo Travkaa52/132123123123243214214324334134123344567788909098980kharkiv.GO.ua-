@@ -12,6 +12,7 @@ import {
   DoorOpen,
 } from 'lucide-react';
 import { getStationPhoto } from '@/data/stationPhotos';
+import { HintBubble } from '@/components/ui/HintBubble';
 import { TIMETABLES } from '@/liveMetro/timetableData';
 import stopsData from '@/data/stops.json';
 
@@ -1305,10 +1306,14 @@ export function LiveMetroPage() {
 
         {/* Кнопки зума */}
         <div className="absolute right-3 top-3 flex flex-col gap-2" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-          <ZoomButton label="+" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale * 1.25) }))} />
+          <HintBubble hintKey="metro-zoom-in" text="Натисніть, щоб наблизити схему метро" side="left">
+            <ZoomButton label="+" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale * 1.25) }))} />
+          </HintBubble>
           <ZoomButton label="−" onClick={() => setTransform((t) => ({ ...t, scale: clampScale(t.scale / 1.25) }))} />
           <ZoomButton label="⟲" onClick={resetView} small />
-          <ZoomButton label="ⓘ" onClick={() => setShowLegend((v) => !v)} small />
+          <HintBubble hintKey="metro-legend-toggle" text="Натисніть, щоб показати/сховати умовні позначення ліній" side="left">
+            <ZoomButton label="ⓘ" onClick={() => setShowLegend((v) => !v)} small />
+          </HintBubble>
         </div>
 
         {/* Умовні позначення — фіксований HTML-оверлей у лівому нижньому куті.
