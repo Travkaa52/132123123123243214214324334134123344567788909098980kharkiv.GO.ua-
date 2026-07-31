@@ -1,0 +1,189 @@
+import { useEffect, useState } from 'react';
+import { Bell, ExternalLink, Rss, AlertCircle } from 'lucide-react';
+import { Sheet } from '@/components/ui/Sheet';
+import { useNotificationsStore } from '@/store/useNotificationsStore';
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'щойно';
+  if (min < 60) return `${min} хв тому`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `${hrs} год тому`;
+  const days = Math.floor(hrs / 24);
+  return `${days} дн тому`;
+}
+
+/** Дзвіночок у шапці головної сторінки: відкриває шторку зі сповіщеннями з Telegram-каналів. */
+export function NotificationsBell() {
+  const { items, isLoading, error, fetchNotifications, markAllSeen, lastSeenCount } = useNotificationsStore();
+  const unseenCount = Math.max(0, items.length - lastSeenCount);
+  // items приходять від парсера відсортованими від найновіших — перші
+  // unseenCount записів і є тими, що користувач ще не бачив.
+  const hasUnseenAlert = items.slice(0, unseenCount).some((n) => n.kind === 'alert');
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  return (
+    <NotificationsBellButton
+      unseenCount={unseenCount}
+      hasUnseenAlert={hasUnseenAlert}
+      isLoading={isLoading}
+      error={error}
+      items={items}
+      onOpen={markAllSeen}
+    />
+  );
+}
+
+function NotificationsBellButton({
+  unseenCount,
+  hasUnseenAlert,
+  isLoading,
+  error,
+  items,
+  onOpen
+}: {
+  unseenCount: number;
+  hasUnseenAlert: boolean;
+  isLoading: boolean;
+  error: string | null;
+  items: ReturnType<typeof useNotificationsStore.getState>['items'];
+  onOpen: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true);
+          onOpen();
+        }}
+        aria-label="Сповіщення"
+        className={`relative p-2.5 rounded-2xl bg-surface-raised border transition-all active:scale-95 text-ink-text shadow-xs ${
+          hasUnseenAlert ? 'border-rose-500/50 animate-pulse' : 'border-border/40 hover:bg-surface-soft'
+        }`}
+      >
+        <Bell size={18} className={hasUnseenAlert ? 'text-rose-500' : undefined} />
+        {unseenCount > 0 && (
+          <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-extrabold flex items-center justify-center">
+            {unseenCount > 9 ? '9+' : unseenCount}
+          </span>
+        )}
+      </button>
+
+      <Sheet open={open} onClose={() => setOpen(false)} title="Сповіщення">
+        <NotificationsList items={items} isLoading={isLoading} error={error} />
+      </Sheet>
+    </>
+  );
+}
+
+function NotificationsList({
+  items,
+  isLoading,
+  error
+}: {
+  items: ReturnType<typeof useNotificationsStore.getState>['items'];
+  isLoading: boolean;
+  error: string | null;
+}) {
+  if (isLoading && items.length === 0) {
+    return (
+      <div className="space-y-3 py-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 rounded-2xl bg-muted/40 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-8 text-center">
+        <AlertCircle className="h-6 w-6 text-ink-muted/60" />
+        <p className="text-xs font-medium text-ink-muted">{error}</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-8 text-center">
+        <Rss className="h-6 w-6 text-ink-muted/60" />
+        <p className="text-xs font-medium text-ink-muted">Нових сповіщень немає</p>
+      </div>
+    );
+  }
+
+  // Термінові оголошення метрополітену (закриття/зупинка руху, повітряна
+  // тривога тощо) піднімаємо над рештою стрічки — саме заради цього парсер
+  // взагалі класифікує повідомлення @kh_metro.
+  const sorted = [...items].sort((a, b) => {
+    const aAlert = a.kind === 'alert' ? 1 : 0;
+    const bAlert = b.kind === 'alert' ? 1 : 0;
+    if (aAlert !== bAlert) return bAlert - aAlert;
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
+  return (
+    <div className="max-h-[55vh] space-y-2 overflow-y-auto -mx-1 px-1 py-1">
+      {sorted.map((n) => (
+        <a
+          key={n.id}
+          href={n.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`block rounded-2xl border p-3 transition-colors ${
+            n.kind === 'alert'
+              ? 'border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/15'
+              : 'border-border/40 bg-surface hover:bg-surface-soft'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="flex items-center gap-1.5 min-w-0">
+              {n.kind === 'alert' && (
+                <span className="shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
+                  Терміново
+                </span>
+              )}
+              <span className="text-[11px] font-bold text-primary truncate">{n.channelTitle}</span>
+            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] text-ink-muted">{timeAgo(n.date)}</span>
+              <ExternalLink className="h-3 w-3 text-ink-muted/60" />
+            </div>
+          </div>
+          <p className="text-xs text-ink-text/90 leading-relaxed line-clamp-3">
+            {n.text || (n.hasMedia ? '📎 Медіа-повідомлення' : '')}
+          </p>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** Компактний блок з останніми 3 повідомленнями прямо на головній сторінці. */
+export function NotificationsSection() {
+  const { items, isLoading, error, fetchNotifications } = useNotificationsStore();
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  if (!isLoading && !error && items.length === 0) return null;
+
+  return (
+    <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center gap-2 mb-3">
+        <Rss className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-extrabold text-ink-text">Сповіщення з каналів</h3>
+      </div>
+      <NotificationsList items={items.slice(0, 3)} isLoading={isLoading} error={error} />
+    </section>
+  );
+}
