@@ -961,6 +961,34 @@ export function LiveMetroPage() {
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
+  // Батчимо оновлення transform у requestAnimationFrame: без цього кожен
+  // "pointermove" одразу викликав setState, і на екранах/тачпадах зі
+  // швидкістю опитування 120–240 Гц React ре-рендерив частіше, ніж встигав
+  // намалювати кадр — звідси ривки замість плавного руху. rAF-петля сама
+  // підлаштовується під частоту оновлення дисплея (60/120 Гц), тож рух
+  // виходить плавним на будь-якому екрані.
+  const pendingTransformRef = useRef<Transform | null>(null);
+  const transformRafRef = useRef<number | null>(null);
+  const scheduleTransform = useCallback((updater: Transform | ((t: Transform) => Transform)) => {
+    const base = pendingTransformRef.current ?? transformRef.current;
+    const next = typeof updater === 'function' ? (updater as (t: Transform) => Transform)(base) : updater;
+    pendingTransformRef.current = next;
+    if (transformRafRef.current !== null) return;
+    transformRafRef.current = requestAnimationFrame(() => {
+      transformRafRef.current = null;
+      if (pendingTransformRef.current) {
+        setTransform(pendingTransformRef.current);
+        pendingTransformRef.current = null;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (transformRafRef.current !== null) cancelAnimationFrame(transformRafRef.current);
+    };
+  }, []);
+
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   // pinchState тепер утримує ще й екранну середину жесту та поточний зсув (x, y) на момент старту —
@@ -1078,7 +1106,7 @@ export function LiveMetroPage() {
       // Утримуємо нерухомою точку схеми, що була між пальцями на старті жесту —
       // саме тому масштабування раніше «зʼїжджало» в кут замість зуму в місці пальців.
       const scaleRatio = newScale / startScale;
-      setTransform({
+      scheduleTransform({
         x: midX - (midX - tx) * scaleRatio,
         y: midY - (midY - ty) * scaleRatio,
         scale: newScale
@@ -1092,10 +1120,10 @@ export function LiveMetroPage() {
       const dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 4) {
         isDraggingRef.current = true;
-        setTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
+        scheduleTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
       }
     }
-  }, []);
+  }, [scheduleTransform]);
 
   const endPointer = useCallback((e: PointerEvent<HTMLDivElement>) => {
     activePointers.current.delete(e.pointerId);
@@ -1336,10 +1364,23 @@ export function LiveMetroPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-2.5 border-t border-white/10 pt-2">
-              <div className="text-[11px] font-bold text-white/90">Працює з 5:30 до 24:00</div>
-              <div className="text-[9.5px] text-white/45">metro.kharkiv.ua · 0-800-505-685</div>
+            <div className="mt-2.5 border-t border-border/10 pt-2">
+              <div className="text-[11px] font-bold text-ink-text">Працює з 5:30 до 24:00</div>
+              <div className="text-[9.5px] text-ink-muted opacity-70">metro.kharkiv.ua · 0-800-505-685</div>
             </div>
+          </div>
+        )}
+
+        {/* Індикатор "метро зараз не працює" — без нього порожня схема (0
+            потягів) поза годинами 5:30–24:00 виглядає як зламана сторінка,
+            хоча насправді це просто нічна перерва в русі за розкладом. */}
+        {trains.length === 0 && !selectedTrain && !selectedStation && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[min(80vw,280px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border/10 bg-surface-raised/95 p-4 text-center shadow-2xl backdrop-blur-sm"
+          >
+            <TrainFront className="mx-auto h-7 w-7 text-ink-muted opacity-40" />
+            <p className="mt-2 text-sm font-bold text-ink-text">Метро зараз не курсує</p>
+            <p className="mt-1 text-xs text-ink-muted opacity-70">Рух поїздів — з 5:30 до 24:00 за розкладом</p>
           </div>
         )}
 

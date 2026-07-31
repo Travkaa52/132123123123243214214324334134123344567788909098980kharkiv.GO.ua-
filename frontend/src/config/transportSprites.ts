@@ -13,39 +13,43 @@ import type { SpriteSheetConfig } from '@/types/sprite';
  * Щоб підключити реальний спрайт-лист — просто відредагуйте значення тут,
  * без змін у компонентах.
  */
+// ПРИМІТКА: у /public/sprites лежать одиночні фото (JPG/PNG), а НЕ
+// нарізані по кадрах sprite sheet-и. Тому для всіх видів транспорту
+// використовуємо rotationMode: 'continuous' — один кадр на весь файл,
+// що плавно обертається CSS transform: rotate() за курсом.
 export const TRANSPORT_SPRITES: Record<TransportKind, SpriteSheetConfig> = {
   metro: {
     kind: 'metro',
-    src: '/sprites/metro.png',
-    frameWidth: 128,
-    frameHeight: 128,
-    columns: 8,
-    directions: 8,
-    rotationMode: 'frames',
+    src: '/sprites/metro.jpg',
+    frameWidth: 1264,
+    frameHeight: 843,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
     baseHeadingDeg: 0,
-    displaySize: 34,
+    displaySize: 38,
     anchor: { x: 0.5, y: 0.5 }
   },
   tram: {
     kind: 'tram',
-    src: '/sprites/tram.png',
-    frameWidth: 128,
-    frameHeight: 128,
-    columns: 8,
-    directions: 8,
-    rotationMode: 'frames',
+    src: '/sprites/tramvay.jpg',
+    frameWidth: 1024,
+    frameHeight: 1024,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
     baseHeadingDeg: 0,
     displaySize: 32,
     anchor: { x: 0.5, y: 0.5 }
   },
   trolleybus: {
     kind: 'trolleybus',
-    src: '/sprites/trolleybus.png',
-    frameWidth: 128,
-    frameHeight: 128,
-    columns: 8,
-    directions: 8,
-    rotationMode: 'frames',
+    src: '/sprites/trolley.jpg',
+    frameWidth: 1280,
+    frameHeight: 714,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
     baseHeadingDeg: 0,
     displaySize: 30,
     anchor: { x: 0.5, y: 0.5 }
@@ -53,11 +57,11 @@ export const TRANSPORT_SPRITES: Record<TransportKind, SpriteSheetConfig> = {
   bus: {
     kind: 'bus',
     src: '/sprites/bus.png',
-    frameWidth: 128,
-    frameHeight: 128,
-    columns: 8,
-    directions: 8,
-    rotationMode: 'frames',
+    frameWidth: 1264,
+    frameHeight: 843,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
     baseHeadingDeg: 0,
     displaySize: 30,
     anchor: { x: 0.5, y: 0.5 }
