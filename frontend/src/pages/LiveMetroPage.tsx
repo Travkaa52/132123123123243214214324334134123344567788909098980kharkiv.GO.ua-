@@ -961,34 +961,6 @@ export function LiveMetroPage() {
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
-  // Батчимо оновлення transform у requestAnimationFrame: без цього кожен
-  // "pointermove" одразу викликав setState, і на екранах/тачпадах зі
-  // швидкістю опитування 120–240 Гц React ре-рендерив частіше, ніж встигав
-  // намалювати кадр — звідси ривки замість плавного руху. rAF-петля сама
-  // підлаштовується під частоту оновлення дисплея (60/120 Гц), тож рух
-  // виходить плавним на будь-якому екрані.
-  const pendingTransformRef = useRef<Transform | null>(null);
-  const transformRafRef = useRef<number | null>(null);
-  const scheduleTransform = useCallback((updater: Transform | ((t: Transform) => Transform)) => {
-    const base = pendingTransformRef.current ?? transformRef.current;
-    const next = typeof updater === 'function' ? (updater as (t: Transform) => Transform)(base) : updater;
-    pendingTransformRef.current = next;
-    if (transformRafRef.current !== null) return;
-    transformRafRef.current = requestAnimationFrame(() => {
-      transformRafRef.current = null;
-      if (pendingTransformRef.current) {
-        setTransform(pendingTransformRef.current);
-        pendingTransformRef.current = null;
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (transformRafRef.current !== null) cancelAnimationFrame(transformRafRef.current);
-    };
-  }, []);
-
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   // pinchState тепер утримує ще й екранну середину жесту та поточний зсув (x, y) на момент старту —
@@ -1106,7 +1078,7 @@ export function LiveMetroPage() {
       // Утримуємо нерухомою точку схеми, що була між пальцями на старті жесту —
       // саме тому масштабування раніше «зʼїжджало» в кут замість зуму в місці пальців.
       const scaleRatio = newScale / startScale;
-      scheduleTransform({
+      setTransform({
         x: midX - (midX - tx) * scaleRatio,
         y: midY - (midY - ty) * scaleRatio,
         scale: newScale
@@ -1120,10 +1092,10 @@ export function LiveMetroPage() {
       const dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 4) {
         isDraggingRef.current = true;
-        scheduleTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
+        setTransform((t) => ({ ...t, x: drag.tx + dx, y: drag.ty + dy }));
       }
     }
-  }, [scheduleTransform]);
+  }, []);
 
   const endPointer = useCallback((e: PointerEvent<HTMLDivElement>) => {
     activePointers.current.delete(e.pointerId);
@@ -1364,9 +1336,9 @@ export function LiveMetroPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-2.5 border-t border-border/10 pt-2">
-              <div className="text-[11px] font-bold text-ink-text">Працює з 5:30 до 24:00</div>
-              <div className="text-[9.5px] text-ink-muted opacity-70">metro.kharkiv.ua · 0-800-505-685</div>
+            <div className="mt-2.5 border-t border-white/10 pt-2">
+              <div className="text-[11px] font-bold text-white/90">Працює з 5:30 до 24:00</div>
+              <div className="text-[9.5px] text-white/45">metro.kharkiv.ua · 0-800-505-685</div>
             </div>
           </div>
         )}
