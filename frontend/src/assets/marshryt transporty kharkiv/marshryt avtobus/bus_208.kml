@@ -1,0 +1,1006 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Автобусный маршрут №208 Харьков (м. Салтовское - ул. Генерала Удовиченко) kharkiv.inform.city</name>
+    <description>Более подробно https://kharkiv.inform.city/-ru/-tr/tr_city/tr_city_a/</description>
+    <Style id="icon-1499-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1499-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1499-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1499-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1499-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1499-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1499-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1499-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1499-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1499-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1532-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1532-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1532-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1532-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1532-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1532-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1532-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1532-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1532-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1532-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1587-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1587-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1587-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1587-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1587-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1587-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1587-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1587-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1587-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1587-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1626-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1626-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1626-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1626-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1626-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1626-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1626-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1626-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1626-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1626-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1670-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1670-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1670-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1670-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1670-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1670-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1670-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1670-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1670-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1670-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1720-000000-normal">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1720-000000-highlight">
+      <IconStyle>
+        <color>ff000000</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1720-000000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1720-000000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1720-000000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1720-A52714-normal">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1720-A52714-highlight">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1720-A52714">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1720-A52714-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1720-A52714-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-000000-4100-nodesc-normal">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>4.1</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-000000-4100-nodesc-highlight">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>6.15</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-000000-4100-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-000000-4100-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-000000-4100-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-A52714-5650-nodesc-normal">
+      <LineStyle>
+        <color>ff1427a5</color>
+        <width>5.65</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-A52714-5650-nodesc-highlight">
+      <LineStyle>
+        <color>ff1427a5</color>
+        <width>8.475</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-A52714-5650-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-A52714-5650-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-A52714-5650-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>Маршрут туда</name>
+      <Placemark>
+        <name>Линия маршрута 
+</name>
+        <styleUrl>#line-A52714-5650-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            36.3358832,50.0264355,0
+            36.3360709,50.0263976,0
+            36.3362909,50.0264217,0
+            36.3364357,50.0265251,0
+            36.3372618,50.0262425,0
+            36.3355988,50.0242643,0
+            36.3327611,50.0252155,0
+            36.3304168,50.0259978,0
+            36.3299233,50.0261288,0
+            36.3280672,50.0267353,0
+            36.3252562,50.0276313,0
+            36.3248056,50.0278105,0
+            36.3243175,50.0279415,0
+            36.3238293,50.0280414,0
+            36.3235504,50.0281207,0
+            36.3220805,50.0283826,0
+            36.3204658,50.0286514,0
+            36.3186741,50.0288616,0
+            36.3176441,50.0289684,0
+            36.3165122,50.029058,0
+            36.3146883,50.0291683,0
+            36.3126016,50.0292062,0
+            36.310311,50.0291649,0
+            36.3097477,50.0291545,0
+            36.307618,50.0291201,0
+            36.306293,50.0290994,0
+            36.3042706,50.0292579,0
+            36.3027525,50.029444,0
+            36.3027257,50.0294957,0
+            36.30301,50.0298472,0
+            36.3029832,50.0299471,0
+            36.3030744,50.0299954,0
+            36.3032246,50.0300953,0
+            36.3034606,50.0303813,0
+            36.3043189,50.0314151,0
+            36.3048768,50.0321181,0
+            36.305424,50.0327383,0
+            36.3057405,50.033014,0
+            36.3060034,50.033269,0
+            36.3064218,50.0336618,0
+            36.3069368,50.0341201,0
+            36.3073874,50.034475,0
+            36.3075644,50.034599,0
+            36.3081116,50.0348781,0
+            36.3085085,50.0351159,0
+            36.3087446,50.0352709,0
+            36.3088465,50.035333,0
+            36.3089055,50.0354053,0
+            36.308986,50.0355259,0
+            36.3090772,50.0356948,0
+            36.3091576,50.0359704,0
+            36.3093776,50.0365493,0
+            36.3096351,50.0371832,0
+            36.3099516,50.0379757,0
+            36.3104558,50.0391368,0
+            36.3109064,50.040198,0
+            36.3110995,50.0406011,0
+            36.3112605,50.040825,0
+            36.3115287,50.0411179,0
+            36.3121885,50.0418103,0
+            36.3127893,50.0424856,0
+            36.3136798,50.0435398,0
+            36.3140553,50.0441013,0
+            36.3142806,50.0444183,0
+            36.314624,50.0450211,0
+            36.3149244,50.0455241,0
+            36.3150746,50.0457032,0
+            36.3151604,50.04581,0
+            36.3153321,50.0459444,0
+            36.3155091,50.0459926,0
+            36.3157827,50.0460443,0
+            36.316067,50.0459582,0
+            36.3163835,50.0458066,0
+            36.3168878,50.0455861,0
+            36.3172525,50.0453898,0
+            36.3177622,50.0451727,0
+            36.3183737,50.0449557,0
+            36.3195056,50.0445974,0
+            36.3209057,50.0441633,0
+            36.3213724,50.0440772,0
+            36.3216514,50.0440634,0
+            36.3219303,50.0440841,0
+            36.3238669,50.0445216,0
+            36.3261897,50.0451589,0
+            36.3274825,50.0455172,0
+            36.3279653,50.0457032,0
+            36.3287431,50.0459995,0
+            36.3294673,50.046251,0
+            36.3300681,50.0463991,0
+            36.3306046,50.0465025,0
+            36.3315112,50.0466506,0
+            36.3329435,50.046778,0
+            36.3348371,50.0469365,0
+            36.3365752,50.0470984,0
+            36.3368809,50.0471329,0
+            36.3377124,50.0472844,0
+            36.3381362,50.0473912,0
+            36.3408345,50.0482352,0
+            36.3433397,50.0490378,0
+            36.3446272,50.0494925,0
+            36.3453192,50.0497784,0
+            36.3462848,50.0502847,0
+            36.3466388,50.0505259,0
+            36.3469231,50.0507842,0
+            36.347186,50.0510288,0
+            36.3475776,50.0515144,0
+            36.3478458,50.0517762,0
+            36.3481891,50.052069,0
+            36.3485003,50.0523101,0
+            36.3489992,50.052689,0
+            36.3500613,50.0534399,0
+            36.3503993,50.053681,0
+            36.3507909,50.0539117,0
+            36.350984,50.0539737,0
+            36.3512469,50.0539978,0
+            36.3512361,50.0541563,0
+            36.351279,50.0542941,0
+            36.3511771,50.0542183,0
+            36.351102,50.0541046,0
+            36.3509089,50.0540495,0
+            36.3507533,50.0539841,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Станция метро Салтовская
+</name>
+        <description>Автобус-208.</description>
+        <styleUrl>#icon-1499-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3358135,50.0264148,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Станция метро Салтовская 
+</name>
+        <description>Автобус-47, 63, 208.</description>
+        <styleUrl>#icon-1626-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3347286,50.0247295,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Пески</name>
+        <description>Автобус-47, 63, 208, 272. Троллейбус -12, 17.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3305604,50.0260942,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Барабашова 
+</name>
+        <description>Автобус-47, 63, 208, 272.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3236081,50.0282236,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Сосновый бор 
+</name>
+        <description>Автобус-47, 63, 208, 272.</description>
+        <styleUrl>#icon-1720-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3165486,50.029285,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Гинзбурга</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3036873,50.0305712,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка пер. Соколовский</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3090947,50.0355882,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Нижегородская</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3152751,50.0457881,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Челюскина</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3111251,50.0404442,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Генерала Удовиченка
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3220256,50.0440725,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Познанская
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3340867,50.046835,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Покровский храм
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1670-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3285077,50.0458153,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Колосиста 
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1587-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3417765,50.0484965,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Сечевых Стрелков
+</name>
+        <description>Автобус-31э, 308э</description>
+        <styleUrl>#icon-1532-A52714</styleUrl>
+        <Point>
+          <coordinates>
+            36.3479135,50.0515278,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Маршрут обратно</name>
+      <Placemark>
+        <name>Линия маршрута</name>
+        <styleUrl>#line-000000-4100-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            36.3507533,50.0539841,0
+            36.3493693,50.0530939,0
+            36.3477815,50.0518746,0
+            36.3473416,50.0514474,0
+            36.3468373,50.050855,0
+            36.3462151,50.0503865,0
+            36.3455177,50.0500076,0
+            36.3445306,50.049546,0
+            36.3428569,50.0489742,0
+            36.3400889,50.0481131,0
+            36.3378573,50.0474241,0
+            36.3369132,50.0472725,0
+            36.3360012,50.0471692,0
+            36.3342524,50.0469901,0
+            36.3328684,50.0468729,0
+            36.3312698,50.0467145,0
+            36.3303042,50.0465629,0
+            36.3291133,50.0462735,0
+            36.3283516,50.0459635,0
+            36.3267959,50.0454881,0
+            36.3254762,50.0450609,0
+            36.3238669,50.0446406,0
+            36.3225043,50.0443444,0
+            36.3216889,50.0441652,0
+            36.3212705,50.0441652,0
+            36.320777,50.0443237,0
+            36.3180841,50.0451574,0
+            36.3175262,50.0453848,0
+            36.3164747,50.0458877,0
+            36.3159705,50.046122,0
+            36.3153804,50.0461082,0
+            36.3151551,50.0459911,0
+            36.3148332,50.0456259,0
+            36.3142217,50.04462,0
+            36.3135672,50.0435658,0
+            36.3130093,50.0428975,0
+            36.3117755,50.0415745,0
+            36.3111425,50.0408648,0
+            36.3108099,50.040472,0
+            36.3107241,50.040162,0
+            36.3104988,50.03959,0
+            36.3098658,50.0381843,0
+            36.3092864,50.036751,0
+            36.3089216,50.0358069,0
+            36.3087285,50.0354417,0
+            36.3084496,50.0352349,0
+            36.3080526,50.0349937,0
+            36.3073552,50.0346629,0
+            36.3069475,50.0343391,0
+            36.305939,50.0333742,0
+            36.3049305,50.032375,0
+            36.3041473,50.0314308,0
+            36.3031388,50.0301764,0
+            36.3028706,50.0300455,0
+            36.3027096,50.0299214,0
+            36.3024414,50.0294803,0
+            36.3026667,50.0293494,0
+            36.303407,50.0292805,0
+            36.3038737,50.0292253,0
+            36.3048662,50.0291013,0
+            36.3054723,50.028991,0
+            36.3061912,50.0289393,0
+            36.3066659,50.0289203,0
+            36.3077093,50.0289496,0
+            36.3084281,50.0290255,0
+            36.3090611,50.0290461,0
+            36.3128162,50.0290875,0
+            36.3142539,50.0290324,0
+            36.3165498,50.0289565,0
+            36.3178266,50.0288187,0
+            36.3195003,50.0286464,0
+            36.3232339,50.0280537,0
+            36.324811,50.0276332,0
+            36.3259161,50.0272679,0
+            36.3301218,50.0259239,0
+            36.3308192,50.0256482,0
+            36.3345636,50.0244626,0
+            36.3356794,50.0241386,0
+            36.3374711,50.0263374,0
+            36.3355184,50.0268957,0
+            36.3352073,50.0269784,0
+            36.3351429,50.0267579,0
+            36.3354004,50.0266062,0
+            36.3355613,50.026558,0
+            36.3358135,50.0264512,0
+            36.3358832,50.0264355,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Генерала Удовиченко
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1499-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.350939,50.0541869,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Сечевых стрельцов
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3474774,50.0515727,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Колосиста
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1587-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3412281,50.0484814,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Познанская
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3335178,50.0470208,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Покровский храм
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1670-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3271463,50.0455777,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Генерала Удовиченко
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3212184,50.04421,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Нижегородская
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.314998,50.0457889,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Челюскина
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3109066,50.0406867,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка пер. Соколовский
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3088611,50.0356908,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Гинзбурга
+</name>
+        <description>Автобус-31, 208.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3031608,50.0302671,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Сосновый бор
+</name>
+        <description>Автобус-47, 63, 208, 272.</description>
+        <styleUrl>#icon-1720-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3161427,50.0288611,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка ул. Барабашова
+</name>
+        <description>Автобус-47, 63, 208, 272.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3252057,50.0274273,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Остановка Пески
+</name>
+        <description>Автобус-47, 63, 208, 272.</description>
+        <styleUrl>#icon-1532-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3311616,50.025568,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Станция метро Салтовская
+</name>
+        <description>Автобус-208.</description>
+        <styleUrl>#icon-1626-000000</styleUrl>
+        <Point>
+          <coordinates>
+            36.3362372,50.0266147,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
