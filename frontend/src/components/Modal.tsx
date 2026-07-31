@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -11,18 +11,39 @@ interface ModalProps {
 }
 
 /**
- * Єдине модальне вікно застосунку. Як і <Sheet />, завжди виїжджає знизу
- * екрана з плавною анімацією (slide-up + fade), використовується для
- * коротких інформаційних та формних модалок з профілю: "Про програму",
- * "Оцінити застосунок", "Політика конфіденційності", підтримка тощо.
+ * Єдине модальне вікно застосунку.
+ *
+ * Стиль і поведінка перенесені зі StationInfoCard (розділ "Живе метро") —
+ * найбільш відшліфованої картки в застосунку: тягнеться вниз за ручку
+ * (реальний drag, не лише анімація), плавно "доїжджає" й закривається з
+ * невеликою затримкою замість миттєвого зникнення, кругла кнопка
+ * закриття плаває поверх контенту, а не займає окремий рядок шапки.
  */
 export function Modal({ open, onClose, title, icon, children }: ModalProps) {
+  const [mounted, setMounted] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+
+  const closeAnimated = useCallback(() => {
+    setClosing(true);
+    window.setTimeout(() => {
+      setClosing(false);
+      onClose();
+    }, 220);
+  }, [onClose]);
+
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    if (open) {
+      setMounted(true);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeAnimated();
     document.addEventListener('keydown', onKey);
 
-    // Блокуємо скрол фону, поки модалка відкрита.
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -30,43 +51,85 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [mounted, closeAnimated]);
 
-  if (!open) return null;
+  const onHandlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    dragRef.current = { startY: e.clientY, currentY: e.clientY, dragging: true };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onHandlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    dragRef.current.currentY = e.clientY;
+    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
+    sheetRef.current.style.transform = `translateY(${dy}px)`;
+    sheetRef.current.style.transition = 'none';
+  };
+
+  const onHandlePointerUp = () => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
+    dragRef.current.dragging = false;
+    sheetRef.current.style.transition = '';
+    sheetRef.current.style.transform = '';
+    if (dy > 80) closeAnimated();
+  };
+
+  if (!mounted) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 animate-in fade-in duration-200 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        className={`absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 ${
+          closing ? 'opacity-0' : 'animate-fade-in opacity-100'
+        }`}
+        onClick={closeAnimated}
+        aria-hidden="true"
       />
 
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="glass-surface relative flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-t-xl3 shadow-glass-lg animate-sheet-up pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:rounded-xl3 sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-200 sm:pb-0"
+        onClick={(e) => e.stopPropagation()}
+        className={[
+          'relative flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden',
+          'rounded-t-[28px] border-t border-border/10 bg-surface-raised shadow-glass-lg',
+          'pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:rounded-[28px] sm:pb-0',
+          closing
+            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:opacity-0 sm:transition-opacity'
+            : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-200',
+        ].join(' ')}
       >
-        <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-ink-text/20 sm:hidden" />
+        {/* Ручка для перетягування вниз — закриває картку жестом, як у метро */}
+        <div
+          className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing sm:hidden"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+        >
+          <div className="h-1.5 w-10 rounded-full bg-ink-muted/25" />
+        </div>
+
+        <button
+          type="button"
+          onClick={closeAnimated}
+          aria-label="Закрити"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/80 text-ink-muted shadow-sm backdrop-blur transition-colors hover:bg-surface hover:text-ink-text active:scale-90"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
         {(title || icon) && (
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 px-5 py-3 sm:py-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {icon && <span className="shrink-0 text-primary/80">{icon}</span>}
-              {title && <h2 className="truncate text-title text-ink-text">{title}</h2>}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Закрити"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-muted/60 hover:text-ink-text active:scale-95"
-            >
-              <X className="h-4 w-4" />
-            </button>
+          <div className="flex shrink-0 items-center gap-2.5 px-5 pr-14 pt-3">
+            {icon && <span className="shrink-0 text-primary/80">{icon}</span>}
+            {title && <h2 className="truncate text-title text-ink-text">{title}</h2>}
           </div>
         )}
 
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto overscroll-contain px-5 pb-5 pt-3">{children}</div>
       </div>
     </div>,
     document.body
