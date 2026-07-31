@@ -41,6 +41,8 @@ const RouteFallback = memo(function RouteFallback() {
     <div 
       className="flex min-h-dvh w-full items-center justify-center bg-bg p-4"
       role="status"
+      aria-live="polite"
+      aria-busy="true"
       aria-label="Завантаження сторінки..."
     >
       <div className="glass-surface relative w-full max-w-md overflow-hidden rounded-2xl p-6 shadow-lg backdrop-blur-xl will-change-transform">
@@ -96,6 +98,7 @@ export default function App() {
   // в DOM (просто ховаємо через CSS) одразу після першого відвідування.
   const isMapRoute = location.pathname === '/map';
   const [mapMounted, setMapMounted] = useState(isMapRoute);
+
   useEffect(() => {
     if (isMapRoute) setMapMounted(true);
   }, [isMapRoute]);
@@ -131,7 +134,7 @@ export default function App() {
       </ErrorBoundary>
 
       {mapMounted && (
-        <div className={isMapRoute ? 'contents' : 'hidden'}>
+        <div className={isMapRoute ? 'w-full min-h-dvh' : 'hidden'}>
           <ErrorBoundary label="Карта">
             <Suspense fallback={<RouteFallback />}>
               <MapPage />
