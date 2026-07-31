@@ -1,4 +1,5 @@
 import type { TripPlan } from '@/data/localData';
+import { estimateTripMinutes } from '@/data/localData';
 import { getWalkingRoutesBatch } from '@/lib/osrmRouting';
 
 /**
@@ -67,19 +68,21 @@ export async function refineTripPlansWithOSM(
     if (transferPos !== -1) {
       legs[1] = { ...legs[1], transferWalkFromM: transferResults[transferPos].distanceM };
     }
-    return {
+    const updated: TripPlan = {
       ...plan,
       legs,
       boardWalkM: boardResults[i].distanceM,
-      alightWalkM: alightResults[i].distanceM
+      alightWalkM: alightResults[i].distanceM,
+      estimatedMinutes: plan.estimatedMinutes
     };
+    updated.estimatedMinutes = estimateTripMinutes(updated);
+    return updated;
   });
 
-  // Переупорядковуємо за фактичною сумарною ходьбою (включно з пересадкою),
-  // щоб найлегший реально маршрут завжди був першим у списку.
-  return refined.sort((a, b) => {
-    const totalA = a.boardWalkM + a.alightWalkM + (a.legs[1]?.transferWalkFromM ?? 0);
-    const totalB = b.boardWalkM + b.alightWalkM + (b.legs[1]?.transferWalkFromM ?? 0);
-    return totalA - totalB;
-  });
+  // Переупорядковуємо за реальним орієнтовним часом у дорозі (ходьба по
+  // вуличній мережі + очікування + сам рух + пересадка), а не лише за
+  // сумарною ходьбою — раніше маршрут з довшою поїздкою в салоні міг
+  // випереджати значно швидший варіант тільки тому, що до зупинки було
+  // на 20 метрів ближче пішки.
+  return refined.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
 }

@@ -228,6 +228,51 @@ export interface TripPlan {
   /** Пішки від останньої зупинки виходу до точки "Куди". */
   alightWalkM: number;
   transfersCount: number;
+  /** Орієнтовний загальний час поїздки, хв: ходьба + очікування + сам рух + пересадка. */
+  estimatedMinutes: number;
+}
+
+const WALK_SPEED_M_PER_MIN = 80; // ≈4.8 км/год — середній пішохідний темп у місті
+const TRANSFER_PENALTY_MIN = 3; // час на орієнтування/вихід на пересадці, окрім самої ходьби
+const MIN_WAIT_MIN = 2;
+const MAX_WAIT_MIN = 12;
+
+/** Середній час "перегону" між сусідніми зупинками (хв), включно з зупинкою на посадку/висадку. */
+const MINUTES_PER_STOP: Record<TransportKind, number> = {
+  metro: 2.0,
+  tram: 2.3,
+  trolleybus: 2.1,
+  bus: 1.9
+};
+
+/** Кількість зупинок, які фактично проїде пасажир на цій ділянці (за позицією в route.stopIds). */
+function stopsRiddenOnLeg(leg: TripLeg): number {
+  const boardIdx = leg.route.stopIds.indexOf(leg.boardStop.id);
+  const alightIdx = leg.route.stopIds.indexOf(leg.alightStop.id);
+  if (boardIdx === -1 || alightIdx === -1 || boardIdx === alightIdx) return 5; // розумний дефолт, якщо індекс не знайдено
+  return Math.abs(alightIdx - boardIdx);
+}
+
+/**
+ * Орієнтовний час усієї поїздки в хвилинах: ходьба (по прямій або, після
+ * refineTripPlansWithOSM, по вуличній мережі) + очікування транспорту
+ * (половина інтервалу руху, в розумних межах) + сам рух по маршруту
+ * (кількість зупинок × середній час перегону для цього виду транспорту) +
+ * штраф за пересадку. Це і є головна "розумна" метрика ранжування — не
+ * просто "хто ближче пішки", а хто реально довезе швидше.
+ */
+export function estimateTripMinutes(plan: TripPlan): number {
+  let minutes = (plan.boardWalkM + plan.alightWalkM) / WALK_SPEED_M_PER_MIN;
+
+  plan.legs.forEach((leg, i) => {
+    const wait = Math.min(MAX_WAIT_MIN, Math.max(MIN_WAIT_MIN, (leg.route.intervalMinutes || 10) / 2));
+    minutes += wait + stopsRiddenOnLeg(leg) * MINUTES_PER_STOP[leg.route.kind];
+    if (i > 0) {
+      minutes += TRANSFER_PENALTY_MIN + (leg.transferWalkFromM ?? 0) / WALK_SPEED_M_PER_MIN;
+    }
+  });
+
+  return Math.round(minutes);
 }
 
 /**
@@ -243,16 +288,27 @@ export function buildTripPlans(
   toLng: number,
   maxOptions = 6
 ): TripPlan[] {
-  const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions).map(
-    (o): TripPlan => ({
+  const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions).map((o): TripPlan => {
+    const plan: TripPlan = {
       legs: [{ route: o.route, boardStop: o.boardStop, alightStop: o.alightStop }],
       boardWalkM: o.boardDistanceM,
       alightWalkM: o.alightDistanceM,
-      transfersCount: 0
-    })
-  );
+      transfersCount: 0,
+      estimatedMinutes: 0
+    };
+    plan.estimatedMinutes = estimateTripMinutes(plan);
+    return plan;
+  });
 
-  if (direct.length >= maxOptions) return direct.slice(0, maxOptions);
+  // Пряму поїздку шукаємо ширшим "бюджетом" пересадкових варіантів лише
+  // тоді, коли прямих замало АБО коли найкращий прямий варіант виявляється
+  // повільнішим за типову поїздку з пересадкою — раніше пересадка взагалі
+  // не розглядалась, якщо прямих маршрутів було достатньо за кількістю,
+  // навіть якщо кожен з них об'їжджав пів міста.
+  const bestDirectMinutes = direct.length > 0 ? Math.min(...direct.map((p) => p.estimatedMinutes)) : Infinity;
+  if (direct.length >= maxOptions && bestDirectMinutes <= 25) {
+    return direct.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
+  }
 
   const RADII_M = [700, 1200, 2200];
   let transferPlans: TripPlan[] = [];
@@ -287,29 +343,35 @@ export function buildTripPlans(
             if (seenPairs.has(pairKey)) continue;
             seenPairs.add(pairKey);
 
-            candidates.push({
+            const plan: TripPlan = {
               legs: [
                 { route: route1, boardStop: board.stop, alightStop: transferStop },
                 { route: route2, boardStop: candidate.stop, alightStop: alight.stop, transferWalkFromM: candidate.walkM }
               ],
               boardWalkM: board.dist,
               alightWalkM: alight.dist,
-              transfersCount: 1
-            });
+              transfersCount: 1,
+              estimatedMinutes: 0
+            };
+            plan.estimatedMinutes = estimateTripMinutes(plan);
+            candidates.push(plan);
           }
         }
       }
     }
 
     if (candidates.length > 0) {
-      transferPlans = candidates
-        .sort((a, b) => a.boardWalkM + a.alightWalkM - (b.boardWalkM + b.alightWalkM))
-        .slice(0, maxOptions);
+      transferPlans = candidates.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
       break;
     }
   }
 
-  return [...direct, ...transferPlans].slice(0, maxOptions);
+  // Фінальне ранжування — усі варіанти (прямі й з пересадкою) разом,
+  // за реальним орієнтовним часом у дорозі. Раніше прямі маршрути завжди
+  // йшли першими незалежно від того, скільки часу вони насправді займали.
+  return [...direct, ...transferPlans]
+    .sort((a, b) => a.estimatedMinutes - b.estimatedMinutes)
+    .slice(0, maxOptions);
 }
 
 export const localRoutes = {
