@@ -1,0 +1,48 @@
+name: Telegram notifications feed
+
+# Оновлює public/data/notifications.json з публічних t.me/s/<канал> сторінок
+# і комітить результат назад у репозиторій. Жодного логіну/api_id/api_hash —
+# лише список каналів (змінна TELEGRAM_CHANNELS у Settings → Secrets and
+# variables → Actions).
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # раз на 10 хвилин; за потреби зробіть рідше/частіше
+  workflow_dispatch: {}       # дозволяє запустити вручну кнопкою "Run workflow"
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/scripts/parse-telegram-channels.mjs'
+      - '.github/workflows/telegram-notifications.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: telegram-notifications
+  cancel-in-progress: true
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Parse public Telegram channel previews
+        working-directory: frontend
+        env:
+          TELEGRAM_CHANNELS: ${{ secrets.TELEGRAM_CHANNELS || vars.TELEGRAM_CHANNELS }}
+          NOTIFICATIONS_LIMIT: ${{ vars.NOTIFICATIONS_LIMIT || '15' }}
+        run: node scripts/parse-telegram-channels.mjs
+
+      - name: Commit updated feed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/data/notifications.json
+          git diff --staged --quiet && echo "Нема змін" || git commit -m "chore: update telegram notifications feed [skip ci]"
+          git push
+

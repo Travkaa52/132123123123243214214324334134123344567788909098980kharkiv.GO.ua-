@@ -1,0 +1,59 @@
+name: Telegram Bot (support + затримки)
+
+# Немає постійного сервера — цей workflow періодично "прокидається",
+# забирає нові повідомлення боту (getUpdates), обробляє їх і комітить
+# оновлений frontend/public/data/route-alerts.json назад у репозиторій,
+# який GitHub Pages роздає як звичайний статичний файл (той самий шлях,
+# що й frontend/public/data/notifications.json у telegram-notifications.yml).
+#
+# Альтернатива для near-real-time відповідей: bot/telegram_bot.py — той
+# самий протокол даних, але постійний процес (для VPS/локального запуску),
+# див. bot/README.md.
+#
+# УВАГА: мінімальний практичний інтервал для scheduled workflow в GitHub
+# Actions — приблизно 5 хвилин (і GitHub може затримувати запуск під
+# навантаженням, до 10-15 хв у пікові моменти) — тобто відповідь
+# адміна користувачу і оновлення банера про затримку можуть з'явитись
+# із затримкою в кілька хвилин, а не миттєво.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Process Telegram bot updates
+        working-directory: frontend
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_IDS: ${{ secrets.ADMIN_CHAT_IDS }}
+          DELAY_REPORT_THRESHOLD: ${{ vars.DELAY_REPORT_THRESHOLD || '5' }}
+          DELAY_REPORT_WINDOW_MINUTES: ${{ vars.DELAY_REPORT_WINDOW_MINUTES || '60' }}
+          DELAY_ALERT_DURATION_HOURS: ${{ vars.DELAY_ALERT_DURATION_HOURS || '2' }}
+        run: node scripts/process-telegram-bot.mjs
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/data-runtime frontend/public/data/route-alerts.json
+          git diff --cached --quiet || git commit -m "chore: process telegram bot updates [skip ci]"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
