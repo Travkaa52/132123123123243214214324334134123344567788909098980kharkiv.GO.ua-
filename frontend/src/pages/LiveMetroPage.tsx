@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getStationPhoto } from '@/data/stationPhotos';
 import { TIMETABLES } from '@/liveMetro/timetableData';
+import { realStationId } from '@/liveMetro/stationIdMap';
 import stopsData from '@/data/stops.json';
 
 // =============================================================================
@@ -70,42 +71,6 @@ export { getStationPhoto };
 // з фотографій табло на станціях) і `data/stops.json` (реальна геолокація) —
 // використовують канонічний id вигляду `stop-metro-<slug>`. Це відображення
 // з'єднує схему з обома джерелами один раз, а не мапить кожен виклик окремо.
-const TIMETABLE_STATION_ID: Record<string, string> = {
-  'kholodna-hora': 'stop-metro-holodna-gora',
-  vokzalna: 'stop-metro-vokzalna',
-  'tsentralnyi-rynok': 'stop-metro-tsentralnyi-rynok',
-  'maidan-konstytutsii': 'stop-metro-maidan-konstytutsii',
-  levada: 'stop-metro-levada',
-  sportyvna: 'stop-metro-sportyvna',
-  zavodska: 'stop-metro-zavodska',
-  turboatom: 'stop-metro-turboatom',
-  'palats-sportu': 'stop-metro-palats-sportu',
-  armiiska: 'stop-metro-armiiska',
-  'imeni-maselskoho': 'stop-metro-imeni-o-s-maselskogo',
-  'traktornyi-zavod': 'stop-metro-traktornyi-zavod',
-  industrialna: 'stop-metro-industrialna',
-  saltivska: 'stop-metro-saltivska',
-  studentska: 'stop-metro-studentska',
-  'akademika-pavlova': 'stop-metro-akademika-pavlova',
-  'akademika-barabashova': 'stop-metro-akademika-barabashova',
-  kyivska: 'stop-metro-kyivska',
-  'yaroslava-mudroho': 'stop-metro-iaroslava-mudrogo',
-  universytet: 'stop-metro-universytet',
-  'istorychnyi-muzei': 'stop-metro-istorychnyi-muzei',
-  peremoha: 'stop-metro-peremoga',
-  oleksiivska: 'stop-metro-oleksiivska',
-  '23-serpnia': 'stop-metro-23-serpnia',
-  'botanichnyi-sad': 'stop-metro-botanichnyi-sad',
-  naukova: 'stop-metro-naukova',
-  derzhprom: 'stop-metro-derzhprom',
-  'arkhitektora-beketova': 'stop-metro-arhitektora-beketova',
-  'zakhysnykiv-ukrainy': 'stop-metro-zahysnykiv-ukrainy',
-  metrobudivnykiv: 'stop-metro-metrobudivnykiv',
-};
-
-function realStationId(schematicStationId: string): string {
-  return TIMETABLE_STATION_ID[schematicStationId] ?? schematicStationId;
-}
 
 /** "HH:MM" -> секунди від півночі. */
 function timeStrToSec(time: string): number {
