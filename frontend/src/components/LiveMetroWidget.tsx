@@ -8,6 +8,7 @@ import {
 } from '@/liveMetro/liveMetroEngine';
 import { METRO_STATION_GEO, haversineMeters } from '@/liveMetro/metroStationsGeo';
 import { schematicStationId } from '@/liveMetro/stationIdMap';
+import { getMetroDirectionSprite } from '@/config/metroDirectionSprites';
 import type { GeoPoint } from '@/types/transport';
 
 interface LiveMetroWidgetProps {
@@ -308,8 +309,22 @@ function TrackLine({ label, arrival, nowSec, directionName, reverse = false }: T
               boxShadow: `0 0 10px ${arrival.lineColor}aa`
             }}
           >
-            {/* Спрайт / Іконка потяга */}
-            <span className="text-xs">🚈</span>
+            {/* Спрайт потяга — підбирається за кольором лінії та напрямком руху
+                (кінцевою станцією); якщо для лінії немає напрямкового спрайту —
+                фолбек на емодзі, щоб віджет лишався робочим. */}
+            {(() => {
+              const sprite = getMetroDirectionSprite(arrival.lineId, arrival.direction);
+              return sprite ? (
+                <img
+                  src={sprite}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 rounded-sm object-cover ring-1 ring-white/40"
+                />
+              ) : (
+                <span className="text-xs">🚈</span>
+              );
+            })()}
             <span className="text-[9px] whitespace-nowrap">
               {isAtStation ? 'На станції' : `${Math.ceil(arrival.etaSec / 60)} хв`}
             </span>

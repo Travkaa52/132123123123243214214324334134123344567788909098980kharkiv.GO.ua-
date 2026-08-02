@@ -14,6 +14,7 @@ import {
 import { getStationPhoto } from '@/data/stationPhotos';
 import { TIMETABLES } from '@/liveMetro/timetableData';
 import { realStationId } from '@/liveMetro/stationIdMap';
+import { getMetroDirectionSprite } from '@/config/metroDirectionSprites';
 import stopsData from '@/data/stops.json';
 
 // =============================================================================
@@ -117,6 +118,8 @@ export interface LiveMetroTrain {
   lineId: string;
   lineNumber: number;
   lineColor: string;
+  /** Напрямок руху: 'forward' — до останньої станції списку лінії, 'backward' — до першої. */
+  direction: 'forward' | 'backward';
   headsign: string;
   point: SchematicPoint;
   headingDeg: number;
@@ -802,6 +805,7 @@ function computeActiveTrains(nowSec: number, dayType: LiveMetroDayType): LiveMet
           lineId: line.id,
           lineNumber: LINE_NUMBERS[line.id],
           lineColor: LINE_COLORS[line.id],
+          direction: dir,
           headsign,
           point,
           headingDeg: heading,
@@ -1507,7 +1511,14 @@ function TrainMarker({
   selected: boolean;
   onClick: () => void;
 }) {
-  const spriteSrc = TRAIN_SPRITES[train.lineId] ?? assetUrl('/sprites/metro-red-line.jpg');
+  // Спершу пробуємо спрайт, підібраний за лінією (кольором) І напрямком руху
+  // (наприклад, потяг червоної лінії, що прямує до Індустріальної, отримує
+  // metro-red-line-indystrialna.png). Якщо для лінії нема напрямкових
+  // спрайтів — фолбек на єдиний спрайт лінії, а потім на червону лінію.
+  const spriteSrc =
+    getMetroDirectionSprite(train.lineId, train.direction) ??
+    TRAIN_SPRITES[train.lineId] ??
+    assetUrl('/sprites/metro-red-line.jpg');
   const isDwell = train.phase === 'dwell';
   const facingLeft = train.headingDeg > 90 && train.headingDeg < 270;
   const size = selected ? 36 : 28;
