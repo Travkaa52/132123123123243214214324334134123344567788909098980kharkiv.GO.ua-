@@ -3,33 +3,41 @@
  * scripts/process-telegram-bot.mjs
  * ---------------------------------------------------------------------------
  * Замінює собою "живого" бота. Оскільки застосунок живе на GitHub Pages
- * (тільки статичні файли) і GitHub Actions (задачі за розкладом, а не
- * процес, що постійно слухає з'єднання), окремого сервера з long polling
- * тут бути не може. Замість цього:
+ * (тільки статичні файли), окремого завжди-увімкненого сервера тут бути не
+ * може — натомість цей скрипт запускається за розкладом
+ * (.github/workflows/telegram-bot.yml) і, поки виконується завдання Actions,
+ * РЕАЛЬНО тримає long-polling з'єднання до Telegram (getUpdates із
+ * timeout — сервер Telegram сам тримає HTTP-запит відкритим, поки не
+ * прийде нове повідомлення або не вийде час) — тобто всередині одного
+ * запуску нема затримки в кілька хвилин, повідомлення обробляються
+ * практично миттєво. Сам запуск повторюється кожні RUN_INTERVAL_HOURS
+ * (за замовчуванням раз на 3 години) і триває до RUN_DURATION_MINUTES
+ * (за замовчуванням ~1 годину) — це свідомий компроміс: наживо бот
+ * "чергує" годину раз на три, замість того, щоб бути увімкненим 24/7
+ * (для чого знадобився б окремий постійний сервер, а не GitHub Actions).
  *
- *   - Цей скрипт запускається за розкладом (.github/workflows/telegram-bot.yml,
- *     раз на кілька хвилин) і один раз забирає нові events через
- *     Telegram Bot API (getUpdates), обробляє їх і завершується.
- *   - Користувач НЕ пише нікуди в застосунок напряму — кнопки в Mini App
- *     ("Повідомити про затримку", "Зв'язок з підтримкою") відкривають чат
- *     із ботом у Telegram (deep link t.me/<bot>?text=...) із заздалегідь
- *     заповненим повідомленням. Користувач сам тисне "Надіслати" в
- *     Telegram — так з'являється звичайне повідомлення від нього боту,
- *     яке цей скрипт забере на наступному запуску.
- *   - Адмін відповідає користувачу звичайним Reply в Telegram — це
- *     повністю нативний Telegram-досвід, без жодної веб-форми.
- *   - Результати (активні оголошення про затримку) складаються у
- *     public/data/route-alerts.json і комітяться назад у репозиторій —
- *     так само, як вже зроблено для notifications.json. GitHub Pages
- *     віддає цей файл як звичайний статичний JSON.
+ *   - Кнопки в Mini App ("Повідомити про затримку", "Зв'язок з підтримкою")
+ *     відкривають чат із ботом у Telegram (deep link t.me/<bot>?text=...)
+ *     із заздалегідь заповненим повідомленням. Користувач сам тисне
+ *     "Надіслати" — з'являється звичайне повідомлення боту.
+ *   - Адмін відповідає користувачу звичайним Reply в Telegram.
+ *   - Активні оголошення про затримку складаються у
+ *     public/data/route-alerts.json і комітяться в репозиторій одразу
+ *     після кожного циклу обробки (не лише в кінці запуску) — так банер
+ *     "Можлива затримка" з'являється в застосунку за лічені хвилини, а не
+ *     чекає до кінця годинного вікна.
  *   - Технічний стан бота (offset для getUpdates, сирі скарги на
  *     затримку, відповідність "повідомлення в чаті адміна -> user id")
- *     зберігається в data-runtime/*.json — це не публічні дані, у
- *     public/ вони не потрапляють.
+ *     зберігається в data-runtime/*.json — не публічні дані, у public/ не
+ *     потрапляють.
  * ---------------------------------------------------------------------------
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
+
+const execFileAsync = promisify(execFile);
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_IDS = (process.env.ADMIN_CHAT_IDS || '')
@@ -41,6 +49,16 @@ const ADMIN_CHAT_IDS = (process.env.ADMIN_CHAT_IDS || '')
 const DELAY_REPORT_THRESHOLD = Number(process.env.DELAY_REPORT_THRESHOLD || 5);
 const DELAY_REPORT_WINDOW_MINUTES = Number(process.env.DELAY_REPORT_WINDOW_MINUTES || 60);
 const DELAY_ALERT_DURATION_HOURS = Number(process.env.DELAY_ALERT_DURATION_HOURS || 2);
+
+// Скільки хвилин тримати активне long-polling з'єднання протягом одного
+// запуску Actions (job має свій ліміт часу — див. timeout-minutes у
+// workflow, тримаємо цей запас, щоб встигнути закомітити перед killʼом).
+const RUN_DURATION_MINUTES = Number(process.env.RUN_DURATION_MINUTES || 55);
+// Таймаут одного виклику getUpdates (Telegram long polling), секунд.
+const POLL_TIMEOUT_SECONDS = Number(process.env.POLL_TIMEOUT_SECONDS || 25);
+// Коміт+push у git після кожного циклу, у якому реально щось змінилось —
+// вимкнути можна, якщо запускаєте скрипт поза git-репозиторієм.
+const AUTO_GIT_PUSH = (process.env.AUTO_GIT_PUSH ?? 'true').toLowerCase() !== 'false';
 
 const RUNTIME_DIR = path.resolve('data-runtime');
 const PUBLIC_ALERTS_PATH = path.resolve('public/data/route-alerts.json');
@@ -70,6 +88,27 @@ async function readJson(file, fallback) {
 async function writeJson(file, data) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
+async function gitCommitAndPush(message) {
+  if (!AUTO_GIT_PUSH) return;
+  try {
+    await execFileAsync('git', ['add', 'data-runtime', 'public/data/route-alerts.json']);
+    try {
+      // Якщо нема staged-змін — diff поверне 0 і кине помилку в execFile
+      // (exit code 0 означає "нема різниці" для --quiet, тобто НЕ кидати коміт).
+      await execFileAsync('git', ['diff', '--cached', '--quiet']);
+      return; // нема змін
+    } catch {
+      // diff --quiet повернув ненульовий код -> є зміни -> комітимо нижче
+    }
+    await execFileAsync('git', ['commit', '-m', message]);
+    await execFileAsync('git', ['pull', '--rebase', '--autostash', 'origin', process.env.GITHUB_REF_NAME || 'main']);
+    await execFileAsync('git', ['push', 'origin', `HEAD:${process.env.GITHUB_REF_NAME || 'main'}`]);
+    console.log(`[bot] Закомічено та запушено: ${message}`);
+  } catch (err) {
+    console.error('[bot] Не вдалося закомітити/запушити зміни:', err?.stderr || err?.message || err);
+  }
 }
 
 // --- Telegram Bot API ---------------------------------------------------
@@ -111,15 +150,11 @@ const DELAY_TAG_RE = /^#delay:([a-z_]+):([^\s#]+)#\s*/;
 // але дозволяє показати гарний текст адміну): "#support#"
 const SUPPORT_TAG_RE = /^#support#\s*/;
 
-async function main() {
-  if (!BOT_TOKEN) {
-    console.log('BOT_TOKEN не задано (секрет репозиторію) — пропускаю запуск.');
-    return;
-  }
-  if (!ADMIN_CHAT_IDS.length) {
-    console.log('ADMIN_CHAT_IDS не задано — нема кому надсилати сповіщення.');
-  }
-
+/**
+ * Один цикл: getUpdates (з реальним long-polling timeout), обробка,
+ * запис файлів. Повертає true, якщо щось реально змінилося (є сенс комітити).
+ */
+async function processCycle() {
   const offsetState = await readJson(OFFSET_FILE, { lastUpdateId: 0 });
   let delayReports = await readJson(DELAY_REPORTS_FILE, []);
   let supportMap = await readJson(SUPPORT_MAP_FILE, []); // [{chatId, messageId, userId}]
@@ -130,10 +165,14 @@ async function main() {
 
   const updatesRes = await tg('getUpdates', {
     offset: offsetState.lastUpdateId + 1,
-    timeout: 0,
+    timeout: POLL_TIMEOUT_SECONDS,
     allowed_updates: ['message', 'callback_query']
   });
   const updates = updatesRes.ok ? updatesRes.result : [];
+
+  if (!updates.length) {
+    return false; // нічого не прийшло цим циклом — не чіпаємо файли й git
+  }
 
   for (const update of updates) {
     offsetState.lastUpdateId = Math.max(offsetState.lastUpdateId, update.update_id);
@@ -170,7 +209,11 @@ async function main() {
       );
       if (mapping) {
         await sendMessage(mapping.userId, `💬 Відповідь від підтримки Kharkiv GO:\n\n${message.text}`);
-        await tg('sendMessage', { chat_id: message.chat.id, text: '✅ Відповідь надіслано користувачу.', reply_to_message_id: message.message_id });
+        await tg('sendMessage', {
+          chat_id: message.chat.id,
+          text: '✅ Відповідь надіслано користувачу.',
+          reply_to_message_id: message.message_id
+        });
       }
       continue;
     }
@@ -272,6 +315,8 @@ async function main() {
   await writeJson(PENDING_PROMPTS_FILE, pendingPrompts);
   await writeJson(PUBLIC_ALERTS_PATH, { updatedAt: new Date().toISOString(), items: alerts });
 
+  return true;
+
   // --- вкладені функції, яким треба читати/писати alerts/pendingPrompts ----
 
   async function handleCallbackQuery(cq) {
@@ -337,6 +382,43 @@ async function main() {
     });
     return sendMessage(message.chat.id, `✅ Оголошення створено для маршруту ${routeNumber} на ${DELAY_ALERT_DURATION_HOURS} год.`);
   }
+}
+
+async function main() {
+  if (!BOT_TOKEN) {
+    console.log('BOT_TOKEN не задано (секрет репозиторію) — пропускаю запуск.');
+    return;
+  }
+  if (!ADMIN_CHAT_IDS.length) {
+    console.log('ADMIN_CHAT_IDS не задано — нема кому надсилати сповіщення.');
+  }
+
+  const deadline = Date.now() + RUN_DURATION_MINUTES * 60 * 1000;
+  let cycles = 0;
+
+  console.log(
+    `[bot] Старт чергування на ${RUN_DURATION_MINUTES} хв (long-polling по ${POLL_TIMEOUT_SECONDS}с за раз).`
+  );
+
+  // Реальний довгий "чат-режим": поки не вийшов ліміт часу цього запуску,
+  // безперервно тримаємо getUpdates-з'єднання відкритим — нові повідомлення
+  // від користувачів чи Reply адміна обробляються практично миттєво, а не
+  // раз на кілька хвилин.
+  while (Date.now() < deadline) {
+    cycles += 1;
+    let changed = false;
+    try {
+      changed = await processCycle();
+    } catch (err) {
+      console.error('[bot] Помилка в циклі обробки:', err);
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    if (changed) {
+      await gitCommitAndPush('chore: process telegram bot updates [skip ci]');
+    }
+  }
+
+  console.log(`[bot] Завершено. Циклів опитування: ${cycles}.`);
 }
 
 main().catch((err) => {
