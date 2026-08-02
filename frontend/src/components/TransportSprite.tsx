@@ -5,6 +5,7 @@ import { useSpriteImage } from '@/hooks/useSpriteImage';
 import { computeSpriteGeometry, pickFrameIndex } from '@/lib/sprite';
 import { RouteDisplay } from '@/components/RouteDisplay';
 import type { TransportKind, VehicleState } from '@/types/transport';
+import type { SpriteSheetConfig } from '@/types/sprite';
 
 export interface TransportSpriteProps {
   kind: TransportKind;
@@ -17,6 +18,8 @@ export interface TransportSpriteProps {
   state: VehicleState;
   selected?: boolean;
   onClick?: () => void;
+  /** Використати конкретний спрайт замість єдиного дефолтного для kind (напр. власний спрайт лінії метро). */
+  spriteConfig?: SpriteSheetConfig;
 }
 
 /**
@@ -43,9 +46,10 @@ function TransportSpriteComponent({
   y,
   state,
   selected = false,
-  onClick
+  onClick,
+  spriteConfig
 }: TransportSpriteProps) {
-  const config = TRANSPORT_SPRITES[kind];
+  const config = spriteConfig ?? TRANSPORT_SPRITES[kind];
   const imageState = useSpriteImage(config.src);
   const spriteReady = imageState === 'loaded';
 

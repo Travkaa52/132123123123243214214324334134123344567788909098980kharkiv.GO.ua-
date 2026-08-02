@@ -4,6 +4,7 @@ import { Train } from 'lucide-react';
 import { useMetroSimulation } from '@/hooks/useMetroSimulation';
 import type { MetroRenderFrame } from '@/metro/MetroRenderer';
 import { TransportSprite } from '@/components/TransportSprite';
+import { METRO_LINE_SPRITES, TRANSPORT_SPRITES } from '@/config/transportSprites';
 
 interface ScreenFrame {
   frame: MetroRenderFrame;
@@ -131,6 +132,7 @@ const MetroTrainMarker = memo(function MetroTrainMarker({ frame, x, y, selected,
         state={isDwell ? 'stopped' : 'moving'}
         selected={selected}
         onClick={onClick}
+        spriteConfig={METRO_LINE_SPRITES[snapshot.lineId] ?? TRANSPORT_SPRITES.metro}
       />
 
       {/* Кольоровий бейдж лінії над спрайтом */}
