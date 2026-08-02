@@ -24,7 +24,7 @@ export function PageTransition({ pathKey, children }: { pathKey: string; childre
   }, []);
 
   return (
-    <div key={pathKey} className={reduceMotion ? undefined : 'animate-page-in will-change-transform'}>
+    <div key={pathKey} className={reduceMotion ? undefined : 'animate-page-in'}>
       {children}
     </div>
   );
