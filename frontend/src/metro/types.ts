@@ -1,5 +1,4 @@
 import type { GeoPoint, TransportRoute } from '@/types/transport';
-import type { MetroStation } from '@/metro/MetroStation';
 
 /**
  * Напрямок руху вздовж лінії метро.
@@ -89,8 +88,8 @@ export interface MetroLineJson extends TransportRoute {
 
 /** Один сегмент маршруту (перегін між сусідніми станціями) з готовою геометрією та часовою розкладкою. */
 export interface MetroRouteSegment {
-  fromStation: MetroStation;
-  toStation: MetroStation;
+  fromStation: MetroStationData;
+  toStation: MetroStationData;
   /** Контрольна точка Без'є для цього перегону, якщо задана в даних лінії. */
   controlPoint?: GeoPoint;
   /** Секунда відправлення з fromStation (від початку рейсу). */

@@ -13,8 +13,13 @@ import {
 } from 'lucide-react';
 import { getStationPhoto } from '@/data/stationPhotos';
 import { TIMETABLES } from '@/liveMetro/timetableData';
-import { realStationId } from '@/liveMetro/stationIdMap';
+import { realStationId, schematicStationId } from '@/liveMetro/stationIdMap';
 import { getMetroDirectionSprite } from '@/config/metroDirectionSprites';
+import {
+  getActiveTrains as getSharedActiveTrains,
+  effectiveOperatingSec
+} from '@/liveMetro/liveMetroEngine';
+import { DWELL_SEC as SHARED_DWELL_SEC } from '@/liveMetro/schematicData';
 import stopsData from '@/data/stops.json';
 
 // =============================================================================
@@ -556,6 +561,17 @@ export const BUILT_LINES: { line: SchematicLine }[] = [
   },
 ];
 
+/**
+ * Плаский індекс усіх станцій схеми за коротким id ('kholodna-hora', 'saltivska', ...).
+ * Потрібен, щоб перекласти потяг, порахований спільним рушієм руху
+ * (`@/liveMetro/liveMetroEngine`, працює з канонічними id `stop-metro-<slug>`),
+ * на координати ЦІЄЇ схеми (тут — власна система координат VIEW_W×VIEW_H,
+ * відмінна від `@/liveMetro/schematicData`).
+ */
+const ALL_LOCAL_STATIONS: Record<string, SchematicStation> = Object.fromEntries(
+  [...LINE1_STATIONS, ...LINE2_STATIONS, ...LINE3_STATIONS].map((s) => [s.id, s])
+);
+
 // =============================================================================
 // ДОПОМІЖНІ ФУНКЦІЇ
 // =============================================================================
@@ -707,134 +723,75 @@ export function getUpcomingArrivalsForStation(
 }
 
 // =============================================================================
-// ХУК: useLiveMetroTrains — позиції поїздів рахуються з реального графіка
-// відправлень (TIMETABLES), а не випадковою симуляцією.
+// ХУК: useLiveMetroTrains — рух рахує спільний рушій @/liveMetro/liveMetroEngine
+// (реальні відправлення з TIMETABLES, де вони є, і рівномірний інтервал-фолбек,
+// де їх нема) — а тут лише перекладаємо його результат у координати ЦІЄЇ схеми.
 // =============================================================================
 
-/** Кеш профілів часу прибуття на кожну станцію напрямку, по кожному рейсу дня. */
-const runProfileCache = new Map<string, { times: number[][]; stations: SchematicStation[] }>();
+/**
+ * Перекладає один потяг зі спільного рушія (координати/id зі `@/liveMetro/schematicData`)
+ * у координати локальної схеми `/metro/live` (LINE1_STATIONS/LINE2_STATIONS/LINE3_STATIONS).
+ * Повертає null, якщо для якоїсь зі станцій перегону немає відповідника в локальній
+ * схемі (не мало б траплятись — усі 30 станцій змасковані в stationIdMap.ts).
+ */
+function mapSharedTrainToLocal(
+  t: ReturnType<typeof getSharedActiveTrains>[number],
+  effectiveNowSec: number
+): LiveMetroTrain | null {
+  const localFrom = ALL_LOCAL_STATIONS[schematicStationId(t.previousStation.id)];
+  const localTo = ALL_LOCAL_STATIONS[schematicStationId(t.nextStation.id)];
+  if (!localFrom || !localTo) return null;
 
-function getRunProfile(
-  lineId: string,
-  stations: SchematicStation[],
-  direction: 'forward' | 'backward',
-  dayType: LiveMetroDayType
-): { times: number[][]; stations: SchematicStation[] } {
-  const key = `${lineId}:${direction}:${dayType}`;
-  const cached = runProfileCache.get(key);
-  if (cached) return cached;
+  // Межі поточного перегону у секундах ВІД ПОЧАТКУ РЕЙСУ (як у sampleTrainAt рушія):
+  // на першій станції рейс стартує одразу (0с), на решті — після стоянки (DWELL_SEC).
+  const isFirstSegment = t.previousStation.arrivalOffsetSec === 0;
+  const segStartRel = isFirstSegment ? 0 : t.previousStation.arrivalOffsetSec + SHARED_DWELL_SEC;
+  const segEndRel = t.nextStation.arrivalOffsetSec;
+  const segDurRel = Math.max(1, segEndRel - segStartRel);
 
-  // Для кожної станції маршруту — реальний список відправлень (сек. від півночі), відсортований.
-  const perStationTimes = stations.map((s) => {
-    const realId = realStationId(s.id);
-    const entry = TIMETABLES[dayType]?.[realId]?.[lineId];
-    const list = entry?.[direction] ?? [];
-    return list.map(timeStrToSec).sort((a, b) => a - b);
-  });
+  const elapsedTripSec = effectiveNowSec - t.departureAtSec;
+  const rawProgress = Math.min(1, Math.max(0, (elapsedTripSec - segStartRel) / segDurRel));
+  const isDwell = t.phase === 'dwell';
 
-  const maxRuns = Math.max(0, ...perStationTimes.map((t) => t.length));
-  // times[k] = масив часів (по станціях, у порядку маршруту) для k-го рейсу дня.
-  const times: number[][] = [];
-  for (let k = 0; k < maxRuns; k++) {
-    const row = perStationTimes.map((list) => (list.length ? list[Math.min(k, list.length - 1)] : NaN));
-    // Рейс валідний, лише якщо часи не спадають вздовж маршруту (захист від зіпсованих даних).
-    let valid = !row.some((v) => Number.isNaN(v));
-    for (let i = 1; valid && i < row.length; i++) {
-      if (row[i] < row[i - 1]) valid = false;
-    }
-    if (valid) times.push(row);
-  }
+  const easedT = easeInOutCubic(rawProgress);
+  const point = isDwell ? localTo.point : lerpPoint(localFrom.point, localTo.point, easedT);
+  const heading = angleBetween(localFrom.point, localTo.point);
 
-  const result = { times, stations };
-  runProfileCache.set(key, result);
-  return result;
+  const distanceMeters = segmentDistanceMeters(localFrom.id, localTo.id);
+  const instSpeedMps = isDwell ? 0 : (distanceMeters * easeInOutCubicDerivative(rawProgress)) / segDurRel;
+  const speedKmh = Math.min(MAX_TRAIN_SPEED_KMH, instSpeedMps * 3.6);
+
+  return {
+    id: t.id,
+    lineId: t.lineId,
+    lineNumber: LINE_NUMBERS[t.lineId],
+    lineColor: LINE_COLORS[t.lineId],
+    direction: t.direction,
+    headsign: t.headsign,
+    point,
+    headingDeg: heading,
+    speedRatio: t.speedRatio,
+    speedKmh: isDwell ? 0 : Math.round(speedKmh),
+    phase: isDwell ? 'dwell' : 'moving',
+    previousStation: localFrom,
+    nextStation: localTo,
+    etaNextStationSec: t.etaNextStationSec,
+    progress: t.progressRatio,
+  };
 }
 
-function computeActiveTrains(nowSec: number, dayType: LiveMetroDayType): LiveMetroTrain[] {
+function computeActiveTrains(now: Date): LiveMetroTrain[] {
+  const effectiveNowSec = effectiveOperatingSec(now);
   const trains: LiveMetroTrain[] = [];
-
-  for (const { line } of BUILT_LINES) {
-    const directions: Array<{ dir: 'forward' | 'backward'; stations: SchematicStation[] }> = [
-      { dir: 'forward', stations: line.stations },
-      { dir: 'backward', stations: [...line.stations].reverse() },
-    ];
-
-    // Показуємо КОЖЕН рейс, який зараз активний за реальним розкладом
-    // станцій (TIMETABLES) — їхню кількість визначає сам розклад: якщо в
-    // цю хвилину за графіком в дорозі кілька составів на лінії (обидва
-    // напрямки, чи навіть кілька услід один одному в години пік), усі вони
-    // відображаються одночасно, кожен зі своєю позицією.
-    for (const { dir, stations } of directions) {
-      const { times } = getRunProfile(line.id, stations, dir, dayType);
-      const headsign = dir === 'forward' ? stations[stations.length - 1].name : stations[0].name;
-
-      for (let k = 0; k < times.length; k++) {
-        const row = times[k];
-        const first = row[0];
-        const last = row[row.length - 1];
-        if (nowSec < first || nowSec > last + DWELL_HOLD_SEC) continue;
-
-        let i = 0;
-        while (i < row.length - 2 && nowSec >= row[i + 1]) i++;
-        const tFrom = row[i];
-        const tTo = row[i + 1];
-        const segDur = Math.max(1, tTo - tFrom);
-        const rawProgress = Math.min(1, Math.max(0, (nowSec - tFrom) / segDur));
-
-        const from = stations[i];
-        const to = stations[i + 1];
-
-        // Плавний фізичний профіль розгін → крейсер → гальмування (замість
-        // лінійної інтерполяції), швидкість — з реальної геодистанції
-        // перегону та реального часу за розкладом, обмежена максимальною
-        // конструктивною швидкістю вагона Еж3 (83 км/год).
-        const easedT = easeInOutCubic(rawProgress);
-        const point = lerpPoint(from.point, to.point, easedT);
-        const heading = angleBetween(from.point, to.point);
-
-        const distanceMeters = segmentDistanceMeters(from.id, to.id);
-        const instSpeedMps = (distanceMeters * easeInOutCubicDerivative(rawProgress)) / segDur;
-        const speedKmh = Math.min(MAX_TRAIN_SPEED_KMH, instSpeedMps * 3.6);
-
-        const isLastLeg = i === row.length - 2;
-        const isDwell = rawProgress >= 1 || (isLastLeg && nowSec > row[row.length - 1]) || rawProgress <= 0;
-        const phase: 'moving' | 'dwell' = isDwell ? 'dwell' : 'moving';
-
-        trains.push({
-          id: `${line.id}-${dir}-${k}`,
-          lineId: line.id,
-          lineNumber: LINE_NUMBERS[line.id],
-          lineColor: LINE_COLORS[line.id],
-          direction: dir,
-          headsign,
-          point,
-          headingDeg: heading,
-          speedRatio: 0.55,
-          speedKmh: isDwell ? 0 : Math.round(speedKmh),
-          phase,
-          previousStation: from,
-          nextStation: to,
-          etaNextStationSec: tTo,
-          progress: rawProgress,
-        });
-      }
-    }
+  for (const t of getSharedActiveTrains(now)) {
+    const mapped = mapSharedTrainToLocal(t, effectiveNowSec);
+    if (mapped) trains.push(mapped);
   }
-
   return trains;
 }
 
-const DWELL_HOLD_SEC = 45; // тримаємо потяг на кінцевій станції ще трохи після останнього відправлення в профілі
-
-/** Точний час доби (з дробовою частиною секунди) для плавної інтерполяції позиції потяга. */
-function preciseSecOfDay(date: Date): number {
-  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + date.getMilliseconds() / 1000;
-}
-
 export function useLiveMetroTrains(): LiveMetroTrain[] {
-  const [trains, setTrains] = useState<LiveMetroTrain[]>(() =>
-    computeActiveTrains(secOfDay(new Date()), dayTypeOf(new Date()))
-  );
+  const [trains, setTrains] = useState<LiveMetroTrain[]>(() => computeActiveTrains(new Date()));
 
   useEffect(() => {
     let rafId = 0;
@@ -845,8 +802,7 @@ export function useLiveMetroTrains(): LiveMetroTrain[] {
     const tick = (ts: number) => {
       if (ts - lastUpdate >= FRAME_INTERVAL_MS) {
         lastUpdate = ts;
-        const now = new Date();
-        setTrains(computeActiveTrains(preciseSecOfDay(now), dayTypeOf(now)));
+        setTrains(computeActiveTrains(new Date()));
       }
       rafId = requestAnimationFrame(tick);
     };

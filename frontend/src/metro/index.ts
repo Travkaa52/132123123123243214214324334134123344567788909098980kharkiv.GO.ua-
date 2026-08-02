@@ -1,14 +1,6 @@
+// Рушій анімації потягів метро на загальній карті (MetroLayer/MetroSimulationEngine/
+// MetroRenderer + класи MetroStation/MetroSchedule/MetroRoute/MetroTrain/MetroLine)
+// видалено навмисно: рух поїздів метро показується ЛИШЕ в розділі «Живе метро»
+// (src/pages/LiveMetroPage.tsx, маршрут /metro/live), а не на загальній карті.
 export * from '@/metro/geometry';
 export * from '@/metro/types';
-export { MetroStation } from '@/metro/MetroStation';
-export { MetroSchedule, DEFAULT_DWELL_SEC } from '@/metro/MetroSchedule';
-export { MetroRoute } from '@/metro/MetroRoute';
-export type { MetroRouteSample } from '@/metro/MetroRoute';
-export { MetroTrain } from '@/metro/MetroTrain';
-export type { MetroTrainContext } from '@/metro/MetroTrain';
-export { MetroLine } from '@/metro/MetroLine';
-export type { MetroStationLookup } from '@/metro/MetroLine';
-export { MetroSimulationEngine } from '@/metro/MetroSimulationEngine';
-export type { MetroSimulationEngineOptions } from '@/metro/MetroSimulationEngine';
-export { MetroRenderer } from '@/metro/MetroRenderer';
-export type { MetroRenderFrame, MetroFrameListener } from '@/metro/MetroRenderer';

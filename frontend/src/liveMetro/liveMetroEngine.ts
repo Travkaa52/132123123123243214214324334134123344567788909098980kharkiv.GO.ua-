@@ -238,7 +238,7 @@ const OPERATING_DURATION_SEC = OPERATING_END_SEC - OPERATING_START_SEC;
  * у вікно 05:30–24:00, прив'язаний до реального годинника (без стрибків/розривів
  * анімації), щоб схема ніколи не показувала порожню карту.
  */
-function effectiveOperatingSec(date: Date): number {
+export function effectiveOperatingSec(date: Date): number {
   const realSec = secOfDay(date);
   if (realSec >= OPERATING_START_SEC && realSec < OPERATING_END_SEC) return realSec;
   // Безперервна шкала часу (мс з епохи, у секундах), щоб закільцьовування було
