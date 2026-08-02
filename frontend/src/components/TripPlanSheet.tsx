@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Repeat, Route as RouteIcon, Zap } from 'lucide-react';
+import { ArrowRight, ChevronRight, Repeat, Route as RouteIcon } from 'lucide-react';
 import { KIND_LABELS_UK } from '@/components/TransportKindIcon';
 import type { TripPlan } from '@/data/localData';
 
@@ -15,10 +15,7 @@ function formatWalk(m: number): string {
 /**
  * Список варіантів поїздки: прямі рейси і варіанти з однією пересадкою.
  * Кожен варіант показує ланцюжок transport-badge'ів у їхніх фірмових
- * кольорах — так одразу видно, на чому їхати і де пересідати. Варіанти
- * відсортовані (buildTripPlans/refineTripPlansWithOSM) за реальним
- * орієнтовним часом у дорозі (ходьба + очікування + рух + пересадка),
- * тож перший у списку — справді найшвидший, а не просто "найближчий пішки".
+ * кольорах — так одразу видно, на чому їхати і де пересідати.
  */
 export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetProps) {
   if (plans.length === 0) {
@@ -31,8 +28,6 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetP
     );
   }
 
-  const fastestMinutes = Math.min(...plans.map((p) => p.estimatedMinutes));
-
   return (
     <div className="divide-y divide-border/40 p-2">
       <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-black uppercase tracking-wider text-ink-muted">
@@ -41,7 +36,6 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetP
       {plans.map((plan, index) => {
         const isSelected = selectedIndex === index;
         const totalWalk = plan.boardWalkM + plan.alightWalkM;
-        const isFastest = plan.estimatedMinutes === fastestMinutes;
 
         return (
           <button
@@ -63,16 +57,7 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetP
                   {legIndex < plan.legs.length - 1 && <Repeat size={14} className="shrink-0 text-ink-muted" />}
                 </div>
               ))}
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <span className="text-sm font-black text-ink-text">≈{plan.estimatedMinutes} хв</span>
-                {isFastest && (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary">
-                    <Zap size={9} />
-                    Найшвидший
-                  </span>
-                )}
-                <ChevronRight size={14} className="shrink-0 text-ink-muted" />
-              </div>
+              <ChevronRight size={14} className="ml-auto shrink-0 text-ink-muted" />
             </div>
 
             <div className="min-w-0 text-xs">
