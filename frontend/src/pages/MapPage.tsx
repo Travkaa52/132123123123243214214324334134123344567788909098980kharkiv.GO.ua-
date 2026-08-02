@@ -17,6 +17,7 @@ import {
   LocateFixed
 } from 'lucide-react';
 import { MapView } from '@/components/MapView';
+import { MetroLayer } from '@/components/MetroLayer';
 import { StopDetailModal } from '@/components/StopDetailModal';
 import { TripPlanSheet } from '@/components/TripPlanSheet';
 import { RouteSheet } from '@/components/RouteSheet';
@@ -56,6 +57,7 @@ export function MapPage() {
 
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [selectedMetroTrainId, setSelectedMetroTrainId] = useState<string | null>(null);
 
   // --- Побудова маршруту "Звідки -> Куди" -------------------------------
   const [fromQuery, setFromQuery] = useState('');
@@ -416,6 +418,12 @@ export function MapPage() {
           fromPoint={fromPoint}
           toPoint={toPoint}
           tripPlan={selectedTripPlan}
+        />
+        <MetroLayer
+          map={map}
+          visible={visibleKinds.includes('metro')}
+          selectedTrainId={selectedMetroTrainId}
+          onTrainSelect={setSelectedMetroTrainId}
         />
       </div>
 

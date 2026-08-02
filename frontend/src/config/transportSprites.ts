@@ -67,3 +67,48 @@ export const TRANSPORT_SPRITES: Record<TransportKind, SpriteSheetConfig> = {
     anchor: { x: 0.5, y: 0.5 }
   }
 };
+
+/**
+ * Окремі спрайти для кожної лінії метро (route-metro-1/2/3 — червона/синя/зелена),
+ * замість єдиного /sprites/metro.jpg для всіх ліній. Ключ — id маршруту з routes.json.
+ * Розміри кадру відповідають реальним файлам у /public/sprites (пропорції в них різні,
+ * тому displayHeight рахуватиметься коректно лише з правильних frameWidth/frameHeight).
+ */
+export const METRO_LINE_SPRITES: Record<string, SpriteSheetConfig> = {
+  'route-metro-1': {
+    kind: 'metro',
+    src: '/sprites/metro-red-line.jpg',
+    frameWidth: 386,
+    frameHeight: 257,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
+    baseHeadingDeg: 0,
+    displaySize: 38,
+    anchor: { x: 0.5, y: 0.5 }
+  },
+  'route-metro-2': {
+    kind: 'metro',
+    src: '/sprites/metro-blue-line.jpg',
+    frameWidth: 389,
+    frameHeight: 217,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
+    baseHeadingDeg: 0,
+    displaySize: 38,
+    anchor: { x: 0.5, y: 0.5 }
+  },
+  'route-metro-3': {
+    kind: 'metro',
+    src: '/sprites/metro-green-line.jpg',
+    frameWidth: 370,
+    frameHeight: 292,
+    columns: 1,
+    directions: 1,
+    rotationMode: 'continuous',
+    baseHeadingDeg: 0,
+    displaySize: 38,
+    anchor: { x: 0.5, y: 0.5 }
+  }
+};
