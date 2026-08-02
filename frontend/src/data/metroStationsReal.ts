@@ -1,4 +1,5 @@
 import type { StopItem } from './localData';
+import { haversineMeters } from '@/metro/geometry';
 
 /**
  * Станції Харківського метрополітену, розшифровані з офіційного KML
@@ -97,6 +98,22 @@ export const METRO_INTERCHANGES: Array<[string, string]> = [
  */
 export const metroRoutesData = (Object.keys(METRO_LINE_ROUTE_IDS) as MetroStationItem['line'][]).map((line) => {
   const lineStations = metroStations.filter((s) => s.line === line);
+
+  // Реальна крейсерська швидкість вагона Еж3 між станціями (без урахування
+  // зупинки на станції — вона рахується окремо через dwellSec нижче), щоб
+  // offset кожної станції відповідав справжній геовідстані перегону, а не
+  // вигаданому рівномірному кроку.
+  const AVERAGE_METRO_CRUISE_SPEED_MPS = 12.5; // ≈45 км/год
+
+  let cumulativeOffsetSec = 0;
+  const schedule = lineStations.map((station, i) => {
+    if (i > 0) {
+      const distanceMeters = haversineMeters(lineStations[i - 1].position, station.position);
+      cumulativeOffsetSec += Math.max(30, Math.round(distanceMeters / AVERAGE_METRO_CRUISE_SPEED_MPS));
+    }
+    return { stopId: station.id, arrivalOffsetSec: cumulativeOffsetSec, dwellSec: 25 };
+  });
+
   return {
     id: METRO_LINE_ROUTE_IDS[line],
     kind: 'metro' as const,
@@ -106,7 +123,7 @@ export const metroRoutesData = (Object.keys(METRO_LINE_ROUTE_IDS) as MetroStatio
     stopIds: lineStations.map((s) => s.id),
     headsignForward: lineStations[lineStations.length - 1].name,
     headsignBackward: lineStations[0].name,
-    schedule: [] as unknown[],
+    schedule,
     firstDeparture: '05:30',
     lastDeparture: '23:40',
     intervalMinutes: 4
