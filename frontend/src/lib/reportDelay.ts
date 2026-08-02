@@ -20,6 +20,69 @@ const KIND_LABELS: Record<TransportKind, string> = {
 };
 
 /**
+ * Готові варіанти коментаря — щоб не набирати текст руками. Тап замість
+ * клавіатури: більшість скарг однакові за суттю ("немає Х хвилин",
+ * "переповнений" тощо), тож обираємо з кнопок.
+ */
+export const QUICK_COMMENTS = [
+  'Немає вже 10+ хв',
+  'Немає вже 20+ хв',
+  'Переповнений, не влізти',
+  'Проїхав повз зупинку',
+  'Зійшов з маршруту достроково'
+] as const;
+
+const COOLDOWN_STORAGE_KEY = 'khgo:delay-reports:recent';
+const COOLDOWN_MS = 10 * 60 * 1000; // 10 хв — щоб не дублювати одну й ту саму скаргу поспіль
+
+function recentKey(kind: TransportKind | null, routeNumber: string): string {
+  return `${kind ?? '_'}::${routeNumber.trim().toLowerCase()}`;
+}
+
+function readRecentMap(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeRecentMap(map: Record<string, number>) {
+  try {
+    localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // localStorage недоступний (приватний режим тощо) — не критично, просто без кулдауну
+  }
+}
+
+/**
+ * Скільки хвилин тому користувач востаннє повідомляв про затримку саме цього
+ * маршруту (з цього пристрою) — або null, якщо ще не повідомляв / кулдаун
+ * вже минув. Використовується лише для дружнього попередження в UI, не
+ * блокує відправку жорстко.
+ */
+export function minutesSinceLastReport(kind: TransportKind | null, routeNumber: string): number | null {
+  if (!routeNumber.trim()) return null;
+  const map = readRecentMap();
+  const ts = map[recentKey(kind, routeNumber)];
+  if (!ts) return null;
+  const elapsed = Date.now() - ts;
+  if (elapsed > COOLDOWN_MS) return null;
+  return Math.max(0, Math.round(elapsed / 60000));
+}
+
+function markReported(kind: TransportKind | null, routeNumber: string) {
+  const map = readRecentMap();
+  const cutoff = Date.now() - COOLDOWN_MS;
+  for (const key of Object.keys(map)) {
+    if (map[key] < cutoff) delete map[key];
+  }
+  map[recentKey(kind, routeNumber)] = Date.now();
+  writeRecentMap(map);
+}
+
+/**
  * Немає бекенду (застосунок на GitHub Pages + Actions) — тож замість POST-запиту
  * ми відкриваємо чат із ботом у Telegram із заздалегідь заповненим текстом
  * (deep link t.me/<bot>?text=...). Користувач сам тисне "Надіслати" в
@@ -48,11 +111,15 @@ export function sendDelayReport(input: DelayReportInput): DelayReportResult {
   const url = `https://t.me/${botUsername}?text=${encodeURIComponent(text)}`;
   const tg = getTelegramWebApp();
 
+  tg?.HapticFeedback?.impactOccurred('medium');
+
   if (tg?.openTelegramLink) {
     tg.openTelegramLink(url);
   } else {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
+
+  markReported(input.kind, input.routeNumber);
 
   return { ok: true };
 }
