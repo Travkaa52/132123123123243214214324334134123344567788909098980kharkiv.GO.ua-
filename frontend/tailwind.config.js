@@ -26,6 +26,7 @@ export default {
         },
         border: 'rgb(var(--color-border))',
         ink: {
+          DEFAULT: 'rgb(var(--color-ink) / <alpha-value>)',
           text: 'rgb(var(--color-text) / <alpha-value>)',
           muted: 'rgb(var(--color-text-muted))',
           inverted: 'rgb(var(--color-text-inverted) / <alpha-value>)',
@@ -123,7 +124,7 @@ export default {
         'splash-word-in': 'splash-word-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         'splash-out': 'splash-out 0.45s cubic-bezier(0.4,0,1,1) both',
         'progress-indeterminate': 'progress-indeterminate 1.2s cubic-bezier(0.4,0,0.2,1) infinite',
-        'page-in': 'page-in 0.22s cubic-bezier(0.22,1,0.36,1) both'
+        'page-in': 'page-in 0.22s cubic-bezier(0.22,1,0.36,1) backwards'
       }
     }
   },
