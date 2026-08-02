@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, memo, startTransition } from 'react';
+import { Suspense, lazy, useState, useEffect, memo, startTransition } from 'react';
 import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { BottomNav } from '@/components/BottomNav';
 import { TelegramGate } from '@/components/TelegramGate';
@@ -12,32 +12,23 @@ import { useAppReady } from '@/hooks/useAppReady';
 import { useDepartureReminder } from '@/hooks/useDepartureReminder';
 import { useAuthStore } from '@/store/useAuthStore';
 import { HomePage } from '@/pages/HomePage';
-import { lazyWithRetry } from '@/lib/lazyWithRetry';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 /**
  * ---------------------------------------------------------------------------
  * Динамічне завантаження важких екранів (Code Splitting & Lazy Loading)
  * з можливістю Prefetch при наведенні або передчасному фокусі.
- *
- * Використовуємо lazyWithRetry (а не голий React.lazy) — саме голий lazy()
- * був причиною "чорного екрана" на /metro/live: коли в браузері закешований
- * старий index.html, а на хостингу вже новий деплой з іншими хешами чанків,
- * динамічний import() старого чанка падає з "Failed to fetch dynamically
- * imported module". lazyWithRetry ловить саме цю мережеву помилку і робить
- * одне примусове перезавантаження сторінки, щоб підтягнути свіжий index.html.
  * ---------------------------------------------------------------------------
  */
-const MapPage = lazyWithRetry(() => import('@/pages/MapPage').then((m) => ({ default: m.MapPage })), 'MapPage');
-const RoutesPage = lazyWithRetry(() => import('@/pages/RoutesPage').then((m) => ({ default: m.RoutesPage })), 'RoutesPage');
-const RouteDetailPage = lazyWithRetry(() => import('@/pages/RouteDetailPage').then((m) => ({ default: m.RouteDetailPage })), 'RouteDetailPage');
-const TransportKindPage = lazyWithRetry(() => import('@/pages/TransportKindPage').then((m) => ({ default: m.TransportKindPage })), 'TransportKindPage');
-const LiveMetroPage = lazyWithRetry(() => import('@/pages/LiveMetroPage').then((m) => ({ default: m.LiveMetroPage })), 'LiveMetroPage');
-const FavoritesPage = lazyWithRetry(() => import('@/pages/FavoritesPage').then((m) => ({ default: m.FavoritesPage })), 'FavoritesPage');
-const HistoryPage = lazyWithRetry(() => import('@/pages/HistoryPage').then((m) => ({ default: m.HistoryPage })), 'HistoryPage');
-const SettingsPage = lazyWithRetry(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })), 'SettingsPage');
-const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })), 'ProfilePage');
-const RemindersPage = lazyWithRetry(() => import('@/pages/RemindersPage').then((m) => ({ default: m.RemindersPage })), 'RemindersPage');
+const MapPage = lazy(() => import('@/pages/MapPage').then((m) => ({ default: m.MapPage })));
+const RoutesPage = lazy(() => import('@/pages/RoutesPage').then((m) => ({ default: m.RoutesPage })));
+const RouteDetailPage = lazy(() => import('@/pages/RouteDetailPage').then((m) => ({ default: m.RouteDetailPage })));
+const TransportKindPage = lazy(() => import('@/pages/TransportKindPage').then((m) => ({ default: m.TransportKindPage })));
+const LiveMetroPage = lazy(() => import('@/pages/LiveMetroPage').then((m) => ({ default: m.LiveMetroPage })));
+const FavoritesPage = lazy(() => import('@/pages/FavoritesPage').then((m) => ({ default: m.FavoritesPage })));
+const HistoryPage = lazy(() => import('@/pages/HistoryPage').then((m) => ({ default: m.HistoryPage })));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const RemindersPage = lazy(() => import('@/pages/RemindersPage').then((m) => ({ default: m.RemindersPage })));
 
 /**
  * Преміальний Route Fallback із використанням Glassmorphism, Skeleton та Shimmer-ефекту.
@@ -109,48 +100,37 @@ export default function App() {
 
   return (
     <div className="relative min-h-dvh w-full overflow-x-hidden bg-bg text-ink-text antialiased selection:bg-primary/20">
-      <ErrorBoundary label="Сторінка">
-        <Suspense fallback={<RouteFallback />}>
-          <PageTransition pathKey={location.pathname}>
-            <Routes location={location}>
-              <Route path="/" element={<HomePage />} />
-              {/* MapPage рендериться окремо нижче — постійно змонтована, щоб не
-                  перезавантажуватись при кожному переході на цю сторінку. */}
-              <Route path="/map" element={null} />
-              <Route path="/routes" element={<RoutesPage />} />
-              <Route path="/routes/:routeId" element={<RouteDetailPage />} />
-              <Route path="/metro" element={<TransportKindPage kind="metro" />} />
-              <Route
-                path="/metro/live"
-                element={
-                  <ErrorBoundary label="Жива карта метро">
-                    <LiveMetroPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route path="/trams" element={<TransportKindPage kind="tram" />} />
-              <Route path="/trolleybuses" element={<TransportKindPage kind="trolleybus" />} />
-              <Route path="/buses" element={<TransportKindPage kind="bus" />} />
-              <Route path="/reminders" element={<RemindersPage />} />
-              <Route path="/favorites" element={<FavoritesPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+      <Suspense fallback={<RouteFallback />}>
+        <PageTransition pathKey={location.pathname}>
+          <Routes location={location}>
+            <Route path="/" element={<HomePage />} />
+            {/* MapPage рендериться окремо нижче — постійно змонтована, щоб не
+                перезавантажуватись при кожному переході на цю сторінку. */}
+            <Route path="/map" element={null} />
+            <Route path="/routes" element={<RoutesPage />} />
+            <Route path="/routes/:routeId" element={<RouteDetailPage />} />
+            <Route path="/metro" element={<TransportKindPage kind="metro" />} />
+            <Route path="/metro/live" element={<LiveMetroPage />} />
+            <Route path="/trams" element={<TransportKindPage kind="tram" />} />
+            <Route path="/trolleybuses" element={<TransportKindPage kind="trolleybus" />} />
+            <Route path="/buses" element={<TransportKindPage kind="bus" />} />
+            <Route path="/reminders" element={<RemindersPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
 
-              {/* Обробка невідомих URL та 404 */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </PageTransition>
-        </Suspense>
-      </ErrorBoundary>
+            {/* Обробка невідомих URL та 404 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </PageTransition>
+      </Suspense>
 
       {mapMounted && (
         <div className={isMapRoute ? 'contents' : 'hidden'}>
-          <ErrorBoundary label="Карта">
-            <Suspense fallback={<RouteFallback />}>
-              <MapPage />
-            </Suspense>
-          </ErrorBoundary>
+          <Suspense fallback={<RouteFallback />}>
+            <MapPage />
+          </Suspense>
         </div>
       )}
 
