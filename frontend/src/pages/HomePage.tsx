@@ -215,35 +215,36 @@ export function HomePage() {
     <div className="relative min-h-dvh bg-bg pb-32 pt-[max(0.75rem,env(safe-area-inset-top))] text-ink-text overflow-x-hidden font-sans antialiased selection:bg-primary selection:text-white">
       
       {/* Ambient background glow */}
-      <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-primary/12 blur-[90px]" />
+      <div className="pointer-events-none absolute top-32 -right-16 h-64 w-64 rounded-full bg-gold/8 blur-[80px]" />
 
-      <div className="relative z-10 mx-auto max-w-md px-4 space-y-4">
+      <div className="relative z-10 mx-auto max-w-md px-4 space-y-5">
         
         {/* 1. UPPER HEADER */}
-        <header className="flex items-center justify-between pt-1 pb-1 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-forest-dark flex items-center justify-center text-white shadow-md shadow-primary/20 font-black text-base tracking-tighter">
+        <header className="flex items-center justify-between pt-2 pb-1 animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 shrink-0 rounded-[18px] bg-gradient-to-br from-primary to-forest-dark flex items-center justify-center text-white shadow-lg shadow-primary/25 font-black text-lg tracking-tighter ring-1 ring-white/10">
               GO
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm tracking-tight text-ink-text">
-                  Kharkiv <span className="text-primary">GO</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-[13px] tracking-tight text-ink-muted">
+                  Kharkiv <span className="text-primary font-extrabold">GO</span>
                 </span>
                 <span className="px-2 py-0.5 text-[9px] font-extrabold bg-primary/10 text-primary rounded-full border border-primary/20">
                   PRO
                 </span>
               </div>
-              <h1 className="font-display text-lg font-black text-ink-text mt-0.5 tracking-tight truncate max-w-[190px]">
-                {greeting}, {displayName}! 👋
+              <h1 className="font-display text-xl font-black text-ink-text mt-0.5 tracking-tight truncate max-w-[210px]">
+                {greeting}, {displayName} 👋
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="hidden xs:flex flex-col items-end text-right mr-1">
-              <span className="text-xs font-bold text-ink-text">{formattedTimeStr}</span>
-              <span className="text-[10px] font-medium text-ink-muted capitalize">{formattedDate}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden xs:flex flex-col items-end text-right mr-0.5">
+              <span className="text-sm font-extrabold text-ink-text tabular-nums">{formattedTimeStr}</span>
+              <span className="text-[10px] font-semibold text-ink-muted capitalize">{formattedDate}</span>
             </div>
             
             <NotificationsBell />
@@ -251,21 +252,21 @@ export function HomePage() {
             <Link 
               to="/profile"
               aria-label="Налаштування"
-              className="p-2.5 rounded-2xl bg-surface-raised border border-border/40 hover:bg-surface-soft transition-all active:scale-95 text-ink-text shadow-xs"
+              className="p-2.5 rounded-[16px] bg-surface-raised border border-border/40 hover:bg-surface-soft transition-all active:scale-90 text-ink-text shadow-sm"
             >
-              <Settings size={18} />
+              <Settings size={19} />
             </Link>
           </div>
         </header>
 
         {/* 2. ADVANCED REAL-TIME SEARCH BAR */}
-        <div className="relative z-30">
+        <div className="relative z-30 animate-in fade-in slide-in-from-top-1 duration-500 delay-75 fill-mode-both">
           <TrainWishSprite />
-          <div className={`relative flex items-center bg-surface-raised rounded-[22px] border transition-all duration-200 shadow-sm ${
+          <div className={`relative flex items-center bg-surface-raised rounded-[24px] border transition-all duration-200 shadow-sm ${
             isSearchFocused ? 'border-primary/40 ring-4 ring-primary/10 shadow-md' : 'border-border/40 hover:border-border/60'
           }`}>
             <div className="pl-4 pr-2 text-ink-muted">
-              <SearchIcon size={18} />
+              <SearchIcon size={19} />
             </div>
             <input
               ref={searchInputRef}
@@ -274,14 +275,14 @@ export function HomePage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setIsSearchFocused(true)}
               placeholder="Пошук маршруту, зупинки, метро..."
-              className="w-full py-3.5 pr-4 text-xs font-semibold text-ink-text bg-transparent outline-none placeholder:text-ink-muted placeholder:font-medium"
+              className="w-full py-4 pr-4 text-sm font-semibold text-ink-text bg-transparent outline-none placeholder:text-ink-muted placeholder:font-medium"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="p-2 mr-2 text-ink-muted hover:text-ink-muted rounded-full"
+                className="p-2 mr-2 text-ink-muted hover:text-ink-text rounded-full transition-colors"
               >
-                <X size={16} />
+                <X size={17} />
               </button>
             )}
           </div>
@@ -391,13 +392,13 @@ export function HomePage() {
           )}
         </div>
 
-        {/* 3. QUICK ACTIONS GRID (2x2) — кнопки зменшені (менше padding/gap), іконки того самого розміру */}
-        <section className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {/* 3. QUICK ACTIONS GRID (2x2) — премиальные плитки в мягком iOS-стиле, каждая со своим акцентом */}
+        <section className="grid grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100 fill-mode-both">
           {[
-            { label: 'Маршрути', icon: Navigation, image: routesIcon, imageFallback: undefined as string | undefined, to: '/routes', color: 'bg-surface-soft text-ink-text border-border/40', imageScale: 'scale-125', overflowVisible: false },
-            { label: 'Карта', icon: MapIcon, image: mapIcon, imageFallback: undefined as string | undefined, to: '/map', color: 'bg-surface-soft text-ink-text border-border/40', imageScale: 'scale-125', overflowVisible: false },
-            { label: 'Метро', icon: TrainTrack, image: metroIconPrimary, imageFallback: metroIconFallback as string | undefined, to: '/metro/live', color: 'bg-surface-soft text-ink-text border-border/40', imageScale: 'scale-150', overflowVisible: true },
-            { label: 'Обране', icon: Star, image: favoritesIcon, imageFallback: undefined as string | undefined, to: '/favorites', color: 'bg-surface-soft text-ink-text border-border/40', imageScale: 'scale-125', overflowVisible: false },
+            { label: 'Маршрути', icon: Navigation, image: routesIcon, imageFallback: undefined as string | undefined, to: '/routes', tint: 'bg-primary/12 text-primary', imageScale: 'scale-125', overflowVisible: false },
+            { label: 'Карта', icon: MapIcon, image: mapIcon, imageFallback: undefined as string | undefined, to: '/map', tint: 'bg-blue-500/12 text-blue-500', imageScale: 'scale-125', overflowVisible: false },
+            { label: 'Метро', icon: TrainTrack, image: metroIconPrimary, imageFallback: metroIconFallback as string | undefined, to: '/metro/live', tint: 'bg-emerald-500/12 text-emerald-500', imageScale: 'scale-150', overflowVisible: true },
+            { label: 'Обране', icon: Star, image: favoritesIcon, imageFallback: undefined as string | undefined, to: '/favorites', tint: 'bg-gold/14 text-gold', imageScale: 'scale-125', overflowVisible: false },
           ].map((item, index) => {
             const Icon = item.icon;
             const fallback = item.imageFallback;
@@ -405,14 +406,14 @@ export function HomePage() {
               <Link
                 key={index}
                 to={item.to}
-                className="bg-surface-raised rounded-2xl p-2.5 flex items-center gap-2.5 border border-border/40 shadow-sm hover:shadow-md hover:border-border/60 active:scale-[0.98] transition-all duration-200 group"
+                className="bg-surface-raised rounded-[20px] p-3 flex items-center gap-3 border border-border/40 shadow-sm hover:shadow-md hover:border-border/60 active:scale-[0.97] transition-all duration-200 group"
               >
-                <div className={`w-16 h-16 shrink-0 rounded-2xl ${item.color} border flex items-center justify-center transition-transform group-hover:scale-110 shadow-2xs ${item.overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}>
+                <div className={`w-14 h-14 shrink-0 rounded-[16px] ${item.tint} flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${item.overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}>
                   {item.image ? (
                     <img
                       src={item.image}
                       alt={item.label}
-                      className={`w-[4.5rem] h-[4.5rem] object-contain ${item.imageScale} ${item.overflowVisible ? 'relative z-10' : ''}`}
+                      className={`w-[3.75rem] h-[3.75rem] object-contain ${item.imageScale} ${item.overflowVisible ? 'relative z-10' : ''}`}
                       onError={(e) => {
                         const img = e.currentTarget as HTMLImageElement & { dataset: { triedFallback?: string } };
                         // Спочатку, якщо є запасний PNG (напр. лого метро замість
@@ -432,12 +433,12 @@ export function HomePage() {
                   ) : null}
                   {Icon && (
                     <Icon
-                      size={30}
+                      size={26}
                       style={item.image ? { display: 'none' } : undefined}
                     />
                   )}
                 </div>
-                <span className="font-extrabold text-ink-text text-xs tracking-tight">{item.label}</span>
+                <span className="font-extrabold text-ink-text text-[13px] tracking-tight leading-tight">{item.label}</span>
               </Link>
             );
           })}
@@ -446,28 +447,29 @@ export function HomePage() {
         {/* 3.5. SMART DEPARTURE REMINDER ENTRY POINT */}
         <Link
           to="/reminders"
-          className="flex items-center gap-3 rounded-2xl border border-border/40 bg-surface-raised p-3.5 shadow-sm active:scale-[0.98] transition-all duration-200 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          className="flex items-center gap-3 rounded-[20px] border border-border/40 bg-surface-raised p-4 shadow-sm hover:shadow-md hover:border-border/60 active:scale-[0.98] transition-all duration-200 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both"
         >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <AlarmClock size={22} />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-primary/12 text-primary">
+            <AlarmClock size={23} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-black text-ink-text">Час виходити</p>
-            <p className="truncate text-[11px] text-ink-muted">Розумне нагадування про вихід із дому</p>
+            <p className="text-sm font-black text-ink-text">Час виходити</p>
+            <p className="truncate text-xs text-ink-muted font-medium">Розумне нагадування про вихід із дому</p>
           </div>
-          <ChevronRight size={16} className="shrink-0 text-ink-muted" />
+          <ChevronRight size={17} className="shrink-0 text-ink-muted" />
         </Link>
 
         {/* 4. LIVE METRO CARD */}
-        <section className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 shadow-lg shadow-emerald-900/10 transition-transform duration-300 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <section className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 shadow-lg shadow-emerald-900/20 ring-1 ring-white/10 transition-transform duration-300 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
+          <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -left-10 -top-10 w-32 h-32 bg-emerald-300/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">
+          <div className="relative flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10">
               <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-              <span className="text-[11px] font-bold tracking-wide uppercase">Метро онлайн</span>
+              <span className="text-xs font-bold tracking-wide uppercase">Метро онлайн</span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] font-bold bg-white/10 px-2.5 py-1 rounded-full text-emerald-100">
+            <div className="flex items-center gap-1 text-[11px] font-bold bg-white/10 px-2.5 py-1.5 rounded-full text-emerald-100">
               <CheckCircle2 size={13} className="text-emerald-300" />
               <span>Працює штатно</span>
             </div>
@@ -520,28 +522,28 @@ export function HomePage() {
 
           <Link
             to={nearestMetroStation ? `/metro/live?station=${nearestMetroStation.id}&tab=timetable` : '/metro/live'}
-            className="w-full py-3.5 px-4 bg-surface-raised text-primary rounded-[18px] font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg hover:bg-primary/10 active:scale-[0.98] transition-all duration-200"
+            className="relative w-full py-4 px-4 bg-white text-emerald-700 rounded-[18px] font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-200"
           >
             <img src={metroIcon} alt="Метро" className="w-4 h-4 object-contain" />
             <span>{nearestMetroStation ? 'Розклад найближчої станції' : 'Відкрити карту метро'}</span>
-            <ArrowUpRight size={16} className="text-primary" />
+            <ArrowUpRight size={17} />
           </Link>
         </section>
 
         <NotificationsSection />
 
         {/* 5. NEAREST STOPS WITH GEO PERMISSION/STATE */}
-        <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-primary/10 text-primary rounded-xl">
-                <Navigation size={16} />
+        <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-primary/10 text-primary rounded-[14px]">
+                <Navigation size={17} />
               </div>
-              <h2 className="font-extrabold text-ink-text text-xs">Найближчі зупинки</h2>
+              <h2 className="font-extrabold text-ink-text text-sm">Найближчі зупинки</h2>
             </div>
             <Link 
               to="/map"
-              className="text-xs font-bold text-primary hover:text-primary flex items-center gap-0.5 active:scale-95 transition-transform"
+              className="text-xs font-bold text-primary flex items-center gap-0.5 active:scale-95 transition-transform"
             >
               <span>На карті</span>
               <ChevronRight size={14} />
@@ -549,12 +551,12 @@ export function HomePage() {
           </div>
 
           {!position ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center bg-surface-soft rounded-[18px] border border-dashed border-border/60 px-4">
-              <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center mb-2">
-                <Compass size={20} className="animate-spin" />
+            <div className="flex flex-col items-center justify-center py-7 text-center bg-surface-soft rounded-[18px] border border-dashed border-border/60 px-4">
+              <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center mb-2.5">
+                <Compass size={21} className="animate-spin" />
               </div>
-              <p className="text-xs font-bold text-ink-text mb-1">Геолокація вимкнена або не дозволена</p>
-              <p className="text-[11px] text-ink-muted mb-3 max-w-[240px]">Увімкніть доступ до GPS, щоб бачити зупинки поруч з вами</p>
+              <p className="text-sm font-bold text-ink-text mb-1">Геолокація вимкнена або не дозволена</p>
+              <p className="text-xs text-ink-muted mb-3.5 max-w-[240px]">Увімкніть доступ до GPS, щоб бачити зупинки поруч з вами</p>
               <button
                 onClick={() => locate()}
                 className="px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-bold shadow-sm hover:brightness-105 active:scale-95 transition-all inline-flex items-center gap-1.5"
@@ -577,15 +579,15 @@ export function HomePage() {
                   className="flex items-center justify-between p-3 rounded-[18px] bg-surface-soft hover:bg-primary/10 transition-colors border border-transparent hover:border-primary/15 group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-surface-raised shadow-xs flex items-center justify-center text-primary font-bold text-xs shrink-0 border border-border/40">
+                    <div className="w-10 h-10 rounded-[13px] bg-surface-raised shadow-xs flex items-center justify-center text-primary font-bold text-sm shrink-0 border border-border/40">
                       🚏
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-ink-text text-xs truncate group-hover:text-primary">{stop.name}</div>
-                      <div className="text-[10px] text-ink-muted font-medium">Зупинка громадського транспорту</div>
+                      <div className="font-bold text-ink-text text-sm truncate group-hover:text-primary">{stop.name}</div>
+                      <div className="text-[11px] text-ink-muted font-medium">Зупинка громадського транспорту</div>
                     </div>
                   </div>
-                  <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1 rounded-full shrink-0">
+                  <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1.5 rounded-full shrink-0">
                     {formatDistance(stop.distance)}
                   </span>
                 </Link>
@@ -595,13 +597,13 @@ export function HomePage() {
         </section>
 
         {/* 6. FAVORITES SECTION */}
-        <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-gold/10 text-gold rounded-xl">
-                <Star size={16} className="fill-gold text-gold" />
+        <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-gold/10 text-gold rounded-[14px]">
+                <Star size={17} className="fill-gold text-gold" />
               </div>
-              <h2 className="font-extrabold text-ink-text text-xs">Обране</h2>
+              <h2 className="font-extrabold text-ink-text text-sm">Обране</h2>
             </div>
             {(favoriteRouteDetails.length > 0 || favoriteStopDetails.length > 0) && (
               <Link to="/favorites" className="text-xs font-bold text-gold hover:brightness-110 flex items-center gap-0.5">
@@ -612,10 +614,10 @@ export function HomePage() {
           </div>
 
           {favoriteRouteDetails.length === 0 && favoriteStopDetails.length === 0 ? (
-            <div className="text-center py-6 px-4 bg-surface-soft rounded-[18px] border border-dashed border-border/60">
-              <div className="text-2xl mb-1">⭐</div>
-              <p className="text-xs font-extrabold text-ink-text mb-1">У вас ще немає обраного</p>
-              <p className="text-[11px] text-ink-muted mb-3 max-w-[220px]">Закріплюйте маршрути та зупинки для швидкого доступу</p>
+            <div className="text-center py-7 px-4 bg-surface-soft rounded-[18px] border border-dashed border-border/60">
+              <div className="text-3xl mb-1.5">⭐</div>
+              <p className="text-sm font-extrabold text-ink-text mb-1">У вас ще немає обраного</p>
+              <p className="text-xs text-ink-muted mb-3.5 max-w-[220px] mx-auto">Закріплюйте маршрути та зупинки для швидкого доступу</p>
               <Link 
                 to="/routes"
                 className="px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-bold shadow-sm hover:brightness-105 active:scale-95 transition-all inline-flex items-center gap-1.5"
@@ -643,7 +645,7 @@ export function HomePage() {
                       <span className="text-base">{KIND_ICON[r.kind]}</span>
                     )}
                     <div className="truncate">
-                      <span className="font-extrabold text-ink-text text-xs truncate block">{r.number} — {r.name}</span>
+                      <span className="font-extrabold text-ink-text text-sm truncate block">{r.number} — {r.name}</span>
                     </div>
                   </div>
                   <ChevronRight size={14} className="text-ink-muted shrink-0" />
@@ -659,7 +661,7 @@ export function HomePage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="w-6 h-6 rounded-lg bg-primary/15 text-primary flex items-center justify-center text-xs">🚏</span>
-                    <span className="font-extrabold text-ink-text text-xs truncate">{s.name}</span>
+                    <span className="font-extrabold text-ink-text text-sm truncate">{s.name}</span>
                   </div>
                   <ChevronRight size={14} className="text-ink-muted shrink-0" />
                 </Link>
@@ -670,24 +672,24 @@ export function HomePage() {
 
         {/* 7. RECENT HISTORY SECTION */}
         {historyEntries.length > 0 && (
-          <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-surface text-ink-text rounded-xl">
-                  <History size={16} />
+          <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
+            <div className="flex items-center justify-between mb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-surface text-ink-text rounded-[14px]">
+                  <History size={17} />
                 </div>
-                <h2 className="font-extrabold text-ink-text text-xs">Останні переглянуті</h2>
+                <h2 className="font-extrabold text-ink-text text-sm">Останні переглянуті</h2>
               </div>
             </div>
 
             <div className="space-y-1.5 max-h-52 overflow-y-auto no-scrollbar">
               {historyEntries.slice(0, 5).map((entry, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-[16px] bg-surface-soft hover:bg-surface transition-colors">
+                <div key={idx} className="flex items-center justify-between p-3 rounded-[16px] bg-surface-soft hover:bg-surface transition-colors">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Clock size={14} className="text-ink-muted shrink-0" />
-                    <span className="font-bold text-xs text-ink-text truncate">{entry.query}</span>
+                    <span className="font-bold text-sm text-ink-text truncate">{entry.query}</span>
                   </div>
-                  <span className="text-[10px] text-ink-muted font-medium">Щойно</span>
+                  <span className="text-[10px] text-ink-muted font-medium shrink-0 ml-2">Щойно</span>
                 </div>
               ))}
             </div>
@@ -695,21 +697,21 @@ export function HomePage() {
         )}
 
         {/* 8. TRANSPORT NEWS & ANNOUNCEMENTS */}
-        <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 bg-surface-soft text-ink-muted rounded-xl">
-              <AlertCircle size={16} />
+        <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-3.5">
+            <div className="p-2 bg-surface-soft text-ink-muted rounded-[14px]">
+              <AlertCircle size={17} />
             </div>
-            <h2 className="font-extrabold text-ink-text text-xs">Новини транспорту</h2>
+            <h2 className="font-extrabold text-ink-text text-sm">Новини транспорту</h2>
           </div>
 
-          <div className="p-3.5 bg-surface-soft rounded-[18px] border border-border/40 space-y-2">
+          <div className="p-4 bg-surface-soft rounded-[18px] border border-border/40 space-y-2">
             <div className="flex items-center justify-between">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-surface-raised text-ink-text">Офіційно</span>
               <span className="text-[10px] font-semibold text-ink-muted">Сьогодні, 08:00</span>
             </div>
-            <h3 className="font-extrabold text-ink-text text-xs">Зміни в розкладі рухів тролейбусів у місті</h3>
-            <p className="text-[11px] text-ink-muted leading-relaxed">
+            <h3 className="font-extrabold text-ink-text text-sm">Зміни в розкладі рухів тролейбусів у місті</h3>
+            <p className="text-xs text-ink-muted leading-relaxed">
               Інформація щодо оновлення маршрутів громадського транспорту Харкова в умовах воєнного стану.
             </p>
             <div className="pt-1">
@@ -727,20 +729,20 @@ export function HomePage() {
         {/* 9. REPORT DELAY CTA */}
         <button
           onClick={() => setIsReportDelayOpen(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-gold/25 bg-gold/10 py-3.5 text-xs font-extrabold text-gold shadow-sm transition-all active:scale-[0.98] hover:bg-gold/15"
+          className="flex w-full items-center justify-center gap-2 rounded-[24px] border border-gold/25 bg-gold/10 py-4 text-sm font-extrabold text-gold shadow-sm transition-all active:scale-[0.98] hover:bg-gold/15"
         >
-          <AlertTriangle size={16} />
+          <AlertTriangle size={17} />
           <span>Повідомити про затримку</span>
         </button>
 
         {/* 10. FOOTER */}
-        <footer className="text-center py-4 space-y-1">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-ink-text">
+        <footer className="text-center py-5 space-y-1">
+          <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-ink-text">
             <span>Kharkiv GO</span>
-            <span>•</span>
+            <span className="text-ink-muted">•</span>
             <span className="text-primary">v1.3.0 Pro</span>
           </div>
-          <p className="text-[10px] text-ink-muted font-medium">Найнадійніший міський навігатор Харкова</p>
+          <p className="text-[11px] text-ink-muted font-medium">Найнадійніший міський навігатор Харкова</p>
         </footer>
 
       </div>
@@ -761,7 +763,7 @@ interface MetroTrackRowProps {
 function MetroTrackRow({ label, arrival, nowSec }: MetroTrackRowProps) {
   if (!arrival) {
     return (
-      <div className="flex items-center justify-between rounded-xl bg-white/5 px-2.5 py-1.5 text-[10px] text-emerald-100/50">
+      <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-[11px] text-emerald-100/50">
         <span className="font-semibold">{label}</span>
         <span className="italic">Рейсів не очікується</span>
       </div>
@@ -771,17 +773,17 @@ function MetroTrackRow({ label, arrival, nowSec }: MetroTrackRowProps) {
   const isAtStation = arrival.etaSec <= 5 && arrival.etaSec >= -15;
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-2.5 py-1.5">
+    <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2">
       <div className="flex items-center gap-1.5 min-w-0">
         <span
           className="h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: arrival.lineColor }}
         />
-        <span className="text-[10px] font-semibold text-emerald-100/70 shrink-0">{label}:</span>
-        <span className="truncate text-[11px] font-bold text-white">→ {arrival.headsign}</span>
+        <span className="text-[11px] font-semibold text-emerald-100/70 shrink-0">{label}:</span>
+        <span className="truncate text-xs font-bold text-white">→ {arrival.headsign}</span>
       </div>
       <span
-        className={`shrink-0 text-[11px] font-black tabular-nums ${
+        className={`shrink-0 text-xs font-black tabular-nums ${
           isAtStation ? 'text-emerald-200 animate-pulse' : 'text-white'
         }`}
       >
