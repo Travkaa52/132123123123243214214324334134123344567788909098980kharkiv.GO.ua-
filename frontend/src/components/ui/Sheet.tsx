@@ -98,7 +98,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
         className={clsx(
-          'absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-200',
+          'absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300',
           closing ? 'opacity-0' : 'animate-fade-in opacity-100'
         )}
         onClick={closeAnimated}
@@ -111,35 +111,35 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
         className={clsx(
-          'relative flex w-full max-w-lg flex-col overflow-hidden',
-          'rounded-t-[28px] border-t border-border/10 bg-surface-raised shadow-glass-lg',
-          'max-h-[92dvh] pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-h-[85dvh] sm:rounded-[28px]',
+          'glass-surface relative flex w-full max-w-lg flex-col overflow-hidden',
+          'rounded-t-[32px] shadow-glass-lg',
+          'max-h-[92dvh] pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-h-[85dvh] sm:rounded-[32px]',
           closing
-            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:opacity-0 sm:transition-opacity'
-            : 'animate-sheet-up'
+            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
+            : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-250'
         )}
       >
         <div
-          className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing"
+          className="flex shrink-0 cursor-grab touch-none justify-center pb-1.5 pt-3 active:cursor-grabbing"
           onPointerDown={onHandlePointerDown}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
         >
-          <div className="h-1.5 w-10 rounded-full bg-ink-muted/25" />
+          <div className="h-1.5 w-11 rounded-full bg-ink-muted/30" />
         </div>
 
         <button
           type="button"
           onClick={closeAnimated}
           aria-label="Закрити"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/80 text-ink-muted shadow-sm backdrop-blur transition-colors hover:bg-surface hover:text-ink-text active:scale-90"
+          className="absolute right-3.5 top-3.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised/90 text-ink-muted shadow-sm ring-1 ring-border/40 backdrop-blur transition-all hover:bg-surface-raised hover:text-ink-text active:scale-90"
         >
           <X className="h-4 w-4" />
         </button>
 
-        {title && <h2 className="shrink-0 px-5 pr-14 pt-1 text-title text-ink-text">{title}</h2>}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-2">{children}</div>
+        {title && <h2 className="shrink-0 px-6 pr-16 pt-1.5 font-display text-lg font-extrabold tracking-tight text-ink-text">{title}</h2>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-5 pt-3">{children}</div>
       </div>
     </div>,
     document.body

@@ -65,8 +65,8 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
   return (
     <Sheet open={open} onClose={handleClose} title="Повідомити про затримку">
       <div className="space-y-4">
-        <div className="flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold/10 p-3 text-[11px] leading-relaxed text-ink-text">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-gold" />
+        <div className="flex items-start gap-2.5 rounded-[18px] border border-gold/25 bg-gold/10 p-3.5 text-xs leading-relaxed text-ink-text">
+          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-gold" />
           <span>
             Розкажіть, який транспорт затримується — відкриється чат із ботом Kharkiv GO в
             Telegram із заповненим повідомленням, залишиться тільки натиснути «Надіслати».
@@ -75,7 +75,7 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
 
         {/* Вид транспорту */}
         <div>
-          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Вид транспорту
           </label>
           <div className="grid grid-cols-4 gap-2">
@@ -84,13 +84,13 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
                 key={opt.value}
                 type="button"
                 onClick={() => setKind(opt.value === kind ? null : opt.value)}
-                className={`flex flex-col items-center gap-1 rounded-2xl border py-2.5 text-[10px] font-bold transition-all active:scale-95 ${
+                className={`flex flex-col items-center gap-1.5 rounded-[16px] border py-3 text-[11px] font-bold transition-all active:scale-95 ${
                   kind === opt.value
-                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    ? 'border-primary/50 bg-primary/10 text-primary shadow-sm'
                     : 'border-border/40 bg-surface-soft text-ink-muted hover:bg-surface'
                 }`}
               >
-                <span className="text-base">{opt.icon}</span>
+                <span className="text-lg">{opt.icon}</span>
                 {opt.label}
               </button>
             ))}
@@ -99,7 +99,7 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
 
         {/* Номер маршруту */}
         <div>
-          <label htmlFor="delay-route" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <label htmlFor="delay-route" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Номер маршруту *
           </label>
           <input
@@ -109,13 +109,13 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
             value={routeNumber}
             onChange={(e) => setRouteNumber(e.target.value)}
             placeholder="Напр. 27 або А1"
-            className="w-full rounded-2xl border border-border/40 bg-surface-soft px-3.5 py-3 text-xs font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            className="w-full rounded-[16px] border border-border/40 bg-surface-soft px-4 py-3.5 text-sm font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           />
         </div>
 
         {/* Зупинка (необов'язково) */}
         <div>
-          <label htmlFor="delay-stop" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <label htmlFor="delay-stop" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Зупинка (необов’язково)
           </label>
           <input
@@ -124,13 +124,13 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
             value={stopName}
             onChange={(e) => setStopName(e.target.value)}
             placeholder="Де саме чекаєте транспорт?"
-            className="w-full rounded-2xl border border-border/40 bg-surface-soft px-3.5 py-3 text-xs font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            className="w-full rounded-[16px] border border-border/40 bg-surface-soft px-4 py-3.5 text-sm font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           />
         </div>
 
         {/* Коментар */}
         <div>
-          <label htmlFor="delay-comment" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <label htmlFor="delay-comment" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Коментар
           </label>
           <textarea
@@ -139,7 +139,7 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Наскільки велика затримка, з якого часу немає транспорту тощо"
-            className="w-full resize-none rounded-2xl border border-border/40 bg-surface-soft px-3.5 py-3 text-xs font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            className="w-full resize-none rounded-[16px] border border-border/40 bg-surface-soft px-4 py-3.5 text-sm font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           />
         </div>
 

@@ -23,8 +23,8 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 pb-safe px-3" aria-label="Основна навігація">
-      <div className="glass-surface mx-auto mb-2 flex max-w-md items-center justify-between rounded-full px-2 py-1.5 shadow-glass-lg">
+    <nav className="fixed inset-x-0 bottom-0 z-40 pb-safe px-4" aria-label="Основна навігація">
+      <div className="glass-surface mx-auto mb-3 flex max-w-md items-center justify-between rounded-[28px] p-1.5 shadow-glass-lg">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
@@ -32,27 +32,30 @@ export function BottomNav() {
               key={item.to}
               to={item.to}
               end={item.exact}
-              className={({ isActive }) =>
-                clsx(
-                  'group relative z-[2] flex flex-1 flex-col items-center justify-center gap-1 rounded-full py-1.5 transition-all duration-300 ease-out active:scale-90',
-                  isActive
-                    ? 'text-primary font-bold bg-primary/12 shadow-[inset_0_1px_0.5px_rgb(255_255_255_/_0.35)]'
-                    : 'text-ink-muted hover:text-ink-text hover:bg-primary/5'
-                )
-              }
+              className="group relative z-[2] flex flex-1 flex-col items-center justify-center gap-1 rounded-[22px] py-2.5 transition-transform duration-200 ease-out active:scale-90"
             >
               {({ isActive }) => (
                 <>
+                  {isActive && (
+                    <span
+                      className="pointer-events-none absolute inset-0 rounded-[22px] bg-primary/14 shadow-[inset_0_1px_0.5px_rgb(255_255_255_/_0.4)] animate-in fade-in zoom-in-95 duration-200"
+                      aria-hidden
+                    />
+                  )}
                   <Icon
                     className={clsx(
-                      'h-5 w-5 transition-all duration-200',
+                      'relative h-[22px] w-[22px] transition-all duration-200',
                       isActive
-                        ? '-translate-y-0.5 stroke-[2.25] text-primary'
-                        : 'stroke-[1.75] group-hover:scale-105'
+                        ? '-translate-y-0.5 stroke-[2.4] text-primary'
+                        : 'stroke-[1.75] text-ink-muted group-hover:text-ink-text group-hover:scale-105'
                     )}
                   />
-
-                  <span className="text-[10px] tracking-tight leading-none">
+                  <span
+                    className={clsx(
+                      'relative text-[10.5px] tracking-tight leading-none transition-colors duration-200',
+                      isActive ? 'font-bold text-primary' : 'font-semibold text-ink-muted group-hover:text-ink-text'
+                    )}
+                  >
                     {item.label}
                   </span>
                 </>

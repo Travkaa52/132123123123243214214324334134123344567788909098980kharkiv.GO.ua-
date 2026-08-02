@@ -110,7 +110,7 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className={`absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300 ${
           closing ? 'opacity-0' : 'animate-fade-in opacity-100'
         }`}
         onClick={closeAnimated}
@@ -124,42 +124,46 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
         className={[
-          'relative flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden',
-          'rounded-t-[28px] border-t border-border/10 bg-surface-raised shadow-glass-lg',
-          'pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:rounded-[28px] sm:pb-0',
+          'glass-surface relative flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden',
+          'rounded-t-[32px] shadow-glass-lg',
+          'pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:rounded-[32px] sm:pb-0',
           closing
-            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:opacity-0 sm:transition-opacity'
-            : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-200',
+            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
+            : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-250',
         ].join(' ')}
       >
         {/* Ручка для перетягування вниз — закриває картку жестом, як у метро */}
         <div
-          className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing sm:hidden"
+          className="flex shrink-0 cursor-grab touch-none justify-center pb-1.5 pt-3 active:cursor-grabbing sm:hidden"
           onPointerDown={onHandlePointerDown}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
         >
-          <div className="h-1.5 w-10 rounded-full bg-ink-muted/25" />
+          <div className="h-1.5 w-11 rounded-full bg-ink-muted/30" />
         </div>
 
         <button
           type="button"
           onClick={closeAnimated}
           aria-label="Закрити"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/80 text-ink-muted shadow-sm backdrop-blur transition-colors hover:bg-surface hover:text-ink-text active:scale-90"
+          className="absolute right-3.5 top-3.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised/90 text-ink-muted shadow-sm ring-1 ring-border/40 backdrop-blur transition-all hover:bg-surface-raised hover:text-ink-text active:scale-90"
         >
           <X className="h-4 w-4" />
         </button>
 
         {(title || icon) && (
-          <div className="flex shrink-0 items-center gap-2.5 px-5 pr-14 pt-3">
-            {icon && <span className="shrink-0 text-primary/80">{icon}</span>}
-            {title && <h2 className="truncate text-title text-ink-text">{title}</h2>}
+          <div className="flex shrink-0 items-center gap-2.5 px-6 pr-16 pt-4">
+            {icon && (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-primary/12 text-primary">
+                {icon}
+              </span>
+            )}
+            {title && <h2 className="truncate font-display text-lg font-extrabold tracking-tight text-ink-text">{title}</h2>}
           </div>
         )}
 
-        <div className="overflow-y-auto overscroll-contain px-5 pb-5 pt-3">{children}</div>
+        <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-4">{children}</div>
       </div>
     </div>,
     document.body

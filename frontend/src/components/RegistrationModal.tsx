@@ -56,17 +56,17 @@ export function RegistrationModal() {
 
       <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <div className="mb-6 flex flex-col items-center text-center">
-          <Emblem size={64} glow className="mb-4" />
-          <h1 className="text-headline font-display font-extrabold text-ink-text">
+          <Emblem size={68} glow className="mb-4" />
+          <h1 className="font-display text-2xl font-black tracking-tight text-ink-text">
             Ласкаво просимо!
           </h1>
-          <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-muted max-w-[280px]">
             Kharkiv GO — транспортний застосунок Харкова. Створіть локальний профіль, щоб зберігати
             обране, історію та налаштування на цьому пристрої.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-surface space-y-4 rounded-xl3 p-5 shadow-glass-lg">
+        <form onSubmit={handleSubmit} className="glass-surface space-y-4 rounded-[28px] p-5 shadow-glass-lg">
           <div>
             <span className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-ink-muted/80">
               Оберіть аватар

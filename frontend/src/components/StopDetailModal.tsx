@@ -43,7 +43,7 @@ export function StopDetailModal({ stop, arrivals, onClose, onRouteSelect, onUseA
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             {stop.kinds.map((k) => (
-              <span key={k} className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-soft">
+              <span key={k} className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-surface-soft">
                 <TransportKindIcon kind={k} size={18} />
               </span>
             ))}
@@ -56,32 +56,32 @@ export function StopDetailModal({ stop, arrivals, onClose, onRouteSelect, onUseA
         </div>
 
         {/* Швидкі дії побудови маршруту */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <button
             type="button"
             onClick={() => onUseAsFrom(stop)}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/50 bg-surface-soft px-3 py-2.5 text-xs font-bold text-ink-text transition-colors hover:bg-surface active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 rounded-[16px] border border-border/50 bg-surface-soft px-3 py-3 text-sm font-bold text-ink-text transition-colors hover:bg-surface active:scale-[0.98]"
           >
-            <Navigation className="h-3.5 w-3.5" />
+            <Navigation className="h-4 w-4" />
             Звідси
           </button>
           <button
             type="button"
             onClick={() => onUseAsTo(stop)}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/50 bg-surface-soft px-3 py-2.5 text-xs font-bold text-ink-text transition-colors hover:bg-surface active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 rounded-[16px] border border-border/50 bg-surface-soft px-3 py-3 text-sm font-bold text-ink-text transition-colors hover:bg-surface active:scale-[0.98]"
           >
-            <MapPin className="h-3.5 w-3.5" />
+            <MapPin className="h-4 w-4" />
             Сюди
           </button>
         </div>
 
         {/* Маршрути, що проходять через зупинку */}
         <div>
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
             <Clock className="h-3.5 w-3.5" />
             <span>Маршрути на зупинці ({routes.length})</span>
           </div>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col gap-2">
             {routes.map((route) => {
               const eta = arrivalByRouteId.get(route.id);
               return (
@@ -89,18 +89,18 @@ export function StopDetailModal({ stop, arrivals, onClose, onRouteSelect, onUseA
                   <button
                     type="button"
                     onClick={() => onRouteSelect(route.id)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/40 bg-surface-soft/80 px-3 py-2.5 text-xs transition-all hover:bg-surface active:scale-[0.98]"
+                    className="flex w-full items-center justify-between gap-3 rounded-[16px] border border-border/40 bg-surface-soft/80 px-3.5 py-3 text-sm transition-all hover:bg-surface active:scale-[0.98]"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <span
-                        className="flex h-8 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-black text-white shadow-xs"
+                        className="flex h-9 w-11 shrink-0 items-center justify-center rounded-[12px] text-sm font-black text-white shadow-xs"
                         style={{ backgroundColor: route.color }}
                       >
                         {route.number}
                       </span>
                       <div className="flex min-w-0 flex-col text-left">
                         <span className="truncate font-bold text-ink-text">{KIND_LABELS_UK[route.kind]}</span>
-                        <span className="truncate text-[11px] text-ink-muted">{route.headsignForward}</span>
+                        <span className="truncate text-xs text-ink-muted">{route.headsignForward}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -118,7 +118,7 @@ export function StopDetailModal({ stop, arrivals, onClose, onRouteSelect, onUseA
               );
             })}
             {routes.length === 0 && (
-              <li className="rounded-xl border border-border/40 bg-surface-soft/60 px-3 py-4 text-center text-xs text-ink-muted">
+              <li className="rounded-[16px] border border-border/40 bg-surface-soft/60 px-3 py-5 text-center text-sm text-ink-muted">
                 Немає даних про маршрути цієї зупинки.
               </li>
             )}
