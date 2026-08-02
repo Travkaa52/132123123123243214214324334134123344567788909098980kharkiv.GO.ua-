@@ -7,6 +7,7 @@ import {
   getUpcomingArrivalsForStation
 } from '@/liveMetro/liveMetroEngine';
 import { METRO_STATION_GEO, haversineMeters } from '@/liveMetro/metroStationsGeo';
+import { schematicStationId } from '@/liveMetro/stationIdMap';
 import type { GeoPoint } from '@/types/transport';
 
 interface LiveMetroWidgetProps {
@@ -72,7 +73,7 @@ export function LiveMetroWidget({ userPosition }: LiveMetroWidgetProps) {
   const nearestMetroStation = useMemo(() => {
     if (!userPosition) return null;
 
-    let best: { id: string; name: string; distM: number; lineId?: string; lineColor?: string } | null = null;
+    let best: { id: string; schematicId: string; name: string; distM: number; lineId?: string; lineColor?: string } | null = null;
 
     for (const { line } of BUILT_LINES) {
       for (const s of line.stations) {
@@ -84,6 +85,7 @@ export function LiveMetroWidget({ userPosition }: LiveMetroWidgetProps) {
         if (!best || distM < best.distM) {
           best = {
             id: s.id,
+            schematicId: schematicStationId(s.id),
             name: s.name,
             distM,
             lineId: line.id,
@@ -146,7 +148,7 @@ export function LiveMetroWidget({ userPosition }: LiveMetroWidgetProps) {
         </div>
 
         <Link
-          to={nearestMetroStation ? `/metro/live?station=${nearestMetroStation.id}&tab=timetable` : '/metro/live'}
+          to={nearestMetroStation ? `/metro/live?station=${nearestMetroStation.schematicId}&tab=timetable` : '/metro/live'}
           className="group flex items-center gap-1 text-[11px] font-semibold text-white/60 transition-colors hover:text-white"
         >
           <span>На схемі</span>
@@ -201,7 +203,7 @@ export function LiveMetroWidget({ userPosition }: LiveMetroWidgetProps) {
 
           {/* Центральний платформений модуль станції — веде до повного розкладу цієї станції */}
           <Link
-            to={`/metro/live?station=${nearestMetroStation.id}&tab=timetable`}
+            to={`/metro/live?station=${nearestMetroStation.schematicId}&tab=timetable`}
             className="my-2.5 flex items-center justify-between rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 shadow-inner backdrop-blur-md transition-colors hover:bg-white/15"
           >
             <div className="flex items-center gap-2 truncate">
