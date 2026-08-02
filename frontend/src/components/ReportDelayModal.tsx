@@ -1,13 +1,16 @@
-import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, Check } from 'lucide-react';
 import { Sheet, Button } from '@/components/ui';
 import { useToastStore } from '@/store/useToastStore';
-import { sendDelayReport } from '@/lib/reportDelay';
+import { sendDelayReport, minutesSinceLastReport, QUICK_COMMENTS } from '@/lib/reportDelay';
 import type { TransportKind } from '@/types/transport';
 
 interface ReportDelayModalProps {
   open: boolean;
   onClose: () => void;
+  initialKind?: TransportKind | null;
+  initialRouteNumber?: string;
+  initialStopName?: string;
 }
 
 const KIND_OPTIONS: Array<{ value: TransportKind; label: string; icon: string }> = [
@@ -18,18 +21,37 @@ const KIND_OPTIONS: Array<{ value: TransportKind; label: string; icon: string }>
 ];
 
 /**
- * Шторка "Повідомити про затримку" — форма, яку користувач заповнює на
- * головній сторінці, щоб поскаржитись на затримку транспорту. Дані
- * відправляються адміну в ЛС через Telegram-бота (lib/reportDelay.ts).
+ * Шторка "Повідомити про затримку". Якщо форму відкрили з конкретного
+ * маршруту (RouteDetailModal тощо), вид транспорту й номер маршруту вже
+ * підставлені — лишається тапнути готовий варіант коментаря (або нічого не
+ * чіпати) і один раз підтвердити відправку. Дані йдуть адміну в ЛС через
+ * Telegram-бота (lib/reportDelay.ts); саме Telegram вимагає останнє
+ * підтвердження "Надіслати" в чаті з ботом — це захист від спаму на боці
+ * платформи, обійти його з фронтенду без бекенду не можна.
  */
-export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
+export function ReportDelayModal({
+  open,
+  onClose,
+  initialKind = null,
+  initialRouteNumber = '',
+  initialStopName = ''
+}: ReportDelayModalProps) {
   const showToast = useToastStore((s) => s.show);
 
-  const [kind, setKind] = useState<TransportKind | null>(null);
-  const [routeNumber, setRouteNumber] = useState('');
-  const [stopName, setStopName] = useState('');
+  const [kind, setKind] = useState<TransportKind | null>(initialKind);
+  const [routeNumber, setRouteNumber] = useState(initialRouteNumber);
+  const [stopName, setStopName] = useState(initialStopName);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setKind(initialKind);
+    setRouteNumber(initialRouteNumber);
+    setStopName(initialStopName);
+    setComment('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialKind, initialRouteNumber, initialStopName]);
 
   const resetForm = () => {
     setKind(null);
@@ -44,6 +66,7 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
   };
 
   const isValid = routeNumber.trim().length > 0;
+  const recentMinutes = minutesSinceLastReport(kind, routeNumber);
 
   const handleSubmit = () => {
     if (!isValid || isSubmitting) return;
@@ -53,7 +76,7 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
     setIsSubmitting(false);
 
     if (result.ok) {
-      showToast('Відкрили чат з ботом — натисніть "Надіслати", щоб підтвердити.', 'success');
+      showToast('Дякуємо! Залишилось підтвердити "Надіслати" в чаті з ботом.', 'success');
       resetForm();
       onClose();
       return;
@@ -68,12 +91,22 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
         <div className="flex items-start gap-2.5 rounded-[18px] border border-gold/25 bg-gold/10 p-3.5 text-xs leading-relaxed text-ink-text">
           <AlertTriangle size={17} className="mt-0.5 shrink-0 text-gold" />
           <span>
-            Розкажіть, який транспорт затримується — відкриється чат із ботом Kharkiv GO в
-            Telegram із заповненим повідомленням, залишиться тільки натиснути «Надіслати».
+            Усе вже підставлено — можна одразу тиснути кнопку внизу. Відкриється чат із ботом
+            Kharkiv GO в Telegram із заповненим повідомленням, залишиться тільки натиснути
+            «Надіслати».
           </span>
         </div>
 
-        {/* Вид транспорту */}
+        {recentMinutes !== null && (
+          <div className="flex items-start gap-2.5 rounded-[18px] border border-primary/25 bg-primary/10 p-3.5 text-xs leading-relaxed text-ink-text">
+            <Check size={17} className="mt-0.5 shrink-0 text-primary" />
+            <span>
+              Ви вже повідомляли про цей маршрут {recentMinutes === 0 ? 'щойно' : `${recentMinutes} хв тому`}.
+              Якщо затримка триває — можна надіслати ще раз.
+            </span>
+          </div>
+        )}
+
         <div>
           <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Вид транспорту
@@ -97,7 +130,6 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
           </div>
         </div>
 
-        {/* Номер маршруту */}
         <div>
           <label htmlFor="delay-route" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Номер маршруту *
@@ -113,7 +145,6 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
           />
         </div>
 
-        {/* Зупинка (необов'язково) */}
         <div>
           <label htmlFor="delay-stop" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Зупинка (необов’язково)
@@ -128,17 +159,32 @@ export function ReportDelayModal({ open, onClose }: ReportDelayModalProps) {
           />
         </div>
 
-        {/* Коментар */}
         <div>
-          <label htmlFor="delay-comment" className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-muted">
             Коментар
           </label>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {QUICK_COMMENTS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setComment(comment === preset ? '' : preset)}
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all active:scale-95 ${
+                  comment === preset
+                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    : 'border-border/40 bg-surface-soft text-ink-muted hover:bg-surface'
+                }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
           <textarea
             id="delay-comment"
-            rows={3}
+            rows={2}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Наскільки велика затримка, з якого часу немає транспорту тощо"
+            placeholder="Або опишіть словами — необов'язково"
             className="w-full resize-none rounded-[16px] border border-border/40 bg-surface-soft px-4 py-3.5 text-sm font-semibold text-ink-text outline-none placeholder:text-ink-muted focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           />
         </div>
