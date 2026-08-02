@@ -862,6 +862,24 @@ export function LiveMetroPage() {
   const [nowSec, setNowSec] = useState<number>(() => secOfDay(new Date()));
   const [showLegend, setShowLegend] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  // Дозволяє вмикати/вимикати відображення окремих ліній на схемі —
+  // за замовчуванням показані всі. За замовчуванням містить id усіх
+  // ліній (заповнюється нижче через BUILT_LINES).
+  const [visibleLineIds, setVisibleLineIds] = useState<Set<string>>(
+    () => new Set(BUILT_LINES.map(({ line }) => line.id))
+  );
+  const toggleLineVisibility = useCallback((lineId: string) => {
+    setVisibleLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) {
+        // Не дозволяємо сховати геть усі лінії — хоч одна лишається видимою.
+        if (next.size > 1) next.delete(lineId);
+      } else {
+        next.add(lineId);
+      }
+      return next;
+    });
+  }, []);
 
   // Якщо параметри в URL змінюються (наприклад, повторний перехід з
   // головної сторінки на іншу станцію), синхронізуємо вибір станції.
@@ -983,6 +1001,20 @@ export function LiveMetroPage() {
     }
     return pairs;
   }, [allStations]);
+
+  // Лінії, станції яких зараз показуються на схемі (з урахуванням тумблерів).
+  const visibleBuiltLines = useMemo(
+    () => BUILT_LINES.filter(({ line }) => visibleLineIds.has(line.id)),
+    [visibleLineIds]
+  );
+  const visibleInterchangePairs = useMemo(
+    () => interchangePairs.filter((p) => visibleLineIds.has(p.s1.lineId) && visibleLineIds.has(p.s2.lineId)),
+    [interchangePairs, visibleLineIds]
+  );
+  const visibleTrains = useMemo(
+    () => trains.filter((t) => visibleLineIds.has(t.lineId)),
+    [trains, visibleLineIds]
+  );
 
   const selectedStation = selectedStationId
     ? allStations.find((s) => s.id === selectedStationId) ?? null
@@ -1223,17 +1255,17 @@ export function LiveMetroPage() {
           </g>
 
           {/* Лінії метро */}
-          {BUILT_LINES.map(({ line }) => (
+          {visibleBuiltLines.map(({ line }) => (
             <LineTracks key={line.id} line={line} />
           ))}
 
           {/* Пересадочні гантелі */}
-          {interchangePairs.map((p) => (
+          {visibleInterchangePairs.map((p) => (
             <InterchangeCapsule key={p.id} s1={p.s1} s2={p.s2} />
           ))}
 
           {/* Маркери станцій */}
-          {BUILT_LINES.map(({ line }) =>
+          {visibleBuiltLines.map(({ line }) =>
             line.stations.map((station) => (
               <StationMarker
                 key={`${line.id}-${station.id}`}
@@ -1246,7 +1278,7 @@ export function LiveMetroPage() {
           )}
 
           {/* Поїзди */}
-          {trains.map((train) => (
+          {visibleTrains.map((train) => (
             <TrainMarker
               key={train.id}
               train={train}
@@ -1267,54 +1299,80 @@ export function LiveMetroPage() {
         {/* Умовні позначення — фіксований HTML-оверлей у лівому нижньому куті.
             На відміну від старої версії (яка малювалась усередині <svg> і тому
             "їхала" разом зі схемою під час пану/зуму й губилась за межами екрана),
-            цей блок завжди лишається на місці незалежно від transform карти. */}
+            цей блок завжди лишається на місці незалежно від transform карти.
+            Кожен рядок — це також тумблер: тап вмикає/вимикає показ лінії на схемі. */}
         {showLegend && !selectedTrain && !selectedStation && (
           <div
-            className="pointer-events-none absolute bottom-3 left-3 z-20 w-[min(78vw,260px)] rounded-2xl border border-border/10 bg-surface-raised/95 p-3 shadow-2xl backdrop-blur-sm"
+            className="absolute bottom-3 left-3 z-20 w-[min(78vw,260px)] rounded-2xl border border-border/10 bg-surface-raised/95 p-3 shadow-2xl backdrop-blur-sm"
             style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <div className="flex flex-col gap-2">
-              {BUILT_LINES.map(({ line }) => (
-                <div key={line.id} className="flex items-center gap-2.5">
-                  <span
-                    className="flex h-6 w-7 shrink-0 items-center justify-center rounded-md text-[12px] font-bold text-white"
-                    style={{ backgroundColor: line.color }}
+            <div className="flex flex-col gap-1">
+              {BUILT_LINES.map(({ line }) => {
+                const isVisible = visibleLineIds.has(line.id);
+                return (
+                  <button
+                    key={line.id}
+                    type="button"
+                    onClick={() => toggleLineVisibility(line.id)}
+                    className="flex items-center gap-2.5 rounded-xl p-1 text-left transition-opacity active:scale-[0.98]"
+                    style={{ opacity: isVisible ? 1 : 0.4 }}
+                    aria-pressed={isVisible}
+                    aria-label={`${isVisible ? 'Сховати' : 'Показати'} ${line.name}`}
                   >
-                    {line.number}
-                  </span>
-                  <div className="min-w-0 leading-tight">
-                    <div className="truncate text-[11px] font-bold text-ink-text">{line.name}</div>
-                    <div className="truncate text-[9.5px] text-ink-muted opacity-70">{line.nameEn} · {line.stations.length} ст.</div>
-                  </div>
-                </div>
-              ))}
+                    <span
+                      className="flex h-6 w-7 shrink-0 items-center justify-center rounded-md text-[12px] font-bold text-white"
+                      style={{ backgroundColor: isVisible ? line.color : 'rgb(var(--color-text-muted))' }}
+                    >
+                      {line.number}
+                    </span>
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <div className="truncate text-[11px] font-bold text-ink-text">{line.name}</div>
+                      <div className="truncate text-[9.5px] text-ink-muted opacity-70">{line.nameEn} · {line.stations.length} ст.</div>
+                    </div>
+                    <div
+                      className="flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors"
+                      style={{ backgroundColor: isVisible ? line.color : 'rgb(var(--color-border))' }}
+                    >
+                      <div
+                        className="h-3 w-3 rounded-full bg-white shadow-sm transition-transform"
+                        style={{ transform: isVisible ? 'translateX(0.75rem)' : 'translateX(0)' }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            <div className="mt-2.5 border-t border-border/10 pt-2">
+            <div className="mt-2 border-t border-border/10 pt-2">
               <div className="text-[11px] font-bold text-ink-text">Працює з 5:30 до 24:00</div>
               <div className="text-[9.5px] text-ink-muted opacity-70">metro.kharkiv.ua · 0-800-505-685</div>
             </div>
           </div>
         )}
 
-        {/* Картки інформації */}
-        {selectedTrain && <TrainInfoCard train={selectedTrain} onClose={() => setSelectedTrainId(null)} />}
-        {selectedStation && (
-          <StationInfoCard
-            key={selectedStation.id}
-            station={selectedStation}
-            arrivals={stationArrivals}
-            timetable={stationTimetable}
-            dayType={dayType}
-            nowSec={nowSec}
-            initialTab={
-              initialDeepLinkRef.current.stationId === selectedStation.id
-                ? initialDeepLinkRef.current.tab ?? undefined
-                : undefined
-            }
-            onClose={() => setSelectedStationId(null)}
-          />
-        )}
       </div>
+
+      {/* Картки інформації — навмисно ПОЗА контейнером карти (не його нащадки в DOM):
+          контейнер карти має touch-action: none і власний нативний touchmove-блокер
+          для пінч-зуму, і якщо картку рендерити всередині, браузер поширює цю
+          заборону на скрол і всередині картки — розклад переставав гортатись
+          пальцем на мобільних. Винесення сюди повертає нативний скрол/свайп. */}
+      {selectedTrain && <TrainInfoCard train={selectedTrain} onClose={() => setSelectedTrainId(null)} />}
+      {selectedStation && (
+        <StationInfoCard
+          key={selectedStation.id}
+          station={selectedStation}
+          arrivals={stationArrivals}
+          timetable={stationTimetable}
+          dayType={dayType}
+          nowSec={nowSec}
+          initialTab={
+            initialDeepLinkRef.current.stationId === selectedStation.id
+              ? initialDeepLinkRef.current.tab ?? undefined
+              : undefined
+          }
+          onClose={() => setSelectedStationId(null)}
+        />
+      )}
     </div>
   );
 }

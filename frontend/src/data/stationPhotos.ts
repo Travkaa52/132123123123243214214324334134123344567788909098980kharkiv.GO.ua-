@@ -17,10 +17,18 @@ function findPhoto(fileSlug: string): string | undefined {
   return match?.[1];
 }
 
-/** stop-id (без префіксу "stop-metro-") → назва файла (без суфікса розміру). */
+/**
+ * stop-id (без префіксу "stop-metro-") → назва файла (без суфікса розміру).
+ *
+ * ВАЖЛИВО: ключі тут мають збігатися з `id`, які реально використовує
+ * `pages/LiveMetroPage.tsx` (саме там визначені станції, що рендеряться
+ * на карті та в модалці) — а не зі `schematicData.ts`, чия транслітерація
+ * подекуди відрізняється (напр. "holodna-gora" замість "kholodna-hora").
+ * Через це раніше 6 станцій із 30 не знаходили фото за жодним ключем.
+ */
 const STATION_FILE_SLUGS: Record<string, string> = {
   // Лінія 1 (червона)
-  'holodna-gora': 'kholodna-hora',
+  'kholodna-hora': 'kholodna-hora',
   vokzalna: 'vokzalna',
   'tsentralnyi-rynok': 'tsentralnyi-rynok',
   'maidan-konstytutsii': 'maidan-konstytutsii',
@@ -30,7 +38,7 @@ const STATION_FILE_SLUGS: Record<string, string> = {
   turboatom: 'turboatom',
   'palats-sportu': 'palats-sportu',
   armiiska: 'armiiska',
-  'imeni-o-s-maselskogo': 'imeni-o-s-maselskoho',
+  'imeni-maselskoho': 'imeni-o-s-maselskoho',
   'traktornyi-zavod': 'traktornyi-zavod',
   industrialna: 'industrialna',
 
@@ -40,19 +48,19 @@ const STATION_FILE_SLUGS: Record<string, string> = {
   'akademika-pavlova': 'akademika-pavlova',
   'akademika-barabashova': 'akademika-barabashova',
   kyivska: 'kyivska',
-  'iaroslava-mudrogo': 'jaroslava-mudrogo',
+  'yaroslava-mudroho': 'jaroslava-mudrogo',
   universytet: 'universytet',
   'istorychnyi-muzei': 'istorychnyi-muzei',
 
   // Лінія 3 (зелена)
-  peremoga: 'peremoha',
+  peremoha: 'peremoha',
   oleksiivska: 'oleksiivska',
   '23-serpnia': '23-serpnia',
   'botanichnyi-sad': 'botanichnyi-sad',
   naukova: 'naukova',
   derzhprom: 'derzhprom',
-  'arhitektora-beketova': 'arkhitektora-beketova',
-  'zahysnykiv-ukrainy': 'zakhysnykiv-ukrainy',
+  'arkhitektora-beketova': 'arkhitektora-beketova',
+  'zakhysnykiv-ukrainy': 'zakhysnykiv-ukrainy',
   metrobudivnykiv: 'metrobudivnykiv'
 };
 
