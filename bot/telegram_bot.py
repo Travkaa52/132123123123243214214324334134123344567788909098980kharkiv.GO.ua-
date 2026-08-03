@@ -245,7 +245,7 @@ def git_commit_and_push() -> None:
         if diff.returncode == 0:
             return  # нема змін
         subprocess.run(
-            ["git", "commit", "-m", "chore: process telegram bot updates [skip ci]"],
+            ["git", "commit", "-m", "chore: process telegram bot updates"],
             cwd=REPO_ROOT,
             check=False,
         )
