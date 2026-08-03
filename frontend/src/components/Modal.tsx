@@ -1,6 +1,7 @@
-import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useDragToClose } from '@/hooks/useDragToClose';
 
 interface ModalProps {
   open: boolean;
@@ -23,7 +24,6 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
   const closeTimeoutRef = useRef<number | null>(null);
 
   const clearCloseTimeout = useCallback(() => {
@@ -45,8 +45,10 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
       setMounted(false);
       setClosing(false);
       onClose();
-    }, 220);
+    }, 240);
   }, [closing, clearCloseTimeout, onClose]);
+
+  const dragHandlers = useDragToClose(sheetRef, { onDismiss: closeAnimated });
 
   useEffect(() => {
     if (open) {
@@ -62,7 +64,7 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
       closeTimeoutRef.current = window.setTimeout(() => {
         setMounted(false);
         setClosing(false);
-      }, 220);
+      }, 240);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -83,27 +85,10 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
     };
   }, [mounted, closeAnimated]);
 
-  const onHandlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    dragRef.current = { startY: e.clientY, currentY: e.clientY, dragging: true };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onHandlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    dragRef.current.currentY = e.clientY;
-    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
-    sheetRef.current.style.transform = `translateY(${dy}px)`;
-    sheetRef.current.style.transition = 'none';
-  };
-
-  const onHandlePointerUp = () => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
-    dragRef.current.dragging = false;
-    sheetRef.current.style.transition = '';
-    sheetRef.current.style.transform = '';
-    if (dy > 80) closeAnimated();
-  };
+  const onHandlePointerDown = dragHandlers.onPointerDown;
+  const onHandlePointerMove = dragHandlers.onPointerMove;
+  const onHandlePointerUp = dragHandlers.onPointerUp;
+  const onHandlePointerCancel = dragHandlers.onPointerCancel;
 
   if (!mounted) return null;
 
@@ -128,7 +113,7 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
           'rounded-t-[32px] shadow-glass-lg',
           'pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:rounded-[32px] sm:pb-0',
           closing
-            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
+            ? 'translate-y-full transition-transform duration-[240ms] ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
             : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-250',
         ].join(' ')}
       >
@@ -138,7 +123,7 @@ export function Modal({ open, onClose, title, icon, children }: ModalProps) {
           onPointerDown={onHandlePointerDown}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
-          onPointerCancel={onHandlePointerUp}
+          onPointerCancel={onHandlePointerCancel}
         >
           <div className="h-1.5 w-11 rounded-full bg-ink-muted/30" />
         </div>

@@ -1,7 +1,8 @@
-import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
+import { useDragToClose } from '@/hooks/useDragToClose';
 
 interface SheetProps {
   open: boolean;
@@ -20,7 +21,6 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
   const closeTimeoutRef = useRef<number | null>(null);
 
   const clearCloseTimeout = useCallback(() => {
@@ -42,8 +42,10 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       setMounted(false);
       setClosing(false);
       onClose();
-    }, 220);
+    }, 240);
   }, [closing, clearCloseTimeout, onClose]);
+
+  const dragHandlers = useDragToClose(sheetRef, { onDismiss: closeAnimated });
 
   useEffect(() => {
     if (open) {
@@ -56,7 +58,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       closeTimeoutRef.current = window.setTimeout(() => {
         setMounted(false);
         setClosing(false);
-      }, 220);
+      }, 240);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -70,27 +72,10 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [mounted, closeAnimated]);
 
-  const onHandlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    dragRef.current = { startY: e.clientY, currentY: e.clientY, dragging: true };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onHandlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    dragRef.current.currentY = e.clientY;
-    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
-    sheetRef.current.style.transform = `translateY(${dy}px)`;
-    sheetRef.current.style.transition = 'none';
-  };
-
-  const onHandlePointerUp = () => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    const dy = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
-    dragRef.current.dragging = false;
-    sheetRef.current.style.transition = '';
-    sheetRef.current.style.transform = '';
-    if (dy > 80) closeAnimated();
-  };
+  const onHandlePointerDown = dragHandlers.onPointerDown;
+  const onHandlePointerMove = dragHandlers.onPointerMove;
+  const onHandlePointerUp = dragHandlers.onPointerUp;
+  const onHandlePointerCancel = dragHandlers.onPointerCancel;
 
   if (!mounted) return null;
 
@@ -115,7 +100,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           'rounded-t-[32px] shadow-glass-lg',
           'max-h-[92dvh] pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-h-[85dvh] sm:rounded-[32px]',
           closing
-            ? 'translate-y-full transition-transform duration-200 ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
+            ? 'translate-y-full transition-transform duration-[240ms] ease-in sm:translate-y-0 sm:scale-95 sm:opacity-0 sm:transition-all'
             : 'animate-sheet-up sm:animate-in sm:fade-in sm:zoom-in-95 sm:duration-250'
         )}
       >
@@ -124,7 +109,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           onPointerDown={onHandlePointerDown}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
-          onPointerCancel={onHandlePointerUp}
+          onPointerCancel={onHandlePointerCancel}
         >
           <div className="h-1.5 w-11 rounded-full bg-ink-muted/30" />
         </div>

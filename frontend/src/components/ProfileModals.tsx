@@ -51,13 +51,7 @@ export function AboutAppModal({ open, onClose }: SimpleModalProps) {
     <Modal open={open} onClose={onClose} title="Про програму" icon={<Info className="h-4 w-4" />}>
       <div className="space-y-3 text-xs leading-relaxed text-ink-text">
         <p>
-          <strong>Kharkiv GO</strong> — незалежний проєкт, створений командою ентузіастів, які прагнуть зробити громадський транспорт Харкова сучаснішим, доступнішим і зручнішим для кожного.
-
-Наша мета — створити швидкий, надійний та інтуїтивно зрозумілий сервіс, який допомагає мешканцям і гостям міста легко орієнтуватися в транспортній мережі.
-
-Ми постійно працюємо над покращенням застосунку, додаємо нові можливості, оптимізуємо продуктивність і вдосконалюємо дизайн, щоб забезпечити найкращий користувацький досвід.
-
-Дякуємо, що користуєтеся Kharkiv GO! 💚
+          <strong>Kharkiv GO</strong> — незалежний застосунок для навігації громадським транспортом Харкова: маршрути, розклади та статус метро в реальному часі.
         </p>
         <p className="text-ink-muted">
           Якщо помітили неточність у розкладі чи маршруті — скористайтеся кнопкою «Повідомити про
@@ -107,10 +101,6 @@ export function PrivacyPolicyModal({ open, onClose }: SimpleModalProps) {
   return (
     <Modal open={open} onClose={onClose} title="Політика конфіденційності" icon={<FileText className="h-4 w-4" />}>
       <div className="max-h-[55dvh] space-y-3 overflow-y-auto pr-2 text-xs leading-relaxed text-ink-text">
-        <div className="rounded-2xl bg-primary/5 p-3 text-primary font-medium text-center">
-          ✨ Ми дбаємо про вашу довіру та прагнемо бути максимально прозорими.
-        </div>
-
         <div className="space-y-2.5">
           <div className="rounded-xl border border-border/40 bg-surface-muted/30 p-3 space-y-1">
             <h4 className="font-extrabold text-ink-text flex items-center gap-1.5">
@@ -209,7 +199,7 @@ export function PrivacyPolicyModal({ open, onClose }: SimpleModalProps) {
         </div>
 
         <div className="pt-2 text-center text-[10px] text-ink-muted/70">
-          © Kharkiv GO. Усі права захищені 💚💛
+          © Kharkiv GO
         </div>
       </div>
     </Modal>

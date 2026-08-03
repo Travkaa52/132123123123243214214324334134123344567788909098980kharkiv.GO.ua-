@@ -24,6 +24,7 @@ const STOPS_SOURCE_ID = 'khgo-stops';
 const STOPS_LAYER_ID = 'khgo-stops-circles';
 const STOPS_HALO_LAYER_ID = 'khgo-stops-halo';
 const STOP_HIGHLIGHT_LAYER_ID = 'khgo-stops-highlight';
+const STOPS_HITBOX_LAYER_ID = 'khgo-stops-hitbox';
 // Метро — окремий шар без minzoom-обмеження: станції метро мають лишатись
 // видимими на будь-якому масштабі карти, на відміну від трамвайних/тролейбусних/
 // автобусних зупинок, яких на віддаленому зумі забагато й вони заховані навмисно.
@@ -212,6 +213,24 @@ function addStaticTransitLayers(
       }
     });
 
+    // Невидимий, але значно ширший шар-"мішень" поверх видимих кружечків
+    // зупинок. Раніше клікабельним був лише сам STOPS_LAYER_ID радіусом
+    // 2.2–8px — пальцем на телефоні в нього практично неможливо було
+    // потрапити. Цей шар нічого не малює (circle-opacity: 0), лише
+    // розширює ділянку дотику навколо кожної точки.
+    map.addLayer({
+      id: STOPS_HITBOX_LAYER_ID,
+      type: 'circle',
+      source: STOPS_SOURCE_ID,
+      minzoom: 12,
+      layout: { visibility: showStops ? 'visible' : 'none' },
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 16, 17, 22],
+        'circle-color': '#000000',
+        'circle-opacity': 0
+      }
+    });
+
     // Метро — без minzoom, завжди видимі, поки showStops увімкнено.
     // Значок станції (лого метрополітену) + назва станції збоку.
     addMetroIconLayer(map, showStops);
@@ -316,7 +335,7 @@ function updateStaticTransitLayers(
 
   updateRouteStopHighlight(map, selectedRouteId);
 
-  for (const layerId of [STOPS_LAYER_ID, STOPS_HALO_LAYER_ID, METRO_STOPS_LAYER_ID]) {
+  for (const layerId of [STOPS_LAYER_ID, STOPS_HALO_LAYER_ID, STOPS_HITBOX_LAYER_ID, METRO_STOPS_LAYER_ID]) {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, 'visibility', showStops ? 'visible' : 'none');
     }
@@ -410,7 +429,7 @@ export function MapView({
       ensureBuildingsLayer(map, show3DBuildings);
       addStaticTransitLayers(map, visibleKinds, showStops, selectedRouteId);
 
-      map.on('click', STOPS_LAYER_ID, (e) => {
+      map.on('click', STOPS_HITBOX_LAYER_ID, (e) => {
         const stopId = e.features?.[0]?.properties?.stopId as string | undefined;
         if (stopId) onStopSelectRef.current?.(stopId);
       });
@@ -425,7 +444,7 @@ export function MapView({
         if (routeId) onRouteSelectRef.current?.(routeId);
       });
 
-      for (const layerId of [STOPS_LAYER_ID, METRO_STOPS_LAYER_ID, ROUTES_HITBOX_LAYER_ID]) {
+      for (const layerId of [STOPS_HITBOX_LAYER_ID, METRO_STOPS_LAYER_ID, ROUTES_HITBOX_LAYER_ID]) {
         map.on('mouseenter', layerId, () => {
           map.getCanvas().style.cursor = 'pointer';
         });
