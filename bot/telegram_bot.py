@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 bot/telegram_bot.py
 ------------------------------------------------------------------------------
@@ -7,24 +7,29 @@ Python-версія бота підтримки/затримок Kharkiv GO — 
 для тих, у кого є VPS / домашній сервер і хочеться миттєвих (не раз на ~3 год)
 відповідей адміна та миттєвої появи банера про затримку.
 
-Що вміє:
-    Користувачі (приватний чат із ботом):
-        /start          — привітання + показує ваш chat_id
-        /help           — коротка довідка
-        будь-який текст — йде в підтримку, адмін відповідає Reply
-        (кнопки в Mini App шлють приховано-тегований текст "#delay:..#" —
-         бот розпізнає це як структуровану скаргу на затримку)
+Повністю кнопковий інтерфейс — команди руками вводити не треба:
 
-    Адміни (ADMIN_CHAT_IDS):
-        /alert <номер|all> [вид] <текст>  — вручну оголосити затримку.
-                                            "all" замість номера маршруту —
-                                            загальне оголошення (весь вид
-                                            транспорту, якщо вказано, або
-                                            геть увесь розділ "Транспорт").
-        /alerts                        — список активних оголошень + кнопки скасування
-        /stats                         — короткий дашборд (скарги, оголошення, черга)
+    Користувачі (приватний чат із ботом) бачать постійну клавіатуру:
+        📣 Повідомити про затримку   — кілька тапів (вид → номер маршруту)
+        🔎 Перевірити маршрут        — чи є зараз затримка на маршруті
+        📋 Активні затримки          — список усіх активних оголошень
+        💬 Підтримка                 — написати повідомлення адміну
+        ℹ️ Допомога
+
+        (кнопки в Mini App шлють приховано-тегований текст "#delay:..#" —
+         бот і далі розпізнає це як структуровану скаргу на затримку, для
+         сумісності)
+
+    Адміни (ADMIN_CHAT_IDS) бачать додаткові кнопки:
+        📢 Оголосити затримку   — вид → маршрут (або "усі") → готовий шаблон
+                                   часу (~15/~30/~60 хв) або свій текст
+        📋 Активні оголошення   — список із кнопкою "🗑 Скасувати" біля кожного
+        📊 Статистика            — короткий дашборд (скарги, оголошення, черга)
         Reply на переслане звернення   — відповідь іде користувачу
         Inline-кнопка під авто-запитом — підтвердити оголошення в 1 тап
+
+    Команди /start і /help лишаються робочими для сумісності, але керувати
+    ботом повністю можна кнопками, без набору тексту команд.
 
 Стійкість/якість:
     - усі записи стану пишуться атомарно (tmp-файл + os.replace), щоб SIGKILL
@@ -89,6 +94,10 @@ AUTO_GIT_PUSH = os.getenv("AUTO_GIT_PUSH", "true").lower() not in ("false", "0",
 # затримки й від флуду в адмінський чат.
 USER_RATE_LIMIT_SECONDS = int(os.getenv("USER_RATE_LIMIT_SECONDS", "20"))
 
+# Скільки хвилин "живе" незавершений діалог (вибір кнопками), поки бот не
+# скине його й не попросить почати спочатку.
+PENDING_ACTION_TTL_MINUTES = int(os.getenv("PENDING_ACTION_TTL_MINUTES", "15"))
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # За замовчуванням цей файл лежить у <repo>/bot/telegram_bot.py, а дані — в
@@ -104,6 +113,7 @@ DELAY_REPORTS_FILE = RUNTIME_DIR / "delay-reports.json"
 SUPPORT_MAP_FILE = RUNTIME_DIR / "support-map.json"
 PENDING_PROMPTS_FILE = RUNTIME_DIR / "pending-alert-prompts.json"
 RATE_LIMIT_FILE = RUNTIME_DIR / "rate-limits.json"
+PENDING_ACTIONS_FILE = RUNTIME_DIR / "pending-user-actions.json"
 
 KIND_LABELS = {
     "bus": "Автобус",
@@ -117,6 +127,10 @@ KIND_EMOJI = {
     "tram": "🚊",
     "metro": "🚇",
 }
+KIND_ORDER = ["bus", "trolleybus", "tram", "metro"]
+
+# Готові шаблони орієнтовного часу затримки для швидкого оголошення адміном.
+DELAY_PRESETS_MINUTES = [15, 30, 60]
 
 API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -126,6 +140,53 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger("kharkivgo-bot")
+
+
+# --- постійні кнопки меню (ReplyKeyboard) ------------------------------------
+
+BTN_REPORT_DELAY = "📣 Повідомити про затримку"
+BTN_CHECK_ROUTE = "🔎 Перевірити маршрут"
+BTN_ACTIVE_ALERTS = "📋 Активні затримки"
+BTN_SUPPORT = "💬 Підтримка"
+BTN_HELP = "ℹ️ Допомога"
+
+BTN_ADMIN_ALERT = "📢 Оголосити затримку"
+BTN_ADMIN_ALERTS = "📋 Активні оголошення"
+BTN_ADMIN_STATS = "📊 Статистика"
+
+BTN_CANCEL = "❌ Скасувати"
+
+
+def main_menu_keyboard(is_admin: bool) -> dict:
+    rows = [
+        [BTN_REPORT_DELAY, BTN_CHECK_ROUTE],
+        [BTN_ACTIVE_ALERTS, BTN_SUPPORT],
+    ]
+    if is_admin:
+        rows.append([BTN_ADMIN_ALERT, BTN_ADMIN_ALERTS])
+        rows.append([BTN_ADMIN_STATS, BTN_HELP])
+    else:
+        rows.append([BTN_HELP])
+    return {"keyboard": rows, "resize_keyboard": True, "is_persistent": True}
+
+
+def cancel_only_keyboard() -> dict:
+    return {"keyboard": [[BTN_CANCEL]], "resize_keyboard": True, "is_persistent": True}
+
+
+def cancel_inline_keyboard() -> dict:
+    return {"inline_keyboard": [[{"text": "❌ Скасувати", "callback_data": "flow_cancel"}]]}
+
+
+def kind_inline_keyboard(prefix: str, *, allow_any: bool = True) -> dict:
+    rows = [
+        [{"text": f"{KIND_EMOJI[k]} {KIND_LABELS[k]}", "callback_data": f"{prefix}:{k}"} for k in KIND_ORDER[:2]],
+        [{"text": f"{KIND_EMOJI[k]} {KIND_LABELS[k]}", "callback_data": f"{prefix}:{k}"} for k in KIND_ORDER[2:]],
+    ]
+    if allow_any:
+        rows.append([{"text": "🌐 Будь-який вид транспорту", "callback_data": f"{prefix}:-"}])
+    rows.append([{"text": "❌ Скасувати", "callback_data": "flow_cancel"}])
+    return {"inline_keyboard": rows}
 
 
 # --- маленькі хелпери роботи з JSON-файлами стану ---------------------------
@@ -230,6 +291,11 @@ def prune_rate_limits(rate_limits: dict, now: float) -> dict:
     return {k: v for k, v in rate_limits.items() if v >= cutoff}
 
 
+def prune_pending_actions(pending_actions: dict, now: float) -> dict:
+    cutoff = now - PENDING_ACTION_TTL_MINUTES * 60
+    return {k: v for k, v in pending_actions.items() if v.get("ts", 0) >= cutoff}
+
+
 # --- git ---------------------------------------------------------------------
 
 def git_commit_and_push() -> None:
@@ -299,14 +365,12 @@ def git_commit_and_push() -> None:
 def register_commands() -> None:
     tg("setMyCommands", {
         "commands": [
-            {"command": "start", "description": "Почати / показати мій chat_id"},
+            {"command": "start", "description": "Почати / відкрити меню"},
             {"command": "help", "description": "Довідка"},
         ],
     })
     admin_commands = [
-        {"command": "alert", "description": "Оголосити затримку вручну"},
-        {"command": "alerts", "description": "Активні оголошення (зі скасуванням)"},
-        {"command": "stats", "description": "Короткий дашборд бота"},
+        {"command": "start", "description": "Почати / відкрити меню"},
         {"command": "help", "description": "Довідка"},
     ]
     for admin_id in ADMIN_CHAT_IDS:
@@ -321,6 +385,7 @@ def process_once() -> None:
     support_map = read_json(SUPPORT_MAP_FILE, [])
     pending_prompts = read_json(PENDING_PROMPTS_FILE, [])
     rate_limits = read_json(RATE_LIMIT_FILE, {})
+    pending_actions = read_json(PENDING_ACTIONS_FILE, {})
     alerts = read_json(PUBLIC_ALERTS_PATH, {"items": []}).get("items", [])
 
     updates_res = tg(
@@ -344,7 +409,7 @@ def process_once() -> None:
         changed = True
 
         if "callback_query" in update:
-            handle_callback_query(update["callback_query"], alerts, pending_prompts, delay_reports, now)
+            handle_callback_query(update["callback_query"], alerts, pending_prompts, delay_reports, pending_actions, now)
             continue
 
         message = update.get("message")
@@ -355,32 +420,93 @@ def process_once() -> None:
         chat_id = message["chat"]["id"]
         chat_type = message["chat"]["type"]
         frm = message.get("from", {}) or {}
+        admin = is_admin_chat(chat_id)
 
-        if text and text.startswith("/start") and chat_type == "private":
-            handle_start(chat_id)
+        if chat_type != "private":
             continue
 
-        if text and text.startswith("/help"):
-            handle_help(chat_id, is_admin_chat(chat_id))
-            continue
-
-        if text and text.startswith("/alert") and is_admin_chat(chat_id) and not text.startswith("/alerts"):
-            handle_alert_command(message, alerts, now)
-            continue
-
-        if text and text.startswith("/alerts") and is_admin_chat(chat_id):
-            handle_alerts_command(chat_id, alerts, now)
-            continue
-
-        if text and text.startswith("/stats") and is_admin_chat(chat_id):
-            handle_stats_command(chat_id, alerts, delay_reports, pending_prompts, now)
+        if text and text.strip() in ("/start", "/help"):
+            pending_actions.pop(str(chat_id), None)
+            if text.strip() == "/start":
+                handle_start(chat_id, admin)
+            else:
+                handle_help(chat_id, admin)
             continue
 
         if not text:
             continue
+        text = text.strip()
+
+        # --- Кнопки постійного меню (мають пріоритет — завжди скидають
+        # незавершений діалог, щоб користувач не застряг) --------------------
+        if text == BTN_CANCEL:
+            pending_actions.pop(str(chat_id), None)
+            send_message(chat_id, "Скасовано. Оберіть дію на клавіатурі 👇", reply_markup=main_menu_keyboard(admin))
+            continue
+
+        if text == BTN_HELP:
+            pending_actions.pop(str(chat_id), None)
+            handle_help(chat_id, admin)
+            continue
+
+        if text == BTN_REPORT_DELAY:
+            pending_actions[str(chat_id)] = {"action": "report_kind", "ts": now}
+            send_message(
+                chat_id,
+                "Який вид транспорту затримується?",
+                reply_markup=kind_inline_keyboard("rkind"),
+            )
+            continue
+
+        if text == BTN_CHECK_ROUTE:
+            pending_actions[str(chat_id)] = {"action": "check_route", "ts": now}
+            send_message(
+                chat_id,
+                "Введіть номер маршруту, який хочете перевірити (наприклад <code>27</code>):",
+                reply_markup=cancel_only_keyboard(),
+            )
+            continue
+
+        if text == BTN_ACTIVE_ALERTS:
+            pending_actions.pop(str(chat_id), None)
+            handle_public_alerts_list(chat_id, alerts, now)
+            continue
+
+        if text == BTN_SUPPORT:
+            pending_actions[str(chat_id)] = {"action": "support_text", "ts": now}
+            send_message(
+                chat_id,
+                "Напишіть повідомлення одним текстом — я передам його адміністратору, і відповідь прийде сюди ж.",
+                reply_markup=cancel_only_keyboard(),
+            )
+            continue
+
+        if admin and text == BTN_ADMIN_ALERT:
+            pending_actions[str(chat_id)] = {"action": "alert_kind", "ts": now}
+            send_message(
+                chat_id,
+                "Оберіть вид транспорту, на який поширюється затримка:",
+                reply_markup=kind_inline_keyboard("akind"),
+            )
+            continue
+
+        if admin and text == BTN_ADMIN_ALERTS:
+            pending_actions.pop(str(chat_id), None)
+            handle_alerts_command(chat_id, alerts, now)
+            continue
+
+        if admin and text == BTN_ADMIN_STATS:
+            pending_actions.pop(str(chat_id), None)
+            handle_stats_command(chat_id, alerts, delay_reports, pending_prompts, now)
+            continue
+
+        # --- Продовження вже почато́го діалогу (введення тексту кроком) -----
+        pending = pending_actions.get(str(chat_id))
+        if pending and handle_pending_text_step(chat_id, frm, text, pending, pending_actions, alerts, delay_reports, rate_limits, support_map, admin, now):
+            continue
 
         # Reply адміна на переслане звернення користувача
-        if is_admin_chat(chat_id) and message.get("reply_to_message"):
+        if admin and message.get("reply_to_message"):
             mapping = next(
                 (
                     m
@@ -394,18 +520,24 @@ def process_once() -> None:
                 send_message(chat_id, "✅ Відповідь надіслано користувачу.", reply_to_message_id=message["message_id"])
             continue
 
-        if is_admin_chat(chat_id):
+        if admin:
             continue  # адмін пише щось інше — ігноруємо
-        if chat_type != "private":
-            continue
 
+        # Сумісність зі старими тегованими повідомленнями з Mini App
         delay_match = DELAY_TAG_RE.match(text)
-
         if delay_match:
             handle_delay_report(chat_id, frm, text, delay_match, delay_reports, rate_limits, now)
             continue
+        if SUPPORT_TAG_RE.match(text):
+            handle_support_message(chat_id, frm, text, support_map, rate_limits, now)
+            continue
 
-        handle_support_message(chat_id, frm, text, support_map, rate_limits, now)
+        # Невпізнаний текст — не мовчимо, підказуємо кнопки.
+        send_message(
+            chat_id,
+            "Не зовсім зрозумів 🙂 Скористайтесь кнопками нижче — так найшвидше:",
+            reply_markup=main_menu_keyboard(admin),
+        )
 
     if not changed:
         return
@@ -439,7 +571,7 @@ def process_once() -> None:
         prompt_text = (
             f"⚠️ <b>Увага!</b> {len(user_set)} різних користувачів поскаржились на затримку маршруту "
             f"<b>{escape_html(route_number)}</b> ({kind_badge(kind)}) за останні {DELAY_REPORT_WINDOW_MINUTES} хв.\n\n"
-            f"Опублікувати оголошення про затримку в застосунку?"
+            f"Опублікувати оголошення про затримку (орієнтовно ~15 хв) в застосунку?"
         )
         keyboard = {
             "inline_keyboard": [[
@@ -462,6 +594,7 @@ def process_once() -> None:
     pending_prompts = [p for p in pending_prompts if now - p["createdAt"] < DELAY_REPORT_WINDOW_MINUTES * 60]
     alerts = [a for a in alerts if a["expiresAt"] > now - 86400]
     rate_limits = prune_rate_limits(rate_limits, now)
+    pending_actions = prune_pending_actions(pending_actions, now)
 
     active_alerts = [a for a in alerts if a["expiresAt"] > now]
     if supabase_sync.replace_route_alerts(active_alerts):
@@ -472,6 +605,7 @@ def process_once() -> None:
     write_json(SUPPORT_MAP_FILE, support_map)
     write_json(PENDING_PROMPTS_FILE, pending_prompts)
     write_json(RATE_LIMIT_FILE, rate_limits)
+    write_json(PENDING_ACTIONS_FILE, pending_actions)
     write_json(PUBLIC_ALERTS_PATH, {"updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "items": alerts})
 
     git_commit_and_push()
@@ -481,34 +615,185 @@ def escape_html(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-# --- обробники повідомлень ----------------------------------------------------
+# --- привітання / довідка -----------------------------------------------------
 
-def handle_start(chat_id: int) -> None:
-    send_message(
-        chat_id,
-        "👋 <b>Вітаємо в Kharkiv GO!</b>\n\n"
-        "Повідомлення, надіслані сюди, автоматично йдуть у підтримку — ми відповімо прямо в цьому чаті.\n\n"
-        f"🆔 Ваш chat_id (для налаштування адмінів): <code>{chat_id}</code>",
+def handle_start(chat_id: int, is_admin: bool) -> None:
+    text = (
+        "👋 <b>Вітаємо у Kharkiv GO!</b>\n\n"
+        "Я допоможу дізнатись про затримки громадського транспорту Харкова "
+        "й швидко звʼязатись із підтримкою — усе кнопками, нічого набирати не треба.\n\n"
+        "Оберіть дію на клавіатурі знизу 👇"
     )
+    if is_admin:
+        text += "\n\n🛠 У вас права адміністратора — доступні додаткові кнопки оголошень і статистики."
+    text += f"\n\n🆔 Ваш chat_id: <code>{chat_id}</code>"
+    send_message(chat_id, text, reply_markup=main_menu_keyboard(is_admin))
 
 
 def handle_help(chat_id: int, is_admin: bool) -> None:
     text = (
-        "ℹ️ <b>Довідка Kharkiv GO Bot</b>\n\n"
-        "• Просто напишіть сюди — звернення піде в підтримку, відповімо в цьому ж чаті.\n"
-        "• Кнопка «⚠️ Затримка» в застосунку сама формує повідомлення-скаргу.\n"
+        "ℹ️ <b>Як користуватись Kharkiv GO Bot</b>\n\n"
+        f"• «{BTN_REPORT_DELAY}» — повідомити, що ваш маршрут затримується (вид → номер).\n"
+        f"• «{BTN_CHECK_ROUTE}» — дізнатись, чи є вже підтверджена затримка на маршруті.\n"
+        f"• «{BTN_ACTIVE_ALERTS}» — список усіх активних оголошень зараз.\n"
+        f"• «{BTN_SUPPORT}» — написати в підтримку, адмін відповість прямо тут.\n"
     )
     if is_admin:
         text += (
-            "\n<b>Адмінські команди:</b>\n"
-            "/alert &lt;номер|all&gt; [bus|tram|trolleybus|metro] &lt;текст&gt; — оголосити затримку вручну\n"
-            "/alerts — активні оголошення зі скасуванням в 1 тап\n"
-            "/stats — короткий дашборд\n"
-            "Reply на переслане звернення користувача — відповідь піде йому напряму.\n\n"
-            "<i>\"all\" замість номера маршруту — загальне оголошення (весь вид транспорту або весь розділ \"Транспорт\").</i>\n"
+            f"\n<b>Адмінські кнопки:</b>\n"
+            f"• «{BTN_ADMIN_ALERT}» — оголосити затримку: вид → маршрут (або «усі») → орієнтовний час.\n"
+            f"• «{BTN_ADMIN_ALERTS}» — активні оголошення, кожне скасовується в 1 тап.\n"
+            f"• «{BTN_ADMIN_STATS}» — короткий дашборд бота.\n"
+            f"• Reply на переслане звернення користувача — відповідь піде йому напряму.\n"
         )
-    send_message(chat_id, text)
+    send_message(chat_id, text, reply_markup=main_menu_keyboard(is_admin))
 
+
+# --- крокові діалоги (FSM за кнопками) ---------------------------------------
+
+def handle_pending_text_step(
+    chat_id: int,
+    frm: dict,
+    text: str,
+    pending: dict,
+    pending_actions: dict,
+    alerts: list,
+    delay_reports: list,
+    rate_limits: dict,
+    support_map: list,
+    is_admin: bool,
+    now: float,
+) -> bool:
+    """Обробляє текстове повідомлення як черговий крок незавершеного діалогу.
+    Повертає True, якщо повідомлення було "спожите" як частина діалогу."""
+    action = pending.get("action")
+
+    if action == "check_route":
+        pending_actions.pop(str(chat_id), None)
+        route_number = text.strip()
+        matches = [
+            a for a in alerts
+            if a["expiresAt"] > now and (
+                str(a["routeNumber"]).strip().lower() == route_number.lower()
+                or str(a["routeNumber"]).strip().lower() == "all"
+            )
+        ]
+        if matches:
+            lines = []
+            for a in matches:
+                lines.append(f"{kind_badge(a.get('kind'))} · {escape_html(a['message'])}")
+            body = "\n\n".join(lines)
+            send_message(
+                chat_id,
+                f"⚠️ <b>На маршруті {escape_html(route_number)} можлива затримка.</b>\n\n{body}",
+                reply_markup=main_menu_keyboard(is_admin),
+            )
+        else:
+            send_message(
+                chat_id,
+                f"✅ Активних оголошень про затримку на маршруті <b>{escape_html(route_number)}</b> зараз немає.",
+                reply_markup=main_menu_keyboard(is_admin),
+            )
+        return True
+
+    if action == "report_route":
+        if not check_and_touch_rate_limit(rate_limits, frm.get("id"), "delay", now):
+            pending_actions.pop(str(chat_id), None)
+            send_message(chat_id, "⏳ Зачекайте трохи перед наступною скаргою — попередню вже надіслано.", reply_markup=main_menu_keyboard(is_admin))
+            return True
+        pending_actions.pop(str(chat_id), None)
+        route_number = text.strip()
+        kind = pending.get("kind")
+        delay_reports.append(
+            {
+                "userId": frm.get("id"),
+                "username": frm.get("username"),
+                "kind": kind,
+                "routeNumber": route_number,
+                "comment": "",
+                "createdAt": now,
+            }
+        )
+        report_text = (
+            f"🚨 <b>Скарга на затримку</b>\n"
+            f"Маршрут: <b>{escape_html(route_number)}</b> ({kind_badge(kind)})\n"
+            f"Від: {escape_html(user_label(frm.get('id'), frm.get('username'), frm.get('first_name')))}"
+        )
+        for admin_id in ADMIN_CHAT_IDS:
+            send_message(admin_id, report_text)
+        send_message(
+            chat_id,
+            "✅ Дякуємо! Скаргу на затримку передано адміністратору.",
+            reply_markup=main_menu_keyboard(is_admin),
+        )
+        log.info("Скарга на затримку (кнопки): маршрут=%s kind=%s user=%s", route_number, kind, frm.get("id"))
+        return True
+
+    if action == "support_text":
+        pending_actions.pop(str(chat_id), None)
+        handle_support_message(chat_id, frm, f"#support# {text}", support_map, rate_limits, now)
+        send_message(chat_id, "Оберіть наступну дію 👇", reply_markup=main_menu_keyboard(is_admin))
+        return True
+
+    if action == "alert_route" and is_admin:
+        pending_actions[str(chat_id)] = {
+            "action": "alert_preset",
+            "kind": pending.get("kind"),
+            "route": text.strip(),
+            "ts": now,
+        }
+        send_preset_prompt(chat_id, text.strip(), pending.get("kind"))
+        return True
+
+    if action == "alert_custom_text" and is_admin:
+        pending_actions.pop(str(chat_id), None)
+        create_alert_and_notify(chat_id, pending.get("route"), pending.get("kind"), text.strip(), alerts, now)
+        return True
+
+    return False
+
+
+def send_preset_prompt(chat_id: int, route_number: str, kind: Optional[str]) -> None:
+    route_label = "усі маршрути" if route_number.lower() == "all" else f"маршрут {route_number}"
+    rows = [
+        [{"text": f"🕐 ~{m} хв", "callback_data": f"apreset:{m}"} for m in DELAY_PRESETS_MINUTES],
+        [{"text": "✍️ Свій текст", "callback_data": "apreset:custom"}],
+        [{"text": "❌ Скасувати", "callback_data": "flow_cancel"}],
+    ]
+    send_message(
+        chat_id,
+        f"Оголошуємо затримку для <b>{escape_html(route_label)}</b> ({kind_badge(kind)}).\n"
+        f"Оберіть орієнтовний час затримки або введіть власний текст:",
+        reply_markup={"inline_keyboard": rows},
+    )
+
+
+def create_alert_and_notify(chat_id: int, route_number: str, kind: Optional[str], alert_text: str, alerts: list, now: float) -> None:
+    if not alert_text:
+        send_message(chat_id, "Порожній текст оголошення — спробуйте ще раз.", reply_markup=main_menu_keyboard(True))
+        return
+    alert_id = int(now * 1000)
+    alerts.append(
+        {
+            "id": alert_id,
+            "kind": kind,
+            "routeNumber": route_number,
+            "message": alert_text,
+            "createdAt": now,
+            "expiresAt": now + DELAY_ALERT_DURATION_HOURS * 3600,
+            "source": "manual",
+        }
+    )
+    send_message(
+        chat_id,
+        f"✅ Оголошення створено для маршруту <b>{escape_html(route_number)}</b> на {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год.",
+        reply_markup={"inline_keyboard": [[{"text": "🗑 Скасувати достроково", "callback_data": f"cancel_alert:{alert_id}"}]]},
+    )
+    send_message(chat_id, "Оберіть наступну дію 👇", reply_markup=main_menu_keyboard(True))
+    log.info("Оголошення створено (кнопки): id=%s маршрут=%s kind=%s", alert_id, route_number, kind)
+
+
+# --- обробники повідомлень ----------------------------------------------------
 
 def handle_delay_report(
     chat_id: int,
@@ -584,129 +869,21 @@ def handle_support_message(
     log.info("Звернення в підтримку від user=%s", frm.get("id"))
 
 
-def handle_callback_query(cq: dict, alerts: list, pending_prompts: list, delay_reports: list, now: float) -> None:
-    chat_id = cq["message"]["chat"]["id"]
-    if not is_admin_chat(chat_id):
-        tg("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Недостатньо прав", "show_alert": True})
+def handle_public_alerts_list(chat_id: int, alerts: list, now: float) -> None:
+    active = [a for a in alerts if a["expiresAt"] > now]
+    if not active:
+        send_message(chat_id, "✅ Наразі активних оголошень про затримки немає.")
         return
-
-    data = cq.get("data", "")
-
-    if data.startswith("cancel_alert:"):
-        alert_id_raw = data.split(":", 1)[1]
-        try:
-            alert_id = int(alert_id_raw)
-        except ValueError:
-            alert_id = None
-        before = len(alerts)
-        alerts[:] = [a for a in alerts if a.get("id") != alert_id]
-        removed = len(alerts) != before
-        tg(
-            "editMessageText",
-            {
-                "chat_id": chat_id,
-                "message_id": cq["message"]["message_id"],
-                "text": f"{cq['message'].get('text', '')}\n\n🗑 <b>Скасовано.</b>" if removed else cq["message"].get("text", ""),
-                "parse_mode": "HTML",
-            },
+    send_message(chat_id, f"📋 <b>Активні оголошення ({len(active)}):</b>")
+    for a in sorted(active, key=lambda x: x["expiresAt"]):
+        minutes_left = max(0, int((a["expiresAt"] - now) / 60))
+        route_label = "усі маршрути" if str(a["routeNumber"]).lower() == "all" else f"маршрут {a['routeNumber']}"
+        text = (
+            f"{kind_badge(a.get('kind'))} · {escape_html(route_label)}\n"
+            f"{escape_html(a['message'])}\n"
+            f"⏱ Ще ~{minutes_left} хв"
         )
-        tg(
-            "answerCallbackQuery",
-            {"callback_query_id": cq["id"], "text": "Оголошення скасовано" if removed else "Вже неактивне"},
-        )
-        return
-
-    parts = data.split(":")
-    if len(parts) < 3 or parts[0] != "confirm_alert":
-        return
-    _, route_number, kind_raw = parts
-    kind = None if kind_raw == "-" else kind_raw
-
-    matching = [
-        r for r in reversed(delay_reports) if r["routeNumber"] == route_number and (kind is None or r["kind"] == kind)
-    ]
-    last_comment = matching[0]["comment"] if matching and matching[0].get("comment") else ""
-
-    text = f"Можлива затримка руху маршруту {route_number}. Повідомляють кілька пасажирів."
-    if last_comment:
-        text += f" Коментар: {last_comment[:200]}"
-
-    new_alert_id = int(now * 1000)
-    alerts.append(
-        {
-            "id": new_alert_id,
-            "kind": kind,
-            "routeNumber": route_number,
-            "message": text,
-            "createdAt": now,
-            "expiresAt": now + DELAY_ALERT_DURATION_HOURS * 3600,
-            "source": "auto",
-        }
-    )
-    pending_prompts[:] = [p for p in pending_prompts if not (p["routeNumber"] == route_number and p["kind"] == kind)]
-
-    tg(
-        "editMessageText",
-        {
-            "chat_id": chat_id,
-            "message_id": cq["message"]["message_id"],
-            "text": (
-                f"{cq['message'].get('text', '')}\n\n"
-                f"✅ <b>Підтверджено.</b> Оголошення активне {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год."
-            ),
-            "parse_mode": "HTML",
-            "reply_markup": {
-                "inline_keyboard": [[{"text": "🗑 Скасувати достроково", "callback_data": f"cancel_alert:{new_alert_id}"}]]
-            },
-        },
-    )
-    tg("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Оголошення опубліковано в застосунку"})
-    log.info("Оголошення затримки створено: id=%s маршрут=%s", new_alert_id, route_number)
-
-
-def handle_alert_command(message: dict, alerts: list, now: float) -> None:
-    chat_id = message["chat"]["id"]
-    parts = message["text"].split()
-    if len(parts) < 3:
-        send_message(
-            chat_id,
-            "Формат: <code>/alert &lt;номер_маршруту або all&gt; [вид: bus/tram/trolleybus/metro] &lt;текст&gt;</code>\n\n"
-            "Приклади:\n"
-            "<code>/alert 27 Затримка 15+ хв через ДТП</code>\n"
-            "<code>/alert all bus Затримки на всіх автобусних маршрутах через негоду</code>\n"
-            "<code>/alert all Тимчасові збої руху транспорту по всьому місту</code>",
-        )
-        return
-
-    route_number = parts[1]
-    kind = None
-    text_start_idx = 2
-    if parts[2].lower() in ("bus", "tram", "trolleybus", "metro"):
-        kind = parts[2].lower()
-        text_start_idx = 3
-
-    alert_text = " ".join(parts[text_start_idx:]).strip()
-    if not alert_text:
-        send_message(chat_id, "Не вистачає тексту оголошення.")
-        return
-
-    alert_id = int(now * 1000)
-    alerts.append(
-        {
-            "id": alert_id,
-            "kind": kind,
-            "routeNumber": route_number,
-            "message": alert_text,
-            "createdAt": now,
-            "expiresAt": now + DELAY_ALERT_DURATION_HOURS * 3600,
-            "source": "manual",
-        }
-    )
-    send_message(
-        chat_id,
-        f"✅ Оголошення створено для маршруту <b>{escape_html(route_number)}</b> на {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год.",
-        reply_markup={"inline_keyboard": [[{"text": "🗑 Скасувати достроково", "callback_data": f"cancel_alert:{alert_id}"}]]},
-    )
+        send_message(chat_id, text)
 
 
 def handle_alerts_command(chat_id: int, alerts: list, now: float) -> None:
@@ -752,6 +929,161 @@ def handle_stats_command(chat_id: int, alerts: list, delay_reports: list, pendin
         f"<b>Топ маршрутів за скаргами:</b>\n{top_lines}"
     )
     send_message(chat_id, text)
+
+
+# --- обробка inline-кнопок (callback_query) ----------------------------------
+
+def handle_callback_query(cq: dict, alerts: list, pending_prompts: list, delay_reports: list, pending_actions: dict, now: float) -> None:
+    chat_id = cq["message"]["chat"]["id"]
+    data = cq.get("data", "")
+    admin = is_admin_chat(chat_id)
+
+    if data == "flow_cancel":
+        pending_actions.pop(str(chat_id), None)
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Скасовано"})
+        tg(
+            "editMessageText",
+            {
+                "chat_id": chat_id,
+                "message_id": cq["message"]["message_id"],
+                "text": f"{cq['message'].get('text', '')}\n\n❌ <i>Скасовано.</i>",
+                "parse_mode": "HTML",
+            },
+        )
+        send_message(chat_id, "Оберіть дію на клавіатурі 👇", reply_markup=main_menu_keyboard(admin))
+        return
+
+    # --- діалог "Повідомити про затримку" (будь-який користувач) -----------
+    if data.startswith("rkind:"):
+        kind = data.split(":", 1)[1]
+        kind = None if kind == "-" else kind
+        pending_actions[str(chat_id)] = {"action": "report_route", "kind": kind, "ts": now}
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"]})
+        send_message(
+            chat_id,
+            "Введіть номер маршруту (наприклад <code>27</code>):",
+            reply_markup=cancel_only_keyboard(),
+        )
+        return
+
+    # --- діалог "Оголосити затримку" (тільки адмін) --------------------------
+    if data.startswith("akind:") and admin:
+        kind = data.split(":", 1)[1]
+        kind = None if kind == "-" else kind
+        pending_actions[str(chat_id)] = {"action": "alert_route", "kind": kind, "ts": now}
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"]})
+        send_message(
+            chat_id,
+            "Введіть номер маршруту, або натисніть «Усі маршрути»:",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "🌐 Усі маршрути цього виду", "callback_data": "aroute_all"}],
+                    [{"text": "❌ Скасувати", "callback_data": "flow_cancel"}],
+                ]
+            },
+        )
+        return
+
+    if data == "aroute_all" and admin:
+        pending = pending_actions.get(str(chat_id), {})
+        kind = pending.get("kind")
+        pending_actions[str(chat_id)] = {"action": "alert_preset", "kind": kind, "route": "all", "ts": now}
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"]})
+        send_preset_prompt(chat_id, "all", kind)
+        return
+
+    if data.startswith("apreset:") and admin:
+        pending = pending_actions.get(str(chat_id), {})
+        route_number = pending.get("route")
+        kind = pending.get("kind")
+        choice = data.split(":", 1)[1]
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"]})
+        if choice == "custom":
+            pending_actions[str(chat_id)] = {"action": "alert_custom_text", "kind": kind, "route": route_number, "ts": now}
+            send_message(chat_id, "Введіть текст оголошення:", reply_markup=cancel_only_keyboard())
+            return
+        pending_actions.pop(str(chat_id), None)
+        minutes = choice
+        route_label = "усі маршрути" if str(route_number).lower() == "all" else f"маршрут {route_number}"
+        alert_text = f"Можлива затримка руху ({route_label}), орієнтовно ~{minutes} хв."
+        create_alert_and_notify(chat_id, route_number, kind, alert_text, alerts, now)
+        return
+
+    # --- решта callback-ів доступні лише адмінам ----------------------------
+    if not admin:
+        tg("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Недостатньо прав", "show_alert": True})
+        return
+
+    if data.startswith("cancel_alert:"):
+        alert_id_raw = data.split(":", 1)[1]
+        try:
+            alert_id = int(alert_id_raw)
+        except ValueError:
+            alert_id = None
+        before = len(alerts)
+        alerts[:] = [a for a in alerts if a.get("id") != alert_id]
+        removed = len(alerts) != before
+        tg(
+            "editMessageText",
+            {
+                "chat_id": chat_id,
+                "message_id": cq["message"]["message_id"],
+                "text": f"{cq['message'].get('text', '')}\n\n🗑 <b>Скасовано.</b>" if removed else cq["message"].get("text", ""),
+                "parse_mode": "HTML",
+            },
+        )
+        tg(
+            "answerCallbackQuery",
+            {"callback_query_id": cq["id"], "text": "Оголошення скасовано" if removed else "Вже неактивне"},
+        )
+        return
+
+    parts = data.split(":")
+    if len(parts) < 3 or parts[0] != "confirm_alert":
+        return
+    _, route_number, kind_raw = parts
+    kind = None if kind_raw == "-" else kind_raw
+
+    matching = [
+        r for r in reversed(delay_reports) if r["routeNumber"] == route_number and (kind is None or r["kind"] == kind)
+    ]
+    last_comment = matching[0]["comment"] if matching and matching[0].get("comment") else ""
+
+    text = f"Можлива затримка руху маршруту {route_number}, орієнтовно ~15 хв. Повідомляють кілька пасажирів."
+    if last_comment:
+        text += f" Коментар: {last_comment[:200]}"
+
+    new_alert_id = int(now * 1000)
+    alerts.append(
+        {
+            "id": new_alert_id,
+            "kind": kind,
+            "routeNumber": route_number,
+            "message": text,
+            "createdAt": now,
+            "expiresAt": now + DELAY_ALERT_DURATION_HOURS * 3600,
+            "source": "auto",
+        }
+    )
+    pending_prompts[:] = [p for p in pending_prompts if not (p["routeNumber"] == route_number and p["kind"] == kind)]
+
+    tg(
+        "editMessageText",
+        {
+            "chat_id": chat_id,
+            "message_id": cq["message"]["message_id"],
+            "text": (
+                f"{cq['message'].get('text', '')}\n\n"
+                f"✅ <b>Підтверджено.</b> Оголошення активне {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год."
+            ),
+            "parse_mode": "HTML",
+            "reply_markup": {
+                "inline_keyboard": [[{"text": "🗑 Скасувати достроково", "callback_data": f"cancel_alert:{new_alert_id}"}]]
+            },
+        },
+    )
+    tg("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Оголошення опубліковано в застосунку"})
+    log.info("Оголошення затримки створено: id=%s маршрут=%s", new_alert_id, route_number)
 
 
 # --- запуск / graceful shutdown ---------------------------------------------
