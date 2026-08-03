@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { HomePage } from '@/pages/HomePage';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { DevToolsGuardOverlay } from '@/components/DevToolsGuardOverlay';
 
 /**
  * ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@ const HistoryPage = lazyWithRetry(() => import('@/pages/HistoryPage').then((m) =
 const SettingsPage = lazyWithRetry(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })), 'SettingsPage');
 const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })), 'ProfilePage');
 const RemindersPage = lazyWithRetry(() => import('@/pages/RemindersPage').then((m) => ({ default: m.RemindersPage })), 'RemindersPage');
+const InstallAppPage = lazyWithRetry(() => import('@/pages/InstallAppPage').then((m) => ({ default: m.InstallAppPage })), 'InstallAppPage');
 
 /**
  * Преміальний Route Fallback із використанням Glassmorphism, Skeleton та Shimmer-ефекту.
@@ -137,6 +139,7 @@ export default function App() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/install-app" element={<InstallAppPage />} />
 
               {/* Обробка невідомих URL та 404 */}
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -160,6 +163,7 @@ export default function App() {
       <MemoizedBottomNav />
       <Toast />
       <PwaUpdateBanner />
+      <DevToolsGuardOverlay />
 
       {showRegistration && <RegistrationModal />}
 

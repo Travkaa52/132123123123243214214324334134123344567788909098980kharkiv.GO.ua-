@@ -27,6 +27,10 @@ interface TelegramWebApp {
   enableClosingConfirmation?: () => void;
   HapticFeedback?: { impactOccurred: (style: string) => void; notificationOccurred?: (type: string) => void };
   openTelegramLink?: (url: string) => void;
+  /** Відкриває зовнішнє посилання. Поза Telegram-звʼязком (у системному браузері),
+   *  а не у вбудованому WebView — потрібно саме для встановлення PWA, бо
+   *  вбудований браузер Telegram не підтримує Service Worker / install prompt. */
+  openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
   close: () => void;
   isVersionAtLeast?: (version: string) => boolean;
   /** Показує системний діалог "Додати на головний екран" (Bot API 8.0+, Telegram 7.x+). */
@@ -121,6 +125,22 @@ export function addAppToHomeScreen(onAdded?: () => void) {
 }
 
 /** Викликати один раз при старті застосунку. */
+/**
+ * Відкриває URL у ЗОВНІШНЬОМУ системному браузері пристрою (Safari/Chrome),
+ * а не у вбудованому вʼюпорті Telegram. Потрібно для сторінки встановлення
+ * PWA: вбудований WebView Telegram не реєструє Service Worker і не показує
+ * діалог "Встановити застосунок" / "На екран Домівка" так само надійно, як
+ * повноцінний браузер.
+ */
+export function openInExternalBrowser(url: string) {
+  const tg = getTelegramWebApp();
+  if (tg?.openLink) {
+    tg.openLink(url, { try_instant_view: false });
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export function initTelegramApp() {
   const tg = getTelegramWebApp();
   if (!tg) return;
