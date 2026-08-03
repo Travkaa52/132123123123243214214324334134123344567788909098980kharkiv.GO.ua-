@@ -97,8 +97,12 @@ export function StopDetailModal({
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5">
             {stop.kinds.map((k) => (
-              <span key={k} className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-surface-soft">
-                <TransportKindIcon kind={k} size={18} />
+              <span
+                key={k}
+                title={KIND_LABELS_UK[k]}
+                className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-surface-soft ring-1 ring-border/50 shadow-xs"
+              >
+                <TransportKindIcon kind={k} size={19} />
               </span>
             ))}
             {distanceM !== null && (
@@ -203,7 +207,7 @@ export function StopDetailModal({
                     kindFilter === k ? 'bg-primary text-white' : 'bg-surface-soft text-ink-muted hover:text-ink-text'
                   )}
                 >
-                  <TransportKindIcon kind={k} size={13} className={kindFilter === k ? 'brightness-0 invert' : ''} />
+                  <TransportKindIcon kind={k} size={14} className={kindFilter === k ? 'ring-2 ring-white' : ''} />
                   {KIND_LABELS_UK[k]}
                 </button>
               ))}
@@ -240,6 +244,9 @@ export function StopDetailModal({
                         style={{ backgroundColor: route.color }}
                       >
                         {route.number}
+                      </span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-surface">
+                        <TransportKindIcon kind={route.kind} size={17} />
                       </span>
                       <div className="flex min-w-0 flex-col text-left">
                         <span className="truncate font-bold text-ink-text">{KIND_LABELS_UK[route.kind]}</span>

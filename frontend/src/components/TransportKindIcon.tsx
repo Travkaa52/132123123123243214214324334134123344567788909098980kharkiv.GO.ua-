@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { TRANSPORT_COLORS } from '@/config/map';
+import { assetUrl } from '@/lib/assetUrl';
 import type { TransportKind } from '@/types/transport';
 
 export interface TransportKindIconProps {
@@ -7,6 +8,18 @@ export interface TransportKindIconProps {
   size?: number;
   className?: string;
 }
+
+/**
+ * Реальні фото-іконки виду транспорту з /public/sprites (замовлення
+ * замовника: використовувати саме ці картинки, а не намальовані SVG).
+ * Для метро окремої іконки-фото нема (є лише великий sprite sheet вагона),
+ * тому метро й далі малюється векторно.
+ */
+const KIND_PHOTO_ICONS: Partial<Record<TransportKind, string>> = {
+  bus: assetUrl('sprites/iconsbus.png'),
+  tram: assetUrl('sprites/iconstramvay.jpg'),
+  trolleybus: assetUrl('sprites/iconstrolley.jpg')
+};
 
 /**
  * Векторна (SVG) піктограма виду транспорту — метро / трамвай / тролейбус / автобус.
@@ -21,6 +34,22 @@ export interface TransportKindIconProps {
  */
 function TransportKindIconComponent({ kind, size = 20, className }: TransportKindIconProps) {
   const color = TRANSPORT_COLORS[kind] ?? '#2B2F31';
+
+  const photoSrc = KIND_PHOTO_ICONS[kind];
+  if (photoSrc) {
+    return (
+      <img
+        src={photoSrc}
+        alt={KIND_LABELS_UK[kind]}
+        width={size}
+        height={size}
+        loading="lazy"
+        className={`shrink-0 rounded-full object-cover ring-1 ring-black/5 ${className ?? ''}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   const common = {
     width: size,
     height: size,
