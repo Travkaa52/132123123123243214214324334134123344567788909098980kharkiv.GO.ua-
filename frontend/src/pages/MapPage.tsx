@@ -7,7 +7,6 @@ import {
   Plus, 
   Minus, 
   Compass, 
-  Navigation, 
   MapPin,
   ArrowUpDown,
   Route as RouteIcon,
