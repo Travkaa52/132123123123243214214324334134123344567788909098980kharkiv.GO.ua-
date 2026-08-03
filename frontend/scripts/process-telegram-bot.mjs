@@ -2,34 +2,8 @@
 /**
  * scripts/process-telegram-bot.mjs
  * ---------------------------------------------------------------------------
- * Замінює собою "живого" бота. Оскільки застосунок живе на GitHub Pages
- * (тільки статичні файли), окремого завжди-увімкненого сервера тут бути не
- * може — натомість цей скрипт запускається за розкладом
- * (.github/workflows/telegram-bot.yml) і, поки виконується завдання Actions,
- * РЕАЛЬНО тримає long-polling з'єднання до Telegram (getUpdates із
- * timeout — сервер Telegram сам тримає HTTP-запит відкритим, поки не
- * прийде нове повідомлення або не вийде час) — тобто всередині одного
- * запуску нема затримки в кілька хвилин, повідомлення обробляються
- * практично миттєво. Сам запуск повторюється кожні RUN_INTERVAL_HOURS
- * (за замовчуванням раз на 3 години) і триває до RUN_DURATION_MINUTES
- * (за замовчуванням ~1 годину) — це свідомий компроміс: наживо бот
- * "чергує" годину раз на три, замість того, щоб бути увімкненим 24/7
- * (для чого знадобився б окремий постійний сервер, а не GitHub Actions).
- *
- *   - Кнопки в Mini App ("Повідомити про затримку", "Зв'язок з підтримкою")
- *     відкривають чат із ботом у Telegram (deep link t.me/<bot>?text=...)
- *     із заздалегідь заповненим повідомленням. Користувач сам тисне
- *     "Надіслати" — з'являється звичайне повідомлення боту.
- *   - Адмін відповідає користувачу звичайним Reply в Telegram.
- *   - Активні оголошення про затримку складаються у
- *     public/data/route-alerts.json і комітяться в репозиторій одразу
- *     після кожного циклу обробки (не лише в кінці запуску) — так банер
- *     "Можлива затримка" з'являється в застосунку за лічені хвилини, а не
- *     чекає до кінця годинного вікна.
- *   - Технічний стан бота (offset для getUpdates, сирі скарги на
- *     затримку, відповідність "повідомлення в чаті адміна -> user id")
- *     зберігається в data-runtime/*.json — не публічні дані, у public/ не
- *     потрапляють.
+ * Оновлений, ультра-зручний бот для Харків GO.
+ * Повністю підтримує інтерактивне меню на Inline-кнопках для користувачів та адмінів.
  * ---------------------------------------------------------------------------
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -51,14 +25,8 @@ const DELAY_REPORT_THRESHOLD = Number(process.env.DELAY_REPORT_THRESHOLD || 5);
 const DELAY_REPORT_WINDOW_MINUTES = Number(process.env.DELAY_REPORT_WINDOW_MINUTES || 60);
 const DELAY_ALERT_DURATION_HOURS = Number(process.env.DELAY_ALERT_DURATION_HOURS || 2);
 
-// Скільки хвилин тримати активне long-polling з'єднання протягом одного
-// запуску Actions (job має свій ліміт часу — див. timeout-minutes у
-// workflow, тримаємо цей запас, щоб встигнути закомітити перед killʼом).
 const RUN_DURATION_MINUTES = Number(process.env.RUN_DURATION_MINUTES || 55);
-// Таймаут одного виклику getUpdates (Telegram long polling), секунд.
 const POLL_TIMEOUT_SECONDS = Number(process.env.POLL_TIMEOUT_SECONDS || 25);
-// Коміт+push у git після кожного циклу, у якому реально щось змінилось —
-// вимкнути можна, якщо запускаєте скрипт поза git-репозиторієм.
 const AUTO_GIT_PUSH = (process.env.AUTO_GIT_PUSH ?? 'true').toLowerCase() !== 'false';
 
 const RUNTIME_DIR = path.resolve('data-runtime');
@@ -68,15 +36,16 @@ const OFFSET_FILE = path.join(RUNTIME_DIR, 'bot-offset.json');
 const DELAY_REPORTS_FILE = path.join(RUNTIME_DIR, 'delay-reports.json');
 const SUPPORT_MAP_FILE = path.join(RUNTIME_DIR, 'support-map.json');
 const PENDING_PROMPTS_FILE = path.join(RUNTIME_DIR, 'pending-alert-prompts.json');
+const ADMIN_STATES_FILE = path.join(RUNTIME_DIR, 'admin-states.json');
 
 const KIND_LABELS = {
-  bus: 'Автобус',
-  trolleybus: 'Тролейбус',
-  tram: 'Трамвай',
-  metro: 'Метро'
+  bus: '🚌 Автобус',
+  trolleybus: '🚎 Тролейбус',
+  tram: '🚋 Трамвай',
+  metro: '🚇 Метро'
 };
 
-// --- маленькі хелпери роботи з JSON-файлами стану ---------------------------
+// --- Допоміжні функції читання/запису файлів ---
 
 async function readJson(file, fallback) {
   try {
@@ -95,29 +64,18 @@ async function gitCommitAndPush(message) {
   if (!AUTO_GIT_PUSH) return;
   const branch = process.env.GITHUB_REF_NAME || 'main';
 
-  // Якщо попередня спроба в цьому ж запуску лишила незавершений
-  // rebase/merge — прибираємо перед тим, як щось робити далі, інакше
-  // git одразу впаде на "already a rebase-merge directory".
   await execFileAsync('git', ['rebase', '--abort']).catch(() => {});
   await execFileAsync('git', ['merge', '--abort']).catch(() => {});
 
   try {
     await execFileAsync('git', ['add', 'data-runtime', 'public/data/route-alerts.json']);
     try {
-      // Якщо нема staged-змін — diff поверне 0 і кине помилку в execFile
-      // (exit code 0 означає "нема різниці" для --quiet, тобто НЕ кидати коміт).
       await execFileAsync('git', ['diff', '--cached', '--quiet']);
-      return; // нема змін
-    } catch {
-      // diff --quiet повернув ненульовий код -> є зміни -> комітимо нижче
-    }
+      return;
+    } catch {}
+
     await execFileAsync('git', ['commit', '-m', message]);
 
-    // Ці файли — лише РЕЗЕРВНА копія поточного стану (Supabase тепер
-    // основне джерело правди для route_alerts/delay_reports), тож замість
-    // rebase з можливими конфліктами просто синхронізуємось із origin і
-    // повторно накочуємо свій (щойно згенерований, актуальний) варіант
-    // цих конкретних файлів поверх — свідомо без злиття вручну.
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         await execFileAsync('git', ['push', 'origin', `HEAD:${branch}`]);
@@ -138,7 +96,7 @@ async function gitCommitAndPush(message) {
   }
 }
 
-// --- Telegram Bot API ---------------------------------------------------
+// --- Telegram API ---
 
 const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -156,7 +114,11 @@ async function tg(method, payload) {
 }
 
 function sendMessage(chatId, text, extra = {}) {
-  return tg('sendMessage', { chat_id: chatId, text, ...extra });
+  return tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', ...extra });
+}
+
+function editMessageText(chatId, messageId, text, extra = {}) {
+  return tg('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'HTML', ...extra });
 }
 
 function isAdminChat(chatId) {
@@ -164,28 +126,69 @@ function isAdminChat(chatId) {
 }
 
 function userLabel(userId, username, displayName) {
-  const handle = username ? `@${username}` : displayName || 'без імені';
-  return `${handle} (id ${userId})`;
+  const handle = username ? `@${username}` : displayName || 'пасажир';
+  return `${handle} (id: <code>${userId}</code>)`;
 }
 
-// Структурована скарга на затримку кодується як прихований префікс у тексті,
-// який користувач надсилає боту (додається автоматично в deep link,
-// див. src/lib/reportDelay.ts). Формат: "#delay:<kind|_>:<routeNumber>#"
 const DELAY_TAG_RE = /^#delay:([a-z_]+):([^\s#]+)#\s*/;
-
-// Так само для підтримки, щоб відрізняти від "просто повідомлення" (не обов'язково,
-// але дозволяє показати гарний текст адміну): "#support#"
 const SUPPORT_TAG_RE = /^#support#\s*/;
 
-/**
- * Один цикл: getUpdates (з реальним long-polling timeout), обробка,
- * запис файлів. Повертає true, якщо щось реально змінилося (є сенс комітити).
- */
+// --- Шаблони меню ---
+
+function getMainMenuKeyboard(isAdmin = false) {
+  const keyboard = [
+    [
+      { text: '🚨 Повідомити про затримку', callback_data: 'user_report_delay' },
+      { text: '💬 Підтримка', callback_data: 'user_support_info' }
+    ],
+    [
+      { text: 'ℹ️ Про Харків GO', callback_data: 'user_about' }
+    ]
+  ];
+
+  if (isAdmin) {
+    keyboard.push([{ text: '⚙️ Адмін-панель', callback_data: 'admin_panel' }]);
+  }
+
+  return { inline_keyboard: keyboard };
+}
+
+function getAdminPanelKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: '📋 Активні оголошення', callback_data: 'admin_view_alerts' }],
+      [{ text: '📢 Створити затримку / оголошення', callback_data: 'admin_create_alert_start' }],
+      [{ text: '📊 Статистика скарг', callback_data: 'admin_stats' }],
+      [{ text: '🔙 Головне меню', callback_data: 'go_main_menu' }]
+    ]
+  };
+}
+
+function getSelectKindKeyboard(prefix) {
+  return {
+    inline_keyboard: [
+      [
+        { text: '🚌 Автобус', callback_data: `${prefix}:bus` },
+        { text: '🚎 Тролейбус', callback_data: `${prefix}:trolleybus` }
+      ],
+      [
+        { text: '🚋 Трамвай', callback_data: `${prefix}:tram` },
+        { text: '🚇 Метро', callback_data: `${prefix}:metro` }
+      ],
+      [{ text: '🌐 Весь транспорт (загальне)', callback_data: `${prefix}:all` }],
+      [{ text: '🔙 Скасувати', callback_data: 'go_main_menu' }]
+    ]
+  };
+}
+
+// --- Основна логіка обробки ---
+
 async function processCycle() {
   const offsetState = await readJson(OFFSET_FILE, { lastUpdateId: 0 });
   let delayReports = await readJson(DELAY_REPORTS_FILE, []);
-  let supportMap = await readJson(SUPPORT_MAP_FILE, []); // [{chatId, messageId, userId}]
-  let pendingPrompts = await readJson(PENDING_PROMPTS_FILE, []); // [{routeNumber, kind, createdAt}]
+  let supportMap = await readJson(SUPPORT_MAP_FILE, []);
+  let pendingPrompts = await readJson(PENDING_PROMPTS_FILE, []);
+  let adminStates = await readJson(ADMIN_STATES_FILE, {});
   let alerts = (await readJson(PUBLIC_ALERTS_PATH, { items: [] })).items || [];
 
   const now = Date.now() / 1000;
@@ -198,70 +201,280 @@ async function processCycle() {
   });
   const updates = updatesRes.ok ? updatesRes.result : [];
 
-  if (!updates.length) {
-    return false; // нічого не прийшло цим циклом — не чіпаємо файли й git
-  }
+  if (!updates.length) return false;
 
   for (const update of updates) {
     offsetState.lastUpdateId = Math.max(offsetState.lastUpdateId, update.update_id);
 
+    // --- ОБРОБКА НАТИСКАНЬ КНОПОК (Callback Queries) ---
     if (update.callback_query) {
-      await handleCallbackQuery(update.callback_query);
+      const cq = update.callback_query;
+      const chatId = cq.message.chat.id;
+      const data = cq.data || '';
+
+      await tg('answerCallbackQuery', { callback_query_id: cq.id });
+
+      // Повернення в головне меню
+      if (data === 'go_main_menu') {
+        delete adminStates[chatId];
+        await editMessageText(
+          chatId,
+          cq.message.message_id,
+          '👋 <b>Ласкаво просимо до Харків GO!</b>\n\nОберіть потрібний розділ нижче:',
+          { reply_markup: getMainMenuKeyboard(isAdminChat(chatId)) }
+        );
+        continue;
+      }
+
+      // Інфо для користувача
+      if (data === 'user_about') {
+        await editMessageText(
+          chatId,
+          cq.message.message_id,
+          '💙💛 <b>Харків GO</b> — зручний міський транспорт Харкова.\n\n' +
+          '• Відстеження маршрутів у реальному часі.\n' +
+          '• Оперативні сповіщення про затримки та перекриття.\n' +
+          '• Прямий зв’язок із підтримкою.\n\n' +
+          'Дякуємо, що користуєтесь нашим застосунком!',
+          { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'go_main_menu' }]] } }
+        );
+        continue;
+      }
+
+      if (data === 'user_support_info') {
+        await editMessageText(
+          chatId,
+          cq.message.message_id,
+          '💬 <b>Служба підтримки Харків GO</b>\n\n' +
+          'Просто напишіть ваше повідомлення, питання або побажання прямо в цей чат — ми миттєво отримаємо його та відповімо вам сюди ж!',
+          { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'go_main_menu' }]] } }
+        );
+        continue;
+      }
+
+      if (data === 'user_report_delay') {
+        await editMessageText(
+          chatId,
+          cq.message.message_id,
+          '🚨 <b>Повідомити про затримку</b>\n\nОберіть вид транспорту:',
+          { reply_markup: getSelectKindKeyboard('user_delay_kind') }
+        );
+        continue;
+      }
+
+      if (data.startsWith('user_delay_kind:')) {
+        const kind = data.split(':')[1];
+        const kindLabel = KIND_LABELS[kind] || 'Транспорт';
+        await editMessageText(
+          chatId,
+          cq.message.message_id,
+          `🚨 <b>Складання скарги на затримку (${kindLabel})</b>\n\n` +
+          `Будь ласка, напишіть номер маршруту та (за бажанням) коментар у відповідь на це повідомлення.\n\n` +
+          `<i>Приклад: 27 затримується на 15 хвилин біля метро</i>`,
+          { reply_markup: { inline_keyboard: [[{ text: '🔙 Скасувати', callback_data: 'go_main_menu' }]] } }
+        );
+        continue;
+      }
+
+      // --- АДМІН-ФУНКЦІОНАЛ ---
+      if (isAdminChat(chatId)) {
+        if (data === 'admin_panel') {
+          await editMessageText(chatId, cq.message.message_id, '⚙️ <b>Панель адміністратора Харків GO</b>', {
+            reply_markup: getAdminPanelKeyboard()
+          });
+          continue;
+        }
+
+        if (data === 'admin_view_alerts') {
+          await handleAlertsCommand(chatId, alerts, now);
+          continue;
+        }
+
+        if (data === 'admin_stats') {
+          const windowStart = now - DELAY_REPORT_WINDOW_MINUTES * 60;
+          const recentReports = delayReports.filter((r) => r.createdAt >= windowStart);
+          await editMessageText(
+            chatId,
+            cq.message.message_id,
+            `📊 <b>Статистика скарг за останні ${DELAY_REPORT_WINDOW_MINUTES} хв:</b>\n\n` +
+            `• Всього скарг: <b>${recentReports.length}</b>\n` +
+            `• Унікальних пасажирів: <b>${new Set(recentReports.map(r => r.userId)).size}</b>\n\n` +
+            `<i>Поріг автоматичного сповіщення: ${DELAY_REPORT_THRESHOLD} скарг на 1 маршрут.</i>`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад в адмінку', callback_data: 'admin_panel' }]] } }
+          );
+          continue;
+        }
+
+        if (data === 'admin_create_alert_start') {
+          await editMessageText(chatId, cq.message.message_id, '📢 <b>Оберіть вид транспорту для оголошення:</b>', {
+            reply_markup: getSelectKindKeyboard('admin_alert_kind')
+          });
+          continue;
+        }
+
+        if (data.startsWith('admin_alert_kind:')) {
+          const kind = data.split(':')[1];
+          adminStates[chatId] = { step: 'awaiting_alert_text', kind: kind === 'all' ? null : kind };
+          await editMessageText(
+            chatId,
+            cq.message.message_id,
+            `📝 <b>Введіть текст оголошення</b>\n\n` +
+            `Надішліть номер маршруту та текст у форматі:\n` +
+            `<code><номер_маршруту> <текст оголошення></code>\n\n` +
+            `<i>Приклад: 27 Затримка 20 хв через ДТП на Салтівці</i>\n` +
+            `<i>Або для всіх маршрутів: all Ремонтні роботи по всьому місту</i>`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 Скасувати', callback_data: 'admin_panel' }]] } }
+          );
+          continue;
+        }
+
+        // Підтвердження скасування оголошення
+        if (data.startsWith('cancel_alert:')) {
+          const alertId = Number(data.split(':')[1]);
+          const before = alerts.length;
+          const removed = alerts.find((a) => a.id === alertId);
+          alerts = alerts.filter((a) => a.id !== alertId);
+          const didRemove = alerts.length !== before;
+
+          await editMessageText(
+            chatId,
+            cq.message.message_id,
+            didRemove
+              ? `🗑 <b>Оголошення скасовано!</b>\nМаршрут: ${removed?.routeNumber || 'Загальне'}`
+              : '❌ Оголошення вже скасоване або неактивне.',
+            { reply_markup: { inline_keyboard: [[{ text: '⚙️ До адмін-панелі', callback_data: 'admin_panel' }]] } }
+          );
+          continue;
+        }
+
+        // Підтвердження затримки за порогом скарг
+        if (data.startsWith('confirm_alert:')) {
+          const [, routeNumber, kindRaw] = data.split(':');
+          const kind = kindRaw === '-' ? null : kindRaw;
+          const lastReport = [...delayReports].reverse().find((r) => r.routeNumber === routeNumber);
+
+          let text = `Можлива затримка руху маршруту ${routeNumber}. Повідомляють кілька пасажирів.`;
+          if (lastReport?.comment) text += ` Коментар: ${lastReport.comment.slice(0, 150)}`;
+
+          const newAlertId = Date.now();
+          alerts.push({
+            id: newAlertId,
+            kind,
+            routeNumber,
+            message: text,
+            createdAt: now,
+            expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
+            source: 'auto'
+          });
+
+          pendingPrompts = pendingPrompts.filter((p) => !(p.routeNumber === routeNumber && p.kind === kind));
+
+          await editMessageText(
+            chatId,
+            cq.message.message_id,
+            `✅ <b>Оголошення підтверджено та опубліковано у застосунку!</b>\nМаршрут ${routeNumber} (активне ${DELAY_ALERT_DURATION_HOURS} год.)`,
+            {
+              reply_markup: {
+                inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${newAlertId}` }]]
+              }
+            }
+          );
+          continue;
+        }
+      }
+
       continue;
     }
 
+    // --- ОБРОБКА ЗВИЧАЙНИХ ПОВІДОМЛЕНЬ (Message) ---
     const message = update.message;
-    if (!message) continue;
+    if (!message || !message.text) continue;
 
-    if (message.text?.startsWith('/start') && message.chat.type === 'private') {
+    const chatId = message.chat.id;
+    const from = message.from || {};
+
+    // Команда /start
+    if (message.text.startsWith('/start')) {
+      delete adminStates[chatId];
       await sendMessage(
-        message.chat.id,
-        '👋 Вітаємо в Kharkiv GO!\n\n' +
-          'Повідомлення, надіслані сюди, автоматично йдуть у підтримку — ми відповімо прямо в цьому чаті.\n\n' +
-          `Ваш chat_id (для налаштування адмінів): ${message.chat.id}`
+        chatId,
+        `👋 <b>Вітаємо у Kharkiv GO Bot!</b>\n\n` +
+        `Тут ви можете оперативно дізнатися про стан транспорту, повідомити про затримку або написати у службу підтримки.`,
+        { reply_markup: getMainMenuKeyboard(isAdminChat(chatId)) }
       );
       continue;
     }
 
-    if (message.text?.startsWith('/help')) {
-      await sendMessage(message.chat.id, helpText(isAdminChat(message.chat.id)));
+    // Команда /admin
+    if (message.text.startsWith('/admin') && isAdminChat(chatId)) {
+      await sendMessage(chatId, '⚙️ <b>Панель адміністратора Харків GO</b>', {
+        reply_markup: getAdminPanelKeyboard()
+      });
       continue;
     }
 
-    if (message.text?.startsWith('/alerts') && isAdminChat(message.chat.id)) {
-      await handleAlertsCommand(message.chat.id, alerts);
+    // Адмін створює оголошення через діалоговий стан
+    if (isAdminChat(chatId) && adminStates[chatId]?.step === 'awaiting_alert_text') {
+      const kind = adminStates[chatId].kind;
+      delete adminStates[chatId];
+
+      const parts = message.text.trim().split(/\s+/);
+      const routeNumber = parts[0];
+      const alertText = parts.slice(1).join(' ');
+
+      if (!routeNumber || !alertText) {
+        await sendMessage(chatId, '❌ <b>Невірний формат!</b> Спробуйте ще раз через меню адмін-панелі.', {
+          reply_markup: getAdminPanelKeyboard()
+        });
+        continue;
+      }
+
+      const alertId = Date.now();
+      alerts.push({
+        id: alertId,
+        kind,
+        routeNumber,
+        message: alertText,
+        createdAt: now,
+        expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
+        source: 'manual'
+      });
+
+      await sendMessage(
+        chatId,
+        `✅ <b>Оголошення опубліковано!</b>\n\n<b>Маршрут:</b> ${routeNumber}\n<b>Текст:</b> ${alertText}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${alertId}` }],
+              [{ text: '⚙️ В адмін-панель', callback_data: 'admin_panel' }]
+            ]
+          }
+        }
+      );
       continue;
     }
 
-    if (message.text?.startsWith('/alert') && isAdminChat(message.chat.id)) {
-      await handleAlertCommand(message, alerts);
-      continue;
-    }
-
-    if (!message.text) continue;
-
-    // Reply адміна на переслане звернення користувача
-    if (isAdminChat(message.chat.id) && message.reply_to_message) {
+    // Reply Адміна на повідомлення підтримки
+    if (isAdminChat(chatId) && message.reply_to_message) {
       const mapping = supportMap.find(
-        (m) => m.chatId === message.chat.id && m.messageId === message.reply_to_message.message_id
+        (m) => m.chatId === chatId && m.messageId === message.reply_to_message.message_id
       );
       if (mapping) {
-        await sendMessage(mapping.userId, `💬 Відповідь від підтримки Kharkiv GO:\n\n${message.text}`);
-        await tg('sendMessage', {
-          chat_id: message.chat.id,
-          text: '✅ Відповідь надіслано користувачу.',
+        await sendMessage(mapping.userId, `💬 <b>Відповідь підтримки Харків GO:</b>\n\n${message.text}`);
+        await sendMessage(chatId, '✅ <b>Відповідь успішно надіслано користувачу!</b>', {
           reply_to_message_id: message.message_id
         });
+      } else {
+        await sendMessage(chatId, '⚠️ Не вдалося знайти оригінальне звернення для відповіді.');
       }
       continue;
     }
 
-    if (isAdminChat(message.chat.id)) continue; // адмін пише щось інше — ігноруємо
-    if (message.chat.type !== 'private') continue;
+    if (isAdminChat(chatId)) continue; // Якщо адмін пише довільний текст без стану/reply — ігноруємо
 
-    const from = message.from || {};
+    // Структурована скарга з App або бота
     const delayMatch = message.text.match(DELAY_TAG_RE);
-
     if (delayMatch) {
       const [, kindRaw, routeNumber] = delayMatch;
       const kind = kindRaw === '_' ? null : kindRaw;
@@ -273,38 +486,44 @@ async function processCycle() {
         kind,
         routeNumber,
         comment,
-        createdAt: Date.now() / 1000
+        createdAt: now
       });
 
       const kindLabel = KIND_LABELS[kind] || 'Транспорт';
-      let text = `🚨 Скарга на затримку\nМаршрут: ${routeNumber} (${kindLabel})\nВід: ${userLabel(from.id, from.username, from.first_name)}`;
-      if (comment) text += `\nКоментар: ${comment}`;
-      for (const chatId of ADMIN_CHAT_IDS) {
-        await sendMessage(chatId, text);
+      let adminNotice = `🚨 <b>Нова скарга на затримку!</b>\n\n<b>Маршрут:</b> ${routeNumber} (${kindLabel})\n<b>Від:</b> ${userLabel(from.id, from.username, from.first_name)}`;
+      if (comment) adminNotice += `\n<b>Коментар:</b> ${comment}`;
+
+      for (const adminId of ADMIN_CHAT_IDS) {
+        await sendMessage(adminId, adminNotice);
       }
-      await sendMessage(message.chat.id, '✅ Дякуємо! Скаргу на затримку передано адміністратору.');
+      await sendMessage(chatId, '✅ <b>Дякуємо!</b> Скаргу на затримку передано диспетчеру.', {
+        reply_markup: getMainMenuKeyboard(false)
+      });
       continue;
     }
 
-    // Звичайне звернення в підтримку (в т.ч. з тегом #support#, якщо прийшло з app)
+    // Звичайне звернення в підтримку
     const text = message.text.replace(SUPPORT_TAG_RE, '').trim();
     if (!text) continue;
 
     const header =
-      `💬 Нове звернення в підтримку\n` +
-      `Від: ${userLabel(from.id, from.username, from.first_name)}\n\n${text}\n\n` +
-      `— Щоб відповісти користувачу, зробіть Reply на це повідомлення.`;
+      `💬 <b>Нове звернення в підтримку</b>\n` +
+      `<b>Від:</b> ${userLabel(from.id, from.username, from.first_name)}\n\n` +
+      `${text}\n\n` +
+      `<i>💡 Щоб відповісти, зробіть Reply на це повідомлення.</i>`;
 
-    for (const chatId of ADMIN_CHAT_IDS) {
-      const sent = await tg('sendMessage', { chat_id: chatId, text: header });
+    for (const adminId of ADMIN_CHAT_IDS) {
+      const sent = await sendMessage(adminId, header);
       if (sent.ok) {
         supportMap.push({ chatId: sent.result.chat.id, messageId: sent.result.message_id, userId: from.id });
       }
     }
-    await sendMessage(message.chat.id, '✅ Дякуємо! Ваше повідомлення передано в підтримку. Відповімо тут же, в цьому чаті.');
+    await sendMessage(chatId, '✅ <b>Дякуємо!</b> Ваше повідомлення отримано. Ми відповімо найближчим часом.', {
+      reply_markup: getMainMenuKeyboard(false)
+    });
   }
 
-  // --- поріг скарг -> запропонувати адміну оголосити затримку -------------
+  // --- Перевірка порогу скарг для сповіщення адмінів ---
   const windowStart = now - DELAY_REPORT_WINDOW_MINUTES * 60;
   const byRoute = new Map();
   for (const r of delayReports) {
@@ -328,26 +547,27 @@ async function processCycle() {
     if (alreadyPrompted) continue;
 
     const kindLabel = KIND_LABELS[kind] || 'Транспорт';
-    const text =
-      `⚠️ Увага! ${userSet.size} різних користувачів поскаржились на затримку маршруту ` +
-      `${routeNumber} (${kindLabel}) за останні ${DELAY_REPORT_WINDOW_MINUTES} хв.\n\n` +
-      `Опублікувати оголошення про затримку в застосунку?`;
-    const keyboard = {
-      inline_keyboard: [[{ text: '✅ Так, оголосити затримку', callback_data: `confirm_alert:${routeNumber}:${kind || '-'}` }]]
-    };
-    for (const chatId of ADMIN_CHAT_IDS) {
-      await sendMessage(chatId, text, { reply_markup: keyboard });
+    const alertPromptText =
+      `⚠️ <b>Увага!</b> <b>${userSet.size}</b> пасажирів поскаржились на затримку маршруту ` +
+      `<b>${routeNumber}</b> (${kindLabel}) за останні ${DELAY_REPORT_WINDOW_MINUTES} хв.\n\n` +
+      `Опублікувати сповіщення про затримку в застосунку?`;
+
+    for (const adminId of ADMIN_CHAT_IDS) {
+      await sendMessage(adminId, alertPromptText, {
+        reply_markup: {
+          inline_keyboard: [[{ text: '✅ Оголосити затримку', callback_data: `confirm_alert:${routeNumber}:${kind || '-'}` }]]
+        }
+      });
     }
     pendingPrompts.push({ routeNumber, kind, createdAt: now });
   }
 
-  // --- Supabase: спершу лог нових скарг (до прибирання старих нижче) ------
+  // --- Синхронізація з Supabase & файлами ---
   const newDelayReports = delayReports.slice(delayReportsBefore);
   if (newDelayReports.length && (await insertDelayReports(newDelayReports))) {
-    console.log(`[bot] Supabase: додано ${newDelayReports.length} нову(і) скаргу(и) на затримку.`);
+    console.log(`[bot] Supabase: додано ${newDelayReports.length} нову(і) скаргу(и).`);
   }
 
-  // --- прибирання: старі скарги/мапи/протухлі оголошення -------------------
   delayReports = delayReports.filter((r) => r.createdAt >= windowStart - 3600);
   supportMap = supportMap.slice(-500);
   pendingPrompts = pendingPrompts.filter((p) => now - p.createdAt < DELAY_REPORT_WINDOW_MINUTES * 60);
@@ -362,158 +582,41 @@ async function processCycle() {
   await writeJson(DELAY_REPORTS_FILE, delayReports);
   await writeJson(SUPPORT_MAP_FILE, supportMap);
   await writeJson(PENDING_PROMPTS_FILE, pendingPrompts);
+  await writeJson(ADMIN_STATES_FILE, adminStates);
   await writeJson(PUBLIC_ALERTS_PATH, { updatedAt: new Date().toISOString(), items: alerts });
 
   return true;
-
-  // --- вкладені функції, яким треба читати/писати alerts/pendingPrompts ----
-
-  async function handleCallbackQuery(cq) {
-    if (!isAdminChat(cq.message.chat.id)) {
-      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Недостатньо прав', show_alert: true });
-      return;
-    }
-
-    if ((cq.data || '').startsWith('cancel_alert:')) {
-      const alertId = Number((cq.data || '').split(':')[1]);
-      const before = alerts.length;
-      const removed = alerts.find((a) => a.id === alertId);
-      alerts = alerts.filter((a) => a.id !== alertId);
-      const didRemove = alerts.length !== before;
-      await tg('editMessageText', {
-        chat_id: cq.message.chat.id,
-        message_id: cq.message.message_id,
-        text: didRemove
-          ? `${cq.message.text}\n\n🗑 Скасовано${removed ? ` (маршрут ${removed.routeNumber})` : ''}.`
-          : cq.message.text
-      });
-      await tg('answerCallbackQuery', {
-        callback_query_id: cq.id,
-        text: didRemove ? 'Оголошення скасовано' : 'Вже неактивне'
-      });
-      return;
-    }
-
-    const [, routeNumber, kindRaw] = (cq.data || '').split(':');
-    if (!routeNumber) return;
-    const kind = kindRaw === '-' ? null : kindRaw;
-
-    const lastReport = [...delayReports].reverse().find((r) => r.routeNumber === routeNumber && (kind == null || r.kind === kind));
-    let text = `Можлива затримка руху маршруту ${routeNumber}. Повідомляють кілька пасажирів.`;
-    if (lastReport?.comment) text += ` Коментар: ${lastReport.comment.slice(0, 200)}`;
-
-    const newAlertId = Date.now();
-    alerts.push({
-      id: newAlertId,
-      kind,
-      routeNumber,
-      message: text,
-      createdAt: now,
-      expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
-      source: 'auto'
-    });
-    pendingPrompts = pendingPrompts.filter((p) => !(p.routeNumber === routeNumber && p.kind === kind));
-
-    await tg('editMessageText', {
-      chat_id: cq.message.chat.id,
-      message_id: cq.message.message_id,
-      text: `${cq.message.text}\n\n✅ Підтверджено. Оголошення активне ${DELAY_ALERT_DURATION_HOURS} год.`,
-      reply_markup: {
-        inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${newAlertId}` }]]
-      }
-    });
-    await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Оголошення опубліковано в застосунку' });
-  }
-
-  function handleAlertCommand(message, alertsArr) {
-    // /alert <номер|all> [bus|tram|trolleybus|metro] <текст>
-    // "all" замість номера маршруту — загальне оголошення на весь вид
-    // транспорту (якщо вказано kind) або геть на весь розділ "Транспорт".
-    const parts = message.text.split(/\s+/);
-    if (parts.length < 3) {
-      return sendMessage(
-        message.chat.id,
-        'Формат: /alert <номер_маршруту АБО all> [вид: bus/tram/trolleybus/metro] <текст оголошення>\n\n' +
-          'Приклади:\n' +
-          '/alert 27 Затримка 15+ хв через ДТП\n' +
-          '/alert all bus Затримки на всіх автобусних маршрутах через негоду\n' +
-          '/alert all Тимчасові збої руху транспорту по всьому місту'
-      );
-    }
-    const routeNumber = parts[1];
-    let kind = null;
-    let textStartIdx = 2;
-    if (['bus', 'tram', 'trolleybus', 'metro'].includes(parts[2]?.toLowerCase())) {
-      kind = parts[2].toLowerCase();
-      textStartIdx = 3;
-    }
-    const alertText = message.text.split(/\s+/).slice(textStartIdx).join(' ').trim();
-    if (!alertText) {
-      return sendMessage(message.chat.id, 'Не вистачає тексту оголошення.');
-    }
-    const alertId = Date.now();
-    alertsArr.push({
-      id: alertId,
-      kind,
-      routeNumber,
-      message: alertText,
-      createdAt: now,
-      expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
-      source: 'manual'
-    });
-    const isGeneral = routeNumber.toLowerCase() === 'all';
-    const scopeLabel = isGeneral
-      ? kind
-        ? `усі маршрути виду "${kind}"`
-        : 'увесь розділ транспорту'
-      : `маршруту ${routeNumber}`;
-    return sendMessage(message.chat.id, `✅ Оголошення створено для ${scopeLabel} на ${DELAY_ALERT_DURATION_HOURS} год.`, {
-      reply_markup: {
-        inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${alertId}` }]]
-      }
-    });
-  }
-
-  async function handleAlertsCommand(chatId, alertsArr) {
-    const active = alertsArr.filter((a) => a.expiresAt > now);
-    if (!active.length) {
-      await sendMessage(chatId, 'Наразі активних оголошень немає. ✅');
-      return;
-    }
-    await sendMessage(chatId, `📋 Активні оголошення (${active.length}):`);
-    for (const a of [...active].sort((x, y) => x.expiresAt - y.expiresAt)) {
-      const minutesLeft = Math.max(0, Math.round((a.expiresAt - now) / 60));
-      const kindLabel = a.kind ? KIND_LABELS[a.kind] || a.kind : 'Будь-який вид транспорту';
-      const scope = a.routeNumber.toLowerCase() === 'all' ? 'Загальне' : `Маршрут ${a.routeNumber}`;
-      const text =
-        `${scope} · ${kindLabel}\n${a.message}\n` +
-        `⏱ Ще ~${minutesLeft} хв · джерело: ${a.source === 'auto' ? 'авто' : 'вручну'}`;
-      await sendMessage(chatId, text, {
-        reply_markup: { inline_keyboard: [[{ text: '🗑 Скасувати', callback_data: `cancel_alert:${a.id}` }]] }
-      });
-    }
-  }
 }
 
-function helpText(isAdmin) {
-  let text =
-    'ℹ️ Довідка Kharkiv GO Bot\n\n' +
-    '• Просто напишіть сюди — звернення піде в підтримку, відповімо в цьому ж чаті.\n' +
-    '• Кнопка «⚠️ Затримка» в застосунку сама формує повідомлення-скаргу.\n';
-  if (isAdmin) {
-    text +=
-      '\nАдмінські команди:\n' +
-      '/alert <номер|all> [bus|tram|trolleybus|metro] <текст> — оголосити затримку вручну (без очікування скарг користувачів)\n' +
-      '/alerts — список активних оголошень зі скасуванням в 1 тап\n' +
-      'Reply на переслане звернення користувача — відповідь піде йому напряму.\n' +
-      '\n"all" замість номера маршруту — загальне оголошення (весь вид транспорту або весь розділ "Транспорт").';
+async function handleAlertsCommand(chatId, alertsArr, now) {
+  const active = alertsArr.filter((a) => a.expiresAt > now);
+  if (!active.length) {
+    await sendMessage(chatId, '📋 <b>Активних оголошень немає.</b>', {
+      reply_markup: { inline_keyboard: [[{ text: '🔙 В адмін-панель', callback_data: 'admin_panel' }]] }
+    });
+    return;
   }
-  return text;
+
+  await sendMessage(chatId, `📋 <b>Активні оголошення (${active.length}):</b>`);
+  for (const a of [...active].sort((x, y) => x.expiresAt - y.expiresAt)) {
+    const minutesLeft = Math.max(0, Math.round((a.expiresAt - now) / 60));
+    const kindLabel = a.kind ? KIND_LABELS[a.kind] || a.kind : 'Всі види';
+    const scope = a.routeNumber.toLowerCase() === 'all' ? 'Загальне' : `Маршрут ${a.routeNumber}`;
+
+    const text =
+      `<b>${scope}</b> (${kindLabel})\n` +
+      `${a.message}\n\n` +
+      `⏱ Залишилось: ~${minutesLeft} хв | Джерело: ${a.source === 'auto' ? 'Авто' : 'Вручну'}`;
+
+    await sendMessage(chatId, text, {
+      reply_markup: { inline_keyboard: [[{ text: '🗑 Скасувати', callback_data: `cancel_alert:${a.id}` }]] }
+    });
+  }
 }
 
 async function main() {
   if (!BOT_TOKEN) {
-    console.log('BOT_TOKEN не задано (секрет репозиторію) — пропускаю запуск.');
+    console.log('BOT_TOKEN не задано — пропускаю запуск.');
     return;
   }
   if (!ADMIN_CHAT_IDS.length) {
@@ -523,14 +626,8 @@ async function main() {
   const deadline = Date.now() + RUN_DURATION_MINUTES * 60 * 1000;
   let cycles = 0;
 
-  console.log(
-    `[bot] Старт чергування на ${RUN_DURATION_MINUTES} хв (long-polling по ${POLL_TIMEOUT_SECONDS}с за раз).`
-  );
+  console.log(`[bot] Старт чергування на ${RUN_DURATION_MINUTES} хв.`);
 
-  // Реальний довгий "чат-режим": поки не вийшов ліміт часу цього запуску,
-  // безперервно тримаємо getUpdates-з'єднання відкритим — нові повідомлення
-  // від користувачів чи Reply адміна обробляються практично миттєво, а не
-  // раз на кілька хвилин.
   while (Date.now() < deadline) {
     cycles += 1;
     let changed = false;
@@ -545,7 +642,7 @@ async function main() {
     }
   }
 
-  console.log(`[bot] Завершено. Циклів опитування: ${cycles}.`);
+  console.log(`[bot] Завершено. Циклів: ${cycles}.`);
 }
 
 main().catch((err) => {
