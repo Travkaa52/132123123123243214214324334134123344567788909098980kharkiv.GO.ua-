@@ -195,6 +195,16 @@ async function processCycle() {
       continue;
     }
 
+    if (message.text?.startsWith('/help')) {
+      await sendMessage(message.chat.id, helpText(isAdminChat(message.chat.id)));
+      continue;
+    }
+
+    if (message.text?.startsWith('/alerts') && isAdminChat(message.chat.id)) {
+      await handleAlertsCommand(message.chat.id, alerts);
+      continue;
+    }
+
     if (message.text?.startsWith('/alert') && isAdminChat(message.chat.id)) {
       await handleAlertCommand(message, alerts);
       continue;
@@ -324,6 +334,27 @@ async function processCycle() {
       await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Недостатньо прав', show_alert: true });
       return;
     }
+
+    if ((cq.data || '').startsWith('cancel_alert:')) {
+      const alertId = Number((cq.data || '').split(':')[1]);
+      const before = alerts.length;
+      const removed = alerts.find((a) => a.id === alertId);
+      alerts = alerts.filter((a) => a.id !== alertId);
+      const didRemove = alerts.length !== before;
+      await tg('editMessageText', {
+        chat_id: cq.message.chat.id,
+        message_id: cq.message.message_id,
+        text: didRemove
+          ? `${cq.message.text}\n\n🗑 Скасовано${removed ? ` (маршрут ${removed.routeNumber})` : ''}.`
+          : cq.message.text
+      });
+      await tg('answerCallbackQuery', {
+        callback_query_id: cq.id,
+        text: didRemove ? 'Оголошення скасовано' : 'Вже неактивне'
+      });
+      return;
+    }
+
     const [, routeNumber, kindRaw] = (cq.data || '').split(':');
     if (!routeNumber) return;
     const kind = kindRaw === '-' ? null : kindRaw;
@@ -332,8 +363,9 @@ async function processCycle() {
     let text = `Можлива затримка руху маршруту ${routeNumber}. Повідомляють кілька пасажирів.`;
     if (lastReport?.comment) text += ` Коментар: ${lastReport.comment.slice(0, 200)}`;
 
+    const newAlertId = Date.now();
     alerts.push({
-      id: Date.now(),
+      id: newAlertId,
       kind,
       routeNumber,
       message: text,
@@ -346,24 +378,33 @@ async function processCycle() {
     await tg('editMessageText', {
       chat_id: cq.message.chat.id,
       message_id: cq.message.message_id,
-      text: `${cq.message.text}\n\n✅ Підтверджено. Оголошення активне ${DELAY_ALERT_DURATION_HOURS} год.`
+      text: `${cq.message.text}\n\n✅ Підтверджено. Оголошення активне ${DELAY_ALERT_DURATION_HOURS} год.`,
+      reply_markup: {
+        inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${newAlertId}` }]]
+      }
     });
     await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Оголошення опубліковано в застосунку' });
   }
 
   function handleAlertCommand(message, alertsArr) {
-    // /alert <номер> [bus|tram|trolleybus|metro] <текст>
+    // /alert <номер|all> [bus|tram|trolleybus|metro] <текст>
+    // "all" замість номера маршруту — загальне оголошення на весь вид
+    // транспорту (якщо вказано kind) або геть на весь розділ "Транспорт".
     const parts = message.text.split(/\s+/);
     if (parts.length < 3) {
       return sendMessage(
         message.chat.id,
-        'Формат: /alert <номер_маршруту> [вид: bus/tram/trolleybus/metro] <текст оголошення>'
+        'Формат: /alert <номер_маршруту АБО all> [вид: bus/tram/trolleybus/metro] <текст оголошення>\n\n' +
+          'Приклади:\n' +
+          '/alert 27 Затримка 15+ хв через ДТП\n' +
+          '/alert all bus Затримки на всіх автобусних маршрутах через негоду\n' +
+          '/alert all Тимчасові збої руху транспорту по всьому місту'
       );
     }
     const routeNumber = parts[1];
     let kind = null;
     let textStartIdx = 2;
-    if (['bus', 'tram', 'trolleybus', 'metro'].includes(parts[2].toLowerCase())) {
+    if (['bus', 'tram', 'trolleybus', 'metro'].includes(parts[2]?.toLowerCase())) {
       kind = parts[2].toLowerCase();
       textStartIdx = 3;
     }
@@ -371,8 +412,9 @@ async function processCycle() {
     if (!alertText) {
       return sendMessage(message.chat.id, 'Не вистачає тексту оголошення.');
     }
+    const alertId = Date.now();
     alertsArr.push({
-      id: Date.now(),
+      id: alertId,
       kind,
       routeNumber,
       message: alertText,
@@ -380,8 +422,54 @@ async function processCycle() {
       expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
       source: 'manual'
     });
-    return sendMessage(message.chat.id, `✅ Оголошення створено для маршруту ${routeNumber} на ${DELAY_ALERT_DURATION_HOURS} год.`);
+    const isGeneral = routeNumber.toLowerCase() === 'all';
+    const scopeLabel = isGeneral
+      ? kind
+        ? `усі маршрути виду "${kind}"`
+        : 'увесь розділ транспорту'
+      : `маршруту ${routeNumber}`;
+    return sendMessage(message.chat.id, `✅ Оголошення створено для ${scopeLabel} на ${DELAY_ALERT_DURATION_HOURS} год.`, {
+      reply_markup: {
+        inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${alertId}` }]]
+      }
+    });
   }
+
+  async function handleAlertsCommand(chatId, alertsArr) {
+    const active = alertsArr.filter((a) => a.expiresAt > now);
+    if (!active.length) {
+      await sendMessage(chatId, 'Наразі активних оголошень немає. ✅');
+      return;
+    }
+    await sendMessage(chatId, `📋 Активні оголошення (${active.length}):`);
+    for (const a of [...active].sort((x, y) => x.expiresAt - y.expiresAt)) {
+      const minutesLeft = Math.max(0, Math.round((a.expiresAt - now) / 60));
+      const kindLabel = a.kind ? KIND_LABELS[a.kind] || a.kind : 'Будь-який вид транспорту';
+      const scope = a.routeNumber.toLowerCase() === 'all' ? 'Загальне' : `Маршрут ${a.routeNumber}`;
+      const text =
+        `${scope} · ${kindLabel}\n${a.message}\n` +
+        `⏱ Ще ~${minutesLeft} хв · джерело: ${a.source === 'auto' ? 'авто' : 'вручну'}`;
+      await sendMessage(chatId, text, {
+        reply_markup: { inline_keyboard: [[{ text: '🗑 Скасувати', callback_data: `cancel_alert:${a.id}` }]] }
+      });
+    }
+  }
+}
+
+function helpText(isAdmin) {
+  let text =
+    'ℹ️ Довідка Kharkiv GO Bot\n\n' +
+    '• Просто напишіть сюди — звернення піде в підтримку, відповімо в цьому ж чаті.\n' +
+    '• Кнопка «⚠️ Затримка» в застосунку сама формує повідомлення-скаргу.\n';
+  if (isAdmin) {
+    text +=
+      '\nАдмінські команди:\n' +
+      '/alert <номер|all> [bus|tram|trolleybus|metro] <текст> — оголосити затримку вручну (без очікування скарг користувачів)\n' +
+      '/alerts — список активних оголошень зі скасуванням в 1 тап\n' +
+      'Reply на переслане звернення користувача — відповідь піде йому напряму.\n' +
+      '\n"all" замість номера маршруту — загальне оголошення (весь вид транспорту або весь розділ "Транспорт").';
+  }
+  return text;
 }
 
 async function main() {
