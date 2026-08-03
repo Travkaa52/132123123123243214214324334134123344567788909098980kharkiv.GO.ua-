@@ -11,13 +11,18 @@
  * функції нижче тихо повертають false, бот працює тільки на JSON.
  */
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '');
+const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
 
 export const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
 
 if (!SUPABASE_ENABLED) {
   console.log('[bot] SUPABASE_URL/SUPABASE_SERVICE_KEY не задано — синхронізація вимкнена, працюю тільки з JSON.');
+} else if (/\/(rest|auth|storage)(\/|$)/i.test(SUPABASE_URL)) {
+  console.warn(
+    `[bot] SUPABASE_URL схоже містить зайвий шлях (${SUPABASE_URL}) — має бути лише базовий домен проєкту, ` +
+      'напр. https://xxxx.supabase.co, без /rest/v1 чи іншого хвоста.'
+  );
 }
 
 async function rest(method, table, { params, body, prefer } = {}) {
@@ -40,7 +45,7 @@ async function rest(method, table, { params, body, prefer } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined
     });
     if (!res.ok) {
-      console.warn(`[bot] Supabase ${method} ${table} -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      console.warn(`[bot] Supabase ${method} ${url} -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
       return null;
     }
     const text = await res.text();

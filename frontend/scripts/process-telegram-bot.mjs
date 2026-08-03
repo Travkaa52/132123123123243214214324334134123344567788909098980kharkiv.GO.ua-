@@ -93,6 +93,14 @@ async function writeJson(file, data) {
 
 async function gitCommitAndPush(message) {
   if (!AUTO_GIT_PUSH) return;
+  const branch = process.env.GITHUB_REF_NAME || 'main';
+
+  // Якщо попередня спроба в цьому ж запуску лишила незавершений
+  // rebase/merge — прибираємо перед тим, як щось робити далі, інакше
+  // git одразу впаде на "already a rebase-merge directory".
+  await execFileAsync('git', ['rebase', '--abort']).catch(() => {});
+  await execFileAsync('git', ['merge', '--abort']).catch(() => {});
+
   try {
     await execFileAsync('git', ['add', 'data-runtime', 'public/data/route-alerts.json']);
     try {
@@ -104,11 +112,29 @@ async function gitCommitAndPush(message) {
       // diff --quiet повернув ненульовий код -> є зміни -> комітимо нижче
     }
     await execFileAsync('git', ['commit', '-m', message]);
-    await execFileAsync('git', ['pull', '--rebase', '--autostash', 'origin', process.env.GITHUB_REF_NAME || 'main']);
-    await execFileAsync('git', ['push', 'origin', `HEAD:${process.env.GITHUB_REF_NAME || 'main'}`]);
-    console.log(`[bot] Закомічено та запушено: ${message}`);
+
+    // Ці файли — лише РЕЗЕРВНА копія поточного стану (Supabase тепер
+    // основне джерело правди для route_alerts/delay_reports), тож замість
+    // rebase з можливими конфліктами просто синхронізуємось із origin і
+    // повторно накочуємо свій (щойно згенерований, актуальний) варіант
+    // цих конкретних файлів поверх — свідомо без злиття вручну.
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await execFileAsync('git', ['push', 'origin', `HEAD:${branch}`]);
+        console.log(`[bot] Закомічено та запушено: ${message}`);
+        return;
+      } catch {
+        if (attempt === 3) throw new Error('push відхилено після 3 спроб');
+        await execFileAsync('git', ['fetch', 'origin', branch]);
+        await execFileAsync('git', ['reset', '--mixed', `origin/${branch}`]);
+        await execFileAsync('git', ['add', 'data-runtime', 'public/data/route-alerts.json']);
+        await execFileAsync('git', ['commit', '-m', message]);
+      }
+    }
   } catch (err) {
     console.error('[bot] Не вдалося закомітити/запушити зміни:', err?.stderr || err?.message || err);
+    await execFileAsync('git', ['rebase', '--abort']).catch(() => {});
+    await execFileAsync('git', ['merge', '--abort']).catch(() => {});
   }
 }
 
