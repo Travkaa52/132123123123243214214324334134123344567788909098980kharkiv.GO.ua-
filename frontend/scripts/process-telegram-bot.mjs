@@ -2,8 +2,9 @@
 /**
  * scripts/process-telegram-bot.mjs
  * ---------------------------------------------------------------------------
- * Оновлений, ультра-зручний бот для Харків GO.
- * Повністю підтримує інтерактивне меню на Inline-кнопках для користувачів та адмінів.
+ * Ультра-зручний та розширений бот для KharkivGO.
+ * Працює в режимі long-polling через GitHub Actions / Node.js.
+ * Повністю підтримує інтерактивне Inline-меню для користувачів та адмінів.
  * ---------------------------------------------------------------------------
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -37,6 +38,7 @@ const DELAY_REPORTS_FILE = path.join(RUNTIME_DIR, 'delay-reports.json');
 const SUPPORT_MAP_FILE = path.join(RUNTIME_DIR, 'support-map.json');
 const PENDING_PROMPTS_FILE = path.join(RUNTIME_DIR, 'pending-alert-prompts.json');
 const ADMIN_STATES_FILE = path.join(RUNTIME_DIR, 'admin-states.json');
+const KNOWN_USERS_FILE = path.join(RUNTIME_DIR, 'known-users.json');
 
 const KIND_LABELS = {
   bus: '🚌 Автобус',
@@ -45,7 +47,7 @@ const KIND_LABELS = {
   metro: '🚇 Метро'
 };
 
-// --- Допоміжні функції читання/запису файлів ---
+// --- Допоміжні функції роботи з JSON-файлами ---
 
 async function readJson(file, fallback) {
   try {
@@ -71,8 +73,10 @@ async function gitCommitAndPush(message) {
     await execFileAsync('git', ['add', 'data-runtime', 'public/data/route-alerts.json']);
     try {
       await execFileAsync('git', ['diff', '--cached', '--quiet']);
-      return;
-    } catch {}
+      return; // Змін немає — не комітимо
+    } catch {
+      // Зміни є — продовжуємо
+    }
 
     await execFileAsync('git', ['commit', '-m', message]);
 
@@ -96,7 +100,7 @@ async function gitCommitAndPush(message) {
   }
 }
 
-// --- Telegram API ---
+// --- Telegram API Helpers ---
 
 const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
@@ -133,7 +137,7 @@ function userLabel(userId, username, displayName) {
 const DELAY_TAG_RE = /^#delay:([a-z_]+):([^\s#]+)#\s*/;
 const SUPPORT_TAG_RE = /^#support#\s*/;
 
-// --- Шаблони меню ---
+// --- Клавіатури Меню ---
 
 function getMainMenuKeyboard(isAdmin = false) {
   const keyboard = [
@@ -142,7 +146,7 @@ function getMainMenuKeyboard(isAdmin = false) {
       { text: '💬 Підтримка', callback_data: 'user_support_info' }
     ],
     [
-      { text: 'ℹ️ Про Харків GO', callback_data: 'user_about' }
+      { text: 'ℹ️ Про KharkivGO', callback_data: 'user_about' }
     ]
   ];
 
@@ -157,7 +161,7 @@ function getAdminPanelKeyboard() {
   return {
     inline_keyboard: [
       [{ text: '📋 Активні оголошення', callback_data: 'admin_view_alerts' }],
-      [{ text: '📢 Створити затримку / оголошення', callback_data: 'admin_create_alert_start' }],
+      [{ text: '📢 Створити оголошення / затримку', callback_data: 'admin_create_alert_start' }],
       [{ text: '📊 Статистика скарг', callback_data: 'admin_stats' }],
       [{ text: '🔙 Головне меню', callback_data: 'go_main_menu' }]
     ]
@@ -181,7 +185,7 @@ function getSelectKindKeyboard(prefix) {
   };
 }
 
-// --- Основна логіка обробки ---
+// --- Основний цикл обробки ---
 
 async function processCycle() {
   const offsetState = await readJson(OFFSET_FILE, { lastUpdateId: 0 });
@@ -189,6 +193,7 @@ async function processCycle() {
   let supportMap = await readJson(SUPPORT_MAP_FILE, []);
   let pendingPrompts = await readJson(PENDING_PROMPTS_FILE, []);
   let adminStates = await readJson(ADMIN_STATES_FILE, {});
+  let knownUsers = await readJson(KNOWN_USERS_FILE, []);
   let alerts = (await readJson(PUBLIC_ALERTS_PATH, { items: [] })).items || [];
 
   const now = Date.now() / 1000;
@@ -206,7 +211,7 @@ async function processCycle() {
   for (const update of updates) {
     offsetState.lastUpdateId = Math.max(offsetState.lastUpdateId, update.update_id);
 
-    // --- ОБРОБКА НАТИСКАНЬ КНОПОК (Callback Queries) ---
+    // --- ОБРОБКА КНОПОК (Callback Queries) ---
     if (update.callback_query) {
       const cq = update.callback_query;
       const chatId = cq.message.chat.id;
@@ -214,28 +219,26 @@ async function processCycle() {
 
       await tg('answerCallbackQuery', { callback_query_id: cq.id });
 
-      // Повернення в головне меню
       if (data === 'go_main_menu') {
         delete adminStates[chatId];
         await editMessageText(
           chatId,
           cq.message.message_id,
-          '👋 <b>Ласкаво просимо до Харків GO!</b>\n\nОберіть потрібний розділ нижче:',
+          '👋 <b>Головне меню KharkivGO</b>\n\nОберіть потрібну дію за допомогою кнопок нижче:',
           { reply_markup: getMainMenuKeyboard(isAdminChat(chatId)) }
         );
         continue;
       }
 
-      // Інфо для користувача
       if (data === 'user_about') {
         await editMessageText(
           chatId,
           cq.message.message_id,
-          '💙💛 <b>Харків GO</b> — зручний міський транспорт Харкова.\n\n' +
-          '• Відстеження маршрутів у реальному часі.\n' +
-          '• Оперативні сповіщення про затримки та перекриття.\n' +
-          '• Прямий зв’язок із підтримкою.\n\n' +
-          'Дякуємо, що користуєтесь нашим застосунком!',
+          '💙💛 <b>KharkivGO</b> — ваш надійний помічник у міському транспорті Харкова.\n\n' +
+          '• Відстеження руху транспорту онлайн.\n' +
+          '• Оперативні сповіщення про затори, ремонтні роботи та ДТП.\n' +
+          '• Прямий зв’язок із диспетчерами та підтримкою.\n\n' +
+          'Дякуємо, що допомагаєте робити транспорт зручнішим!',
           { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'go_main_menu' }]] } }
         );
         continue;
@@ -245,8 +248,8 @@ async function processCycle() {
         await editMessageText(
           chatId,
           cq.message.message_id,
-          '💬 <b>Служба підтримки Харків GO</b>\n\n' +
-          'Просто напишіть ваше повідомлення, питання або побажання прямо в цей чат — ми миттєво отримаємо його та відповімо вам сюди ж!',
+          '💬 <b>Служба підтримки KharkivGO</b>\n\n' +
+          'Просто напишіть будь-яке запитання, пропозицію чи скаргу прямим повідомленням у цей чат — ми отримаємо його і відповімо вам сюди ж!',
           { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'go_main_menu' }]] } }
         );
         continue;
@@ -268,9 +271,9 @@ async function processCycle() {
         await editMessageText(
           chatId,
           cq.message.message_id,
-          `🚨 <b>Складання скарги на затримку (${kindLabel})</b>\n\n` +
-          `Будь ласка, напишіть номер маршруту та (за бажанням) коментар у відповідь на це повідомлення.\n\n` +
-          `<i>Приклад: 27 затримується на 15 хвилин біля метро</i>`,
+          `🚨 <b>Скарга на затримку (${kindLabel})</b>\n\n` +
+          `Напишіть номер маршруту та коротко описати ситуацію у відповідь на це повідомлення.\n\n` +
+          `<i>Приклад: 27 затримується на 15 хв біля станції метро</i>`,
           { reply_markup: { inline_keyboard: [[{ text: '🔙 Скасувати', callback_data: 'go_main_menu' }]] } }
         );
         continue;
@@ -279,7 +282,7 @@ async function processCycle() {
       // --- АДМІН-ФУНКЦІОНАЛ ---
       if (isAdminChat(chatId)) {
         if (data === 'admin_panel') {
-          await editMessageText(chatId, cq.message.message_id, '⚙️ <b>Панель адміністратора Харків GO</b>', {
+          await editMessageText(chatId, cq.message.message_id, '⚙️ <b>Панель адміністратора KharkivGO</b>', {
             reply_markup: getAdminPanelKeyboard()
           });
           continue;
@@ -297,10 +300,10 @@ async function processCycle() {
             chatId,
             cq.message.message_id,
             `📊 <b>Статистика скарг за останні ${DELAY_REPORT_WINDOW_MINUTES} хв:</b>\n\n` +
-            `• Всього скарг: <b>${recentReports.length}</b>\n` +
-            `• Унікальних пасажирів: <b>${new Set(recentReports.map(r => r.userId)).size}</b>\n\n` +
-            `<i>Поріг автоматичного сповіщення: ${DELAY_REPORT_THRESHOLD} скарг на 1 маршрут.</i>`,
-            { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад в адмінку', callback_data: 'admin_panel' }]] } }
+            `• Всього отримано скарг: <b>${recentReports.length}</b>\n` +
+            `• Унікальних дописувачів: <b>${new Set(recentReports.map(r => r.userId)).size}</b>\n\n` +
+            `<i>Поріг авто-сповіщення: ${DELAY_REPORT_THRESHOLD} скарг на маршрут.</i>`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 В адмін-панель', callback_data: 'admin_panel' }]] } }
           );
           continue;
         }
@@ -320,15 +323,14 @@ async function processCycle() {
             cq.message.message_id,
             `📝 <b>Введіть текст оголошення</b>\n\n` +
             `Надішліть номер маршруту та текст у форматі:\n` +
-            `<code><номер_маршруту> <текст оголошення></code>\n\n` +
+            `<code>[номер_маршруту] [текст оголошення]</code>\n\n` +
             `<i>Приклад: 27 Затримка 20 хв через ДТП на Салтівці</i>\n` +
-            `<i>Або для всіх маршрутів: all Ремонтні роботи по всьому місту</i>`,
+            `<i>Або для всіх маршрутів: all Тимчасові збої руху по всьому місту</i>`,
             { reply_markup: { inline_keyboard: [[{ text: '🔙 Скасувати', callback_data: 'admin_panel' }]] } }
           );
           continue;
         }
 
-        // Підтвердження скасування оголошення
         if (data.startsWith('cancel_alert:')) {
           const alertId = Number(data.split(':')[1]);
           const before = alerts.length;
@@ -340,14 +342,13 @@ async function processCycle() {
             chatId,
             cq.message.message_id,
             didRemove
-              ? `🗑 <b>Оголошення скасовано!</b>\nМаршрут: ${removed?.routeNumber || 'Загальне'}`
-              : '❌ Оголошення вже скасоване або неактивне.',
-            { reply_markup: { inline_keyboard: [[{ text: '⚙️ До адмін-панелі', callback_data: 'admin_panel' }]] } }
+              ? `🗑 <b>Оголошення скасовано!</b>\n<b>Маршрут:</b> ${removed?.routeNumber || 'Загальне'}`
+              : '❌ Оголошення вже скасоване або застаріло.',
+            { reply_markup: { inline_keyboard: [[{ text: '⚙️ В адмін-панель', callback_data: 'admin_panel' }]] } }
           );
           continue;
         }
 
-        // Підтвердження затримки за порогом скарг
         if (data.startsWith('confirm_alert:')) {
           const [, routeNumber, kindRaw] = data.split(':');
           const kind = kindRaw === '-' ? null : kindRaw;
@@ -372,7 +373,7 @@ async function processCycle() {
           await editMessageText(
             chatId,
             cq.message.message_id,
-            `✅ <b>Оголошення підтверджено та опубліковано у застосунку!</b>\nМаршрут ${routeNumber} (активне ${DELAY_ALERT_DURATION_HOURS} год.)`,
+            `✅ <b>Оголошення підтверджено та опубліковано у застосунку!</b>\nМаршрут: ${routeNumber} (активне ${DELAY_ALERT_DURATION_HOURS} год.)`,
             {
               reply_markup: {
                 inline_keyboard: [[{ text: '🗑 Скасувати достроково', callback_data: `cancel_alert:${newAlertId}` }]]
@@ -386,34 +387,46 @@ async function processCycle() {
       continue;
     }
 
-    // --- ОБРОБКА ЗВИЧАЙНИХ ПОВІДОМЛЕНЬ (Message) ---
+    // --- ОБРОБКА ЗВИЧАЙНИХ ПОВІДОМЛЕНЬ ---
     const message = update.message;
     if (!message || !message.text) continue;
 
     const chatId = message.chat.id;
     const from = message.from || {};
 
-    // Команда /start
+    // Команда /start (З перевіркою нового користувача)
     if (message.text.startsWith('/start')) {
       delete adminStates[chatId];
-      await sendMessage(
-        chatId,
-        `👋 <b>Вітаємо у Kharkiv GO Bot!</b>\n\n` +
-        `Тут ви можете оперативно дізнатися про стан транспорту, повідомити про затримку або написати у службу підтримки.`,
-        { reply_markup: getMainMenuKeyboard(isAdminChat(chatId)) }
-      );
+      const isNew = !knownUsers.includes(chatId);
+      if (isNew) {
+        knownUsers.push(chatId);
+      }
+
+      const welcomeText = isNew
+        ? `👋 <b>Ласкаво просимо до KharkivGO, ${from.first_name || 'пасажире'}!</b>\n\n` +
+          `Це офіційний бот для відстеження міського транспорту Харкова.\n\n` +
+          `<b>Що тут можна робити:</b>\n` +
+          `• 🚨 <b>Повідомити про затримку:</b> якщо транспорт затримується, оперативно передайте це диспетчеру.\n` +
+          `• 💬 <b>Зв'язатися з підтримкою:</b> просто напишіть повідомлення сюди, і ми відповімо.\n` +
+          `• 🔔 <b>Отримувати важливі сповіщення:</b> дізнавайтеся про ремонти доріг та зміни маршрутів.\n\n` +
+          `Скористайтеся кнопками нижче:`
+        : `👋 <b>З поверненням, ${from.first_name || 'пасажире'}!</b>\n\nОберіть потрібний розділ меню:`;
+
+      await sendMessage(chatId, welcomeText, {
+        reply_markup: getMainMenuKeyboard(isAdminChat(chatId))
+      });
       continue;
     }
 
     // Команда /admin
     if (message.text.startsWith('/admin') && isAdminChat(chatId)) {
-      await sendMessage(chatId, '⚙️ <b>Панель адміністратора Харків GO</b>', {
+      await sendMessage(chatId, '⚙️ <b>Панель адміністратора KharkivGO</b>', {
         reply_markup: getAdminPanelKeyboard()
       });
       continue;
     }
 
-    // Адмін створює оголошення через діалоговий стан
+    // Адмін вводить текст для нового оголошення
     if (isAdminChat(chatId) && adminStates[chatId]?.step === 'awaiting_alert_text') {
       const kind = adminStates[chatId].kind;
       delete adminStates[chatId];
@@ -423,7 +436,7 @@ async function processCycle() {
       const alertText = parts.slice(1).join(' ');
 
       if (!routeNumber || !alertText) {
-        await sendMessage(chatId, '❌ <b>Невірний формат!</b> Спробуйте ще раз через меню адмін-панелі.', {
+        await sendMessage(chatId, '❌ <b>Помилка формату!</b> Потрібно: <code>[номер] [текст]</code>. Спробуйте ще раз з адмін-панелі.', {
           reply_markup: getAdminPanelKeyboard()
         });
         continue;
@@ -461,19 +474,19 @@ async function processCycle() {
         (m) => m.chatId === chatId && m.messageId === message.reply_to_message.message_id
       );
       if (mapping) {
-        await sendMessage(mapping.userId, `💬 <b>Відповідь підтримки Харків GO:</b>\n\n${message.text}`);
-        await sendMessage(chatId, '✅ <b>Відповідь успішно надіслано користувачу!</b>', {
+        await sendMessage(mapping.userId, `💬 <b>Відповідь підтримки KharkivGO:</b>\n\n${message.text}`);
+        await sendMessage(chatId, '✅ <b>Відповідь відправлено користувачу!</b>', {
           reply_to_message_id: message.message_id
         });
       } else {
-        await sendMessage(chatId, '⚠️ Не вдалося знайти оригінальне звернення для відповіді.');
+        await sendMessage(chatId, '⚠️ Оригінальне звернення не знайдено.');
       }
       continue;
     }
 
-    if (isAdminChat(chatId)) continue; // Якщо адмін пише довільний текст без стану/reply — ігноруємо
+    if (isAdminChat(chatId)) continue; // Ігноруємо довільний текст від адмінів без контексту
 
-    // Структурована скарга з App або бота
+    // Обробка скарги з App
     const delayMatch = message.text.match(DELAY_TAG_RE);
     if (delayMatch) {
       const [, kindRaw, routeNumber] = delayMatch;
@@ -510,7 +523,7 @@ async function processCycle() {
       `💬 <b>Нове звернення в підтримку</b>\n` +
       `<b>Від:</b> ${userLabel(from.id, from.username, from.first_name)}\n\n` +
       `${text}\n\n` +
-      `<i>💡 Щоб відповісти, зробіть Reply на це повідомлення.</i>`;
+      `<i>💡 Зробіть Reply на це повідомлення, щоб відповісти.</i>`;
 
     for (const adminId of ADMIN_CHAT_IDS) {
       const sent = await sendMessage(adminId, header);
@@ -518,12 +531,12 @@ async function processCycle() {
         supportMap.push({ chatId: sent.result.chat.id, messageId: sent.result.message_id, userId: from.id });
       }
     }
-    await sendMessage(chatId, '✅ <b>Дякуємо!</b> Ваше повідомлення отримано. Ми відповімо найближчим часом.', {
+    await sendMessage(chatId, '✅ <b>Дякуємо!</b> Ваше повідомлення отримано. Ми відповімо вам найближчим часом.', {
       reply_markup: getMainMenuKeyboard(false)
     });
   }
 
-  // --- Перевірка порогу скарг для сповіщення адмінів ---
+  // --- Перевірка порогу скарг для авто-сповіщення адмінів ---
   const windowStart = now - DELAY_REPORT_WINDOW_MINUTES * 60;
   const byRoute = new Map();
   for (const r of delayReports) {
@@ -562,7 +575,7 @@ async function processCycle() {
     pendingPrompts.push({ routeNumber, kind, createdAt: now });
   }
 
-  // --- Синхронізація з Supabase & файлами ---
+  // --- Збереження стану ---
   const newDelayReports = delayReports.slice(delayReportsBefore);
   if (newDelayReports.length && (await insertDelayReports(newDelayReports))) {
     console.log(`[bot] Supabase: додано ${newDelayReports.length} нову(і) скаргу(и).`);
@@ -583,9 +596,10 @@ async function processCycle() {
   await writeJson(SUPPORT_MAP_FILE, supportMap);
   await writeJson(PENDING_PROMPTS_FILE, pendingPrompts);
   await writeJson(ADMIN_STATES_FILE, adminStates);
+  await writeJson(KNOWN_USERS_FILE, knownUsers);
   await writeJson(PUBLIC_ALERTS_PATH, { updatedAt: new Date().toISOString(), items: alerts });
 
-  return true;
+  return newDelayReports.length > 0 || updates.length > 0;
 }
 
 async function handleAlertsCommand(chatId, alertsArr, now) {
