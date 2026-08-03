@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-03T20:59:44.063Z",
+  "updatedAt": "2026-08-03T21:00:00.393Z",
   "items": [
     {
       "id": 1785760899383,
@@ -35,6 +35,15 @@
       "message": "ТЕСТ",
       "createdAt": 1785785029.55,
       "expiresAt": 1785792229.55,
+      "source": "manual"
+    },
+    {
+      "id": 1785790799753,
+      "kind": "trolleybus",
+      "routeNumber": "204",
+      "message": "люблю свою зайку",
+      "createdAt": 1785790785.712,
+      "expiresAt": 1785797985.712,
       "source": "manual"
     }
   ]
