@@ -9,7 +9,9 @@ import {
   Loader2,
   Check,
   Copy,
-  ExternalLink
+  ExternalLink,
+  ClipboardList,
+  MessageCircle
 } from 'lucide-react';
 import { Modal } from '@/components/Modal';
 import { useToastStore } from '@/store/useToastStore';
@@ -28,6 +30,12 @@ import { BOT_USERNAME } from '@/lib/botConfig';
 const TELEGRAM_BOT_URL = `https://t.me/${BOT_USERNAME}`;
 const DONATION_CARD_NUMBER = '0000 0000 0000 0000';
 const DONATION_JAR_URL = 'https://send.monobank.ua/jar/6S34HzcLMS';
+// Google-форма зворотного зв'язку — запасний канал поруч із чатом у боті.
+// Стилізувати вміст самої форми неможливо (кросдоменний iframe), тож
+// оформлення app-стилю тримається на обгортці: рамка, скруглення, "скелетон"
+// завантаження та адаптивна висота під контент модалки.
+const SUPPORT_FORM_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLScXW_IwNTAbXxJEj4RL86F7avqp5_otaGFUieC2poA8e0kgbA/viewform?embedded=true';
 
 
 interface SimpleModalProps {
@@ -212,9 +220,13 @@ export function PrivacyPolicyModal({ open, onClose }: SimpleModalProps) {
 /* Зв'язок з підтримкою — надсилає повідомлення адміну через бота         */
 /* ---------------------------------------------------------------------- */
 
+type SupportTab = 'chat' | 'form';
+
 export function SupportModal({ open, onClose }: SimpleModalProps) {
+  const [tab, setTab] = useState<SupportTab>('chat');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [formLoaded, setFormLoaded] = useState(false);
   const showToast = useToastStore((s) => s.show);
 
   const resetAndClose = () => {
@@ -222,6 +234,8 @@ export function SupportModal({ open, onClose }: SimpleModalProps) {
     window.setTimeout(() => {
       setMessage('');
       setStatus('idle');
+      setTab('chat');
+      setFormLoaded(false);
     }, 200);
   };
 
@@ -244,46 +258,106 @@ export function SupportModal({ open, onClose }: SimpleModalProps) {
 
   return (
     <Modal open={open} onClose={resetAndClose} title="Зв'язок з підтримкою" icon={<LifeBuoy className="h-4 w-4" />}>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <p className="text-xs leading-relaxed text-ink-muted">
-          Опишіть проблему, ідею чи запитання — відкриється чат із ботом Kharkiv GO в Telegram із
-          готовим текстом, залишиться тільки натиснути "Надіслати". Відповідь адміністратора
-          прийде вам особистим повідомленням від бота.
-        </p>
+      <div className="space-y-4">
+        {/* Перемикач способу звернення — чат із ботом або Google-форма */}
+        <div className="flex gap-1 rounded-2xl bg-surface-muted/40 p-1">
+          <button
+            type="button"
+            onClick={() => setTab('chat')}
+            className={`flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[11px] font-extrabold transition-all ${
+              tab === 'chat'
+                ? 'bg-surface-raised text-ink-text shadow-sm'
+                : 'text-ink-muted hover:text-ink-text'
+            }`}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span>Чат із ботом</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('form')}
+            className={`flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[11px] font-extrabold transition-all ${
+              tab === 'form'
+                ? 'bg-surface-raised text-ink-text shadow-sm'
+                : 'text-ink-muted hover:text-ink-text'
+            }`}
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span>Форма</span>
+          </button>
+        </div>
 
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ваше повідомлення..."
-          rows={5}
-          maxLength={1000}
-          required
-          className="w-full resize-none rounded-2xl border border-border/60 bg-surface-muted/40 p-3 text-xs font-medium text-ink-text outline-none transition-all placeholder:text-ink-muted/60 focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-        />
+        {tab === 'chat' ? (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <p className="text-xs leading-relaxed text-ink-muted">
+              Опишіть проблему, ідею чи запитання — відкриється чат із ботом Kharkiv GO в Telegram із
+              готовим текстом, залишиться тільки натиснути "Надіслати". Відповідь адміністратора
+              прийде вам особистим повідомленням від бота.
+            </p>
 
-        <button
-          type="submit"
-          disabled={!message.trim() || status === 'sending'}
-          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-98 disabled:pointer-events-none disabled:opacity-50"
-        >
-          {status === 'sending' ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Відкриваємо чат...</span>
-            </>
-          ) : status === 'sent' ? (
-            <>
-              <Check className="h-4 w-4" />
-              <span>Чат відкрито</span>
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4" />
-              <span>Написати в підтримку</span>
-            </>
-          )}
-        </button>
-      </form>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ваше повідомлення..."
+              rows={5}
+              maxLength={1000}
+              required
+              className="w-full resize-none rounded-2xl border border-border/60 bg-surface-muted/40 p-3 text-xs font-medium text-ink-text outline-none transition-all placeholder:text-ink-muted/60 focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+            />
+
+            <button
+              type="submit"
+              disabled={!message.trim() || status === 'sending'}
+              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-98 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {status === 'sending' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Відкриваємо чат...</span>
+                </>
+              ) : status === 'sent' ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  <span>Чат відкрито</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  <span>Написати в підтримку</span>
+                </>
+              )}
+            </button>
+          </form>
+        ) : (
+          <div className="space-y-2.5">
+            <p className="text-xs leading-relaxed text-ink-muted">
+              Або заповніть коротку форму зворотного зв'язку — вона теж потрапляє прямо до
+              адміністратора Kharkiv GO.
+            </p>
+
+            <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-surface-muted/40 shadow-inner">
+              {!formLoaded && (
+                <div className="flex h-[420px] w-full flex-col items-center justify-center gap-2.5">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-[11px] font-medium text-ink-muted">Завантажуємо форму…</span>
+                </div>
+              )}
+              <iframe
+                src={SUPPORT_FORM_URL}
+                title="Форма зворотного зв'язку Kharkiv GO"
+                onLoad={() => setFormLoaded(true)}
+                className={`w-full transition-opacity duration-300 ${formLoaded ? 'opacity-100' : 'absolute inset-0 h-0 opacity-0'}`}
+                style={{ height: formLoaded ? '65dvh' : 0, colorScheme: 'light' }}
+                frameBorder={0}
+                marginHeight={0}
+                marginWidth={0}
+              >
+                Завантаження…
+              </iframe>
+            </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
