@@ -584,9 +584,22 @@ export function HomePage() {
                       <div className="text-[11px] text-ink-muted font-medium">Зупинка громадського транспорту</div>
                     </div>
                   </div>
-                  <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1.5 rounded-full shrink-0">
-                    {formatDistance(stop.distance)}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1.5 rounded-full">
+                      {formatDistance(stop.distance)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {stop.kinds.includes('bus') && (
+                        <img src="/sprites/iconsbus.png" alt="Автобус" className="w-4 h-4 object-contain rounded-sm" />
+                      )}
+                      {stop.kinds.includes('trolleybus') && (
+                        <img src="/sprites/iconstrolley.jpg" alt="Тролейбус" className="w-4 h-4 object-contain rounded-sm" />
+                      )}
+                      {stop.kinds.includes('tram') && (
+                        <img src="/sprites/iconstramvay.jpg" alt="Трамвай" className="w-4 h-4 object-contain rounded-sm" />
+                      )}
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
