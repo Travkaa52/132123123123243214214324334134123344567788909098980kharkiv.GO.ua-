@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-03T16:58:28.091Z",
+  "updatedAt": "2026-08-03T16:58:40.413Z",
   "items": [
     {
       "id": 1785760899383,
@@ -17,6 +17,15 @@
       "message": "ТЕСТ",
       "createdAt": 1785776279.422,
       "expiresAt": 1785783479.422,
+      "source": "manual"
+    },
+    {
+      "id": 1785776319848,
+      "kind": null,
+      "routeNumber": "Всі",
+      "message": "ТЕСТ",
+      "createdAt": 1785776309.175,
+      "expiresAt": 1785783509.175,
       "source": "manual"
     }
   ]
