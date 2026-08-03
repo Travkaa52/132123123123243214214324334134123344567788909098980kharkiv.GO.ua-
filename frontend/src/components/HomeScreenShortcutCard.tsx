@@ -7,9 +7,14 @@ import { openInExternalBrowser } from '@/lib/telegram';
 
 /** Посилання на сторінку-гайд повного встановлення PWA — відкривається
  *  ЗОВНІШНІМ браузером (не WebView Telegram), інакше Service Worker і
- *  діалог встановлення просто не спрацюють. */
+ *  діалог встановлення просто не спрацюють.
+ *  Обов'язково враховуємо BASE_URL (Vite `base`): на GitHub Pages
+ *  застосунок живе не в корені домену, а в `/<repo>/`, тож
+ *  `origin + '/install-app'` вів би на неіснуючий шлях і сторінка
+ *  виглядала б "не працює" (404 на хостингу). */
 function getInstallGuideUrl(): string {
-  return `${window.location.origin}/install-app`;
+  const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+  return `${window.location.origin}${base}install-app`;
 }
 
 /** Найпростіша евристика платформи для ручних інструкцій поза Telegram. */

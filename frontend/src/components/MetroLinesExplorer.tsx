@@ -129,7 +129,18 @@ function InterchangeBadge({ stationId }: { stationId: string }) {
   );
 }
 
-/** Одна колонка розкладу (один напрямок) з підсвіткою відносно поточного часу. */
+/** Групує "HH:MM" у список годин з масивом хвилин (класичний формат табло станції). */
+function groupTimesByHour(times: string[]): { hour: string; minutes: { value: string; idx: number }[] }[] {
+  const byHour = new Map<string, { value: string; idx: number }[]>();
+  times.forEach((t, idx) => {
+    const [h, m] = t.split(':');
+    if (!byHour.has(h)) byHour.set(h, []);
+    byHour.get(h)!.push({ value: m, idx });
+  });
+  return Array.from(byHour.entries()).map(([hour, minutes]) => ({ hour, minutes }));
+}
+
+/** Одна колонка розкладу (один напрямок) — таблиця "година → хвилини", як на табло станції. */
 function DirectionTimetable({
   entry,
   nowSec,
@@ -139,10 +150,11 @@ function DirectionTimetable({
 }) {
   // Індекс найближчого рейсу, що ще не відправився.
   const nextIdx = entry.times.findIndex((t) => timeStrToSec(t) >= nowSec);
+  const hourRows = useMemo(() => groupTimesByHour(entry.times), [entry.times]);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-surface/50 p-3">
-      <div className="mb-2 flex items-center gap-2">
+    <div className="overflow-hidden rounded-2xl border border-border/50 bg-surface/50">
+      <div className="flex items-center gap-2 border-b border-border/40 bg-surface/70 p-3">
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold text-white"
           style={{ backgroundColor: entry.lineColor }}
@@ -154,31 +166,44 @@ function DirectionTimetable({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {entry.times.map((t, idx) => {
-          const isPast = idx < nextIdx || nextIdx === -1;
-          const isNext = idx === nextIdx;
-          return (
-            <span
-              key={`${t}-${idx}`}
-              className={
-                isNext
-                  ? 'rounded-md border-2 px-2 py-1 text-caption font-extrabold shadow-sm'
-                  : isPast
-                  ? 'rounded-md border border-border/30 bg-surface/40 px-2 py-1 text-caption font-semibold text-ink-muted opacity-40'
-                  : 'rounded-md border border-border/40 bg-surface/80 px-2 py-1 text-caption font-semibold text-ink-text'
-              }
-              style={
-                isNext
-                  ? { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)', color: '#16a34a' }
-                  : undefined
-              }
-            >
-              {t}
-            </span>
-          );
-        })}
-      </div>
+      <table className="w-full border-collapse">
+        <tbody>
+          {hourRows.map(({ hour, minutes }) => (
+            <tr key={hour} className="border-b border-border/25 last:border-b-0">
+              <td className="w-12 shrink-0 border-r border-border/30 bg-surface/60 px-2 py-2 text-center align-top">
+                <span className="text-body-sm font-extrabold tabular-nums text-ink-text">{hour}</span>
+              </td>
+              <td className="px-2 py-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {minutes.map(({ value, idx }) => {
+                    const isPast = idx < nextIdx || nextIdx === -1;
+                    const isNext = idx === nextIdx;
+                    return (
+                      <span
+                        key={`${hour}-${value}-${idx}`}
+                        className={
+                          isNext
+                            ? 'rounded-md border-2 px-1.5 py-0.5 text-caption font-extrabold tabular-nums shadow-sm'
+                            : isPast
+                            ? 'rounded-md border border-border/30 bg-surface/40 px-1.5 py-0.5 text-caption font-semibold tabular-nums text-ink-muted opacity-40'
+                            : 'rounded-md border border-border/40 bg-surface/80 px-1.5 py-0.5 text-caption font-semibold tabular-nums text-ink-text'
+                        }
+                        style={
+                          isNext
+                            ? { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)', color: '#16a34a' }
+                            : undefined
+                        }
+                      >
+                        {value}
+                      </span>
+                    );
+                  })}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
