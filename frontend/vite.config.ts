@@ -17,7 +17,25 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Власний сервіс-воркер (src/sw.ts) замість автогенерованого — саме
+      // там реалізована стратегія NetworkFirst для HTML/навігацій з
+      // офлайн-фолбеком (щоб уникнути "чорного екрана" зі старим index.html
+      // після редеплою) і окремі стратегії кешування по типах ресурсів.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+      },
+      // registerType 'prompt' + injectRegister: false — реєструємо сервіс-воркер
+      // самі через virtual:pwa-register/react (components/PwaUpdateBanner.tsx),
+      // бо sw.ts свідомо чекає на повідомлення SKIP_WAITING від UI, а не
+      // оновлюється мовчки сам: це дає змогу показати користувачу кнопку
+      // "Оновити", а не перезавантажити застосунок непомітно під час активної
+      // роботи (відкрита картка маршруту, форма скарги на затримку тощо).
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
         name: 'Kharkiv GO',
@@ -33,20 +51,6 @@ export default defineConfig({
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-        ]
-      },
-      workbox: {
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/tiles\.openfreemap\.org\/.*/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'map-tiles-cache',
-              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 }
-            }
-          }
         ]
       }
     })
