@@ -662,6 +662,7 @@ export function MapPage() {
       <StopDetailModal
         stop={selectedStop ?? null}
         arrivals={arrivals}
+        userPosition={position}
         onClose={() => setSelectedStopId(null)}
         onRouteSelect={handleRouteSelect}
         onUseAsFrom={handleUseStopAsFrom}
