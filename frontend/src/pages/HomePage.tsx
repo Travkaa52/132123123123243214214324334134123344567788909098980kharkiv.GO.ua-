@@ -8,7 +8,6 @@ import {
   Settings, 
   Plus, 
   ArrowUpRight, 
-  AlertCircle,
   Search as SearchIcon,
   X,
   History,
@@ -16,7 +15,6 @@ import {
   MapPin,
   Compass,
   CheckCircle2,
-  ExternalLink,
   AlertTriangle,
   TrainTrack,
   AlarmClock
@@ -25,12 +23,12 @@ import { ReportDelayModal } from '@/components/ReportDelayModal';
 import { RouteDetailModal } from '@/components/RouteDetailModal';
 import { TrainWishSprite } from '@/components/TrainWishSprite';
 import { NotificationsBell, NotificationsSection } from '@/components/NotificationsSection';
+import { TransportNewsSection } from '@/components/TransportNewsSection';
 import { localRoutes, localStops } from '@/data/localData';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useToastStore } from '@/store/useToastStore';
 import { assetUrl } from '@/lib/assetUrl';
 import {
   BUILT_LINES,
@@ -79,7 +77,6 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile);
-  const showToast = useToastStore((s) => s.show);
   const favoriteRoutes = useFavoritesStore((s) => s.routes);
   const favoriteStops = useFavoritesStore((s) => s.stops);
   const { position, locate } = useGeolocation();
@@ -696,35 +693,10 @@ export function HomePage() {
           </section>
         )}
 
-        {/* 8. TRANSPORT NEWS & ANNOUNCEMENTS */}
-        <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
-          <div className="flex items-center gap-2.5 mb-3.5">
-            <div className="p-2 bg-surface-soft text-ink-muted rounded-[14px]">
-              <AlertCircle size={17} />
-            </div>
-            <h2 className="font-extrabold text-ink-text text-sm">Новини транспорту</h2>
-          </div>
-
-          <div className="p-4 bg-surface-soft rounded-[18px] border border-border/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-surface-raised text-ink-text">Офіційно</span>
-              <span className="text-[10px] font-semibold text-ink-muted">Сьогодні, 08:00</span>
-            </div>
-            <h3 className="font-extrabold text-ink-text text-sm">Зміни в розкладі рухів тролейбусів у місті</h3>
-            <p className="text-xs text-ink-muted leading-relaxed">
-              Інформація щодо оновлення маршрутів громадського транспорту Харкова в умовах воєнного стану.
-            </p>
-            <div className="pt-1">
-              <button 
-                onClick={() => showToast('Детальна інформація доступна в офіційному Telegram каналі Kharkiv GO.')}
-                className="inline-flex items-center gap-1 text-xs font-bold text-blue-500 hover:brightness-110"
-              >
-                <span>Детальніше</span>
-                <ExternalLink size={13} />
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* 8. TRANSPORT NEWS & ANNOUNCEMENTS — живий фід активних оголошень про
+            затримки (публікує/знімає адмін через Telegram-бота, без жодних
+            push-сповіщень користувачу — див. INTEGRATION_NOTES_UK.md) */}
+        <TransportNewsSection />
 
         {/* 9. REPORT DELAY CTA */}
         <button

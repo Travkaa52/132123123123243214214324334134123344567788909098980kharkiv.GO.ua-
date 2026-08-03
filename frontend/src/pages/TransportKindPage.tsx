@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react';
 import { RouteCard } from '@/components/RouteCard';
+import { TransportAlertsBanner } from '@/components/TransportAlertsBanner';
 import { MetroLinesExplorer } from '@/components/MetroLinesExplorer';
 import { routesApi } from '@/api/routes';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
@@ -205,6 +206,8 @@ export function TransportKindPage({ kind }: { kind: TransportKind }) {
             )}
           </div>
         </header>
+
+        <TransportAlertsBanner kind={kind} />
 
         {kind === 'metro' && (
           <div className="relative group overflow-hidden rounded-[22px] bg-gradient-to-r from-primary to-forest-dark p-4 text-white shadow-lg shadow-primary/10 transition-transform active:scale-[0.99]">

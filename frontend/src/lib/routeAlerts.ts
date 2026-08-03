@@ -43,11 +43,41 @@ export async function fetchRouteAlerts(): Promise<RouteAlert[]> {
   }
 }
 
-/** Знаходить активне оголошення для конкретного маршруту (номер + вид транспорту). */
+/**
+ * Спеціальне значення routeNumber для "загального" оголошення — не про
+ * конкретний маршрут, а про весь вид транспорту (якщо вказано kind) або
+ * геть про весь розділ "Транспорт" (якщо kind не вказано). Адмін ставить
+ * його командою /alert all ... або /alert all bus ... в боті.
+ */
+export const GENERAL_ALERT_ROUTE = 'all';
+
+function isGeneralAlert(alert: RouteAlert): boolean {
+  return String(alert.routeNumber).trim().toLowerCase() === GENERAL_ALERT_ROUTE;
+}
+
+/**
+ * Знаходить активне оголошення для конкретного маршруту (номер + вид
+ * транспорту). Загальні оголошення (routeNumber === "all") теж враховуються:
+ * вони підсвічують будь-який маршрут відповідного виду транспорту (або взагалі
+ * будь-який, якщо kind в оголошенні не вказано).
+ */
 export function findAlertForRoute(
   alerts: RouteAlert[],
   routeNumber: string,
   kind?: TransportKind | null
 ): RouteAlert | undefined {
-  return alerts.find((a) => a.routeNumber === routeNumber && (a.kind == null || a.kind === kind));
+  return alerts.find((a) => {
+    if (isGeneralAlert(a)) return a.kind == null || a.kind === kind;
+    return a.routeNumber === routeNumber && (a.kind == null || a.kind === kind);
+  });
+}
+
+/**
+ * Активні "загальні" оголошення (не привʼязані до конкретного маршруту) —
+ * для банера на весь розділ транспорту чи конкретного виду транспорту.
+ * Якщо передано kind — повертає загальні оголошення, які стосуються геть
+ * усього транспорту (a.kind == null) АБО саме цього виду (a.kind === kind).
+ */
+export function findGeneralAlerts(alerts: RouteAlert[], kind?: TransportKind | null): RouteAlert[] {
+  return alerts.filter((a) => isGeneralAlert(a) && (a.kind == null || kind == null || a.kind === kind));
 }
