@@ -227,64 +227,107 @@ function sampleTrainAt(route: DirectionRoute, elapsedSec: number): {
   };
 }
 
-/** Початок і кінець умовного "дня експлуатації" метро (05:30–24:00), в межах якого рухаються поїзди. */
-const OPERATING_START_SEC = 5 * 3600 + 30 * 60;
-const OPERATING_END_SEC = 24 * 3600;
-const OPERATING_DURATION_SEC = OPERATING_END_SEC - OPERATING_START_SEC;
-
 /**
- * Симуляція завжди "жива": якщо реальний час поза годинами роботи метро (ніч),
- * поїзди все одно рухаються по лінії за розкладом — час безперервно "закільцьовується"
- * у вікно 05:30–24:00, прив'язаний до реального годинника (без стрибків/розривів
- * анімації), щоб схема ніколи не показувала порожню карту.
+ * ЗБЕРЕЖЕНО ДЛЯ СУМІСНОСТІ з кодом, який очікує "секунди від півночі" (наприклад,
+ * для прив'язки локальної точки на схемі до конкретного сегмента маршруту).
+ * Раніше ця функція вночі штучно "закільцьовувала" час, щоб потяги ніколи не
+ * зникали з карти — тепер поїзди повинні реально зникати, коли метро не працює,
+ * тож функція просто повертає справжній час доби без жодних підмін.
  */
 export function effectiveOperatingSec(date: Date): number {
-  const realSec = secOfDay(date);
-  if (realSec >= OPERATING_START_SEC && realSec < OPERATING_END_SEC) return realSec;
-  // Безперервна шкала часу (мс з епохи, у секундах), щоб закільцьовування було
-  // плавним і однаковим для всіх клієнтів, а не залежало від моменту відкриття сторінки.
-  const continuousSec = date.getTime() / 1000;
-  return OPERATING_START_SEC + (continuousSec % OPERATING_DURATION_SEC);
+  return secOfDay(date);
 }
 
-/** Усі активні потяги (обидва напрямки, усі лінії) на момент `date`. Чиста функція часу — без GPS і випадковості. */
+/** Опівночі (00:00:00 за локальним часом) заданого дня, зі зсувом у добах, у секундах з епохи. */
+function dayStartAbsSec(date: Date, dayOffset: number): number {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate() + dayOffset, 0, 0, 0, 0);
+  return d.getTime() / 1000;
+}
+
+function dayTypeOfAbsDay(dayStartSec: number): LiveMetroDayType {
+  const d = new Date(dayStartSec * 1000).getDay();
+  return d === 0 || d === 6 ? 'weekend' : 'weekday';
+}
+
+/**
+ * Усі активні потяги (обидва напрямки, усі лінії) на момент `date`.
+ *
+ * Час рахується у безперервних секундах з епохи (а не "секундах від півночі
+ * поточного дня") — це дає дві важливі речі:
+ *  1) потяг, що виїхав, наприклад, о 23:50, і закінчує рейс вже після
+ *     півночі, коректно "доїжджає" до кінцевої, а не зникає/телепортується
+ *     через перехід через 00:00;
+ *  2) коли реальний час знаходиться поза годинами роботи метро (глибока
+ *     ніч), жодних активних відправлень немає — і ця функція чесно повертає
+ *     ПОРОЖНІЙ список, тобто на карті просто немає потягів, поки метро не
+ *     відкриється за розкладом (а не фейкова їзда по колу, як було раніше).
+ */
 export function getActiveTrains(date: Date): LiveMetroTrain[] {
-  const nowSec = effectiveOperatingSec(date);
-  const dayType = dayTypeOf(date);
+  const nowAbsSec = date.getTime() / 1000;
   const trains: LiveMetroTrain[] = [];
 
-  for (const { line, forward, backward } of BUILT_LINES) {
-    for (const route of [forward, backward]) {
-      const departures = getDailyDepartures(line, route.direction, dayType);
-      for (const departureAtSec of departures) {
-        const elapsed = nowSec - departureAtSec;
-        if (elapsed < 0 || elapsed > route.totalActiveDurationSec) continue;
+  // Перевіряємо "сьогодні" й "вчора": рейс, що відправився пізно ввечері
+  // напередодні, може ще бути в дорозі вже після півночі.
+  for (const dayOffset of [0, -1]) {
+    const dayStartSec = dayStartAbsSec(date, dayOffset);
+    const dayType = dayTypeOfAbsDay(dayStartSec);
 
-        const sample = sampleTrainAt(route, elapsed);
-        trains.push({
-          id: `${line.id}-${route.direction}-${departureAtSec}`,
-          lineId: line.id,
-          lineNumber: line.number,
-          lineName: line.name,
-          lineColor: line.color,
-          direction: route.direction,
-          headsign: route.headsign,
-          point: sample.point,
-          headingDeg: sample.headingDeg,
-          speedRatio: sample.speedRatio,
-          phase: sample.phase,
-          progressRatio: sample.progressRatio,
-          previousStation: route.stations[sample.segmentIndex],
-          nextStation: route.stations[sample.segmentIndex + 1],
-          etaNextStationSec: departureAtSec + sample.nextStationOffsetSec,
-          etaTerminusSec: departureAtSec + route.tripDurationSec,
-          departureAtSec
-        });
+    for (const { line, forward, backward } of BUILT_LINES) {
+      for (const route of [forward, backward]) {
+        const departures = getDailyDepartures(line, route.direction, dayType);
+        for (const departureSecOfDay of departures) {
+          const departureAbsSec = dayStartSec + departureSecOfDay;
+          const elapsed = nowAbsSec - departureAbsSec;
+          if (elapsed < 0 || elapsed > route.totalActiveDurationSec) continue;
+
+          const sample = sampleTrainAt(route, elapsed);
+          trains.push({
+            id: `${line.id}-${route.direction}-${Math.round(departureAbsSec)}`,
+            lineId: line.id,
+            lineNumber: line.number,
+            lineName: line.name,
+            lineColor: line.color,
+            direction: route.direction,
+            headsign: route.headsign,
+            point: sample.point,
+            headingDeg: sample.headingDeg,
+            speedRatio: sample.speedRatio,
+            phase: sample.phase,
+            progressRatio: sample.progressRatio,
+            previousStation: route.stations[sample.segmentIndex],
+            nextStation: route.stations[sample.segmentIndex + 1],
+            etaNextStationSec: departureSecOfDay + sample.nextStationOffsetSec,
+            etaTerminusSec: departureSecOfDay + route.tripDurationSec,
+            departureAtSec: departureSecOfDay
+          });
+        }
       }
     }
   }
 
   return trains;
+}
+
+/**
+ * Чи працює метро прямо зараз — тобто чи є хоч один потяг на лінії.
+ * Зручний прапорець для UI (наприклад, банер "Метро зараз не працює: 00:32–05:30").
+ */
+export function isMetroOperatingNow(date: Date): boolean {
+  return getActiveTrains(date).length > 0;
+}
+
+/** Час найближчого відкриття метро (перше відправлення) від моменту `date`, якщо метро зараз закрите. Секунди від півночі поточного/наступного дня. */
+export function nextMetroOpeningLabel(date: Date): string | null {
+  if (isMetroOperatingNow(date)) return null;
+  const nowSec = secOfDay(date);
+  const dayType = dayTypeOf(date);
+  let earliestFirst = Infinity;
+  for (const { line } of BUILT_LINES) {
+    earliestFirst = Math.min(earliestFirst, timeToSec(line.firstDepartureForward[dayType]), timeToSec(line.firstDepartureBackward[dayType]));
+  }
+  // Якщо зараз пізня ніч до півночі й перше відправлення вже "завтра" (менше за nowSec), просто показуємо його час.
+  void nowSec;
+  return formatEtaClock(earliestFirst);
 }
 
 export interface UpcomingDeparture {

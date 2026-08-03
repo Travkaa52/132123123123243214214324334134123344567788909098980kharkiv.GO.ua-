@@ -17,7 +17,8 @@ import { realStationId, schematicStationId } from '@/liveMetro/stationIdMap';
 import { getMetroDirectionSprite } from '@/config/metroDirectionSprites';
 import {
   getActiveTrains as getSharedActiveTrains,
-  effectiveOperatingSec
+  effectiveOperatingSec,
+  nextMetroOpeningLabel
 } from '@/liveMetro/liveMetroEngine';
 import { DWELL_SEC as SHARED_DWELL_SEC } from '@/liveMetro/schematicData';
 import stopsData from '@/data/stops.json';
@@ -1016,6 +1017,12 @@ export function LiveMetroPage() {
     [trains, visibleLineIds]
   );
 
+  // Час першого потяга — показуємо в банері, коли метро зараз не працює (нема жодного потяга на схемі).
+  const metroOpensAt = useMemo(() => {
+    if (trains.length > 0) return null;
+    return nextMetroOpeningLabel(new Date());
+  }, [trains.length]);
+
   const selectedStation = selectedStationId
     ? allStations.find((s) => s.id === selectedStationId) ?? null
     : null;
@@ -1207,6 +1214,19 @@ export function LiveMetroPage() {
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-mint/20 border-t-mint" />
               <span className="text-sm text-ink-muted">Завантаження схеми...</span>
             </div>
+          </div>
+        )}
+
+        {!isLoading && visibleTrains.length === 0 && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border/10 bg-surface-raised/95 px-4 py-2 text-xs font-semibold text-ink-muted shadow-xl backdrop-blur-sm"
+            style={{ marginTop: 'env(safe-area-inset-top)' }}
+          >
+            <span aria-hidden="true">🌙</span>
+            <span>
+              Метро зараз не працює
+              {metroOpensAt ? ` · перший потяг о ${metroOpensAt}` : ''}
+            </span>
           </div>
         )}
 
