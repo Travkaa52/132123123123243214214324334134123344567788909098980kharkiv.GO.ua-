@@ -106,8 +106,15 @@ export function buildTripPathGeoJson(
   };
 
   plan.legs.forEach((leg, legIndex) => {
-    const boardIdx = leg.route.stopIds.indexOf(leg.boardStop.id);
-    const alightIdx = leg.route.stopIds.indexOf(leg.alightStop.id);
+    // ВАЖЛИВО: індекси рахуємо по leg.directionStopIds — послідовності
+    // зупинок САМЕ того напрямку, яким їде пасажир на цій ділянці, а не
+    // по leg.route.stopIds (це завжди лише напрямок "туди" і для поїздки
+    // "назад" зупинка посадки/висадки могла там взагалі бути відсутньою
+    // або йти у хибному порядку — раніше це давало неправильно намальовану
+    // чи навіть порожню лінію на карті для зворотних поїздок).
+    const stopSequence = leg.directionStopIds ?? leg.route.stopIds;
+    const boardIdx = stopSequence.indexOf(leg.boardStop.id);
+    const alightIdx = stopSequence.indexOf(leg.alightStop.id);
     const forward = alightIdx >= boardIdx;
     const [startIdx, endIdx] = forward ? [boardIdx, alightIdx] : [alightIdx, boardIdx];
 
@@ -138,13 +145,20 @@ export function buildTripPathGeoJson(
       const sliced = flat.slice(lo, hi + 1);
       coords = iBoard <= iAlight ? sliced : [...sliced].reverse();
       if (coords.length < 2) coords = [boardCoord, alightCoord];
-    } else {
-      coords = leg.route.stopIds
+    } else if (startIdx !== -1 && endIdx !== -1) {
+      coords = stopSequence
         .slice(startIdx, endIdx + 1)
         .map((id) => localStops.getById(id))
         .filter((s): s is NonNullable<typeof s> => !!s)
         .map((s) => [s.position.lng, s.position.lat] as [number, number]);
       if (!forward) coords = coords.reverse();
+    } else {
+      // Останній запасний варіант — обидві зупинки все одно відомі, тож
+      // пряма лінія між ними краща за порожню/зламану ділянку на карті.
+      coords = [
+        [leg.boardStop.position.lng, leg.boardStop.position.lat],
+        [leg.alightStop.position.lng, leg.alightStop.position.lat]
+      ];
     }
 
     features.push({

@@ -89,8 +89,71 @@ const stopsData: StopItem[] = Array.from(stopsMap.values());
 // сприймають лінію метро так само, як маршрут автобуса/трамвая/тролейбуса.
 routesData.push(...(metroRoutesData as unknown as RouteItem[]));
 
+/**
+ * КРИТИЧНО ДЛЯ ТОЧНОСТІ: реальний маршрут громадського транспорту в
+ * Харкові (і майже будь-якому місті) фізично не однакова петля в обидва
+ * боки — "туди" й "назад" часто йдуть різними вулицями/смугами (одностороній
+ * рух, розворотні кільця, різні зупинки на протилежних боках проспекту).
+ * `routesReal.json` вже містить обидва реальні напрямки
+ * (`stopIdsForward`/`stopIdsBackward`) — вони НЕ однакові навіть у
+ * зворотному порядку (перевірено: жодної пари з 84 маршрутів не збігається).
+ *
+ * Раніше роутер поїздок використовував лише `stopIds` (=stopIdsForward) і
+ * ЖОДНОГО РАЗУ не перевіряв, що зупинка посадки дійсно йде РАНІШЕ зупинки
+ * висадки в напрямку руху. Це означало дві реальні помилки:
+ *  1) для поїздок у зворотному напрямку маршруту потрібні зупинки могли
+ *     просто бути відсутні в списку (weren't in stopIdsForward) — маршрут
+ *     "губився", хоча фізично довозив саме туди;
+ *  2) навіть коли обидві зупинки випадково траплялись у forward-списку,
+ *     ніхто не перевіряв порядок — міг вийти "маршрут", що вимагав їхати
+ *     назад проти напрямку руху транспорту (фізично неможлива поїздка).
+ *
+ * Рішення: для кожного маршруту рахуємо ОБИДВА напрямки як окремі
+ * впорядковані послідовності зупинок і завжди перевіряємо
+ * `alightIdx > boardIdx` у межах ОДНОГО обраного напрямку. Метро (єдиний
+ * список станцій, потяги їдуть в обидва боки по тій самій колії) отримує
+ * другий напрямок як розворот того самого списку.
+ */
+export interface RouteDirectionVariant {
+  headsign: string;
+  stopIds: string[];
+}
+
+const routeDirectionsById = new Map<string, RouteDirectionVariant[]>();
+
+REAL_ROUTES.forEach((r) => {
+  const fwd = r.stopIdsForward.length > 0 ? r.stopIdsForward : r.stopIdsBackward;
+  const bwd = r.stopIdsBackward.length > 0 ? r.stopIdsBackward : r.stopIdsForward;
+  routeDirectionsById.set(r.id, [
+    { headsign: r.headsignForward, stopIds: fwd },
+    { headsign: r.headsignBackward, stopIds: bwd }
+  ]);
+});
+
+(metroRoutesData as unknown as RouteItem[]).forEach((r) => {
+  routeDirectionsById.set(r.id, [
+    { headsign: r.headsignForward, stopIds: r.stopIds },
+    { headsign: r.headsignBackward, stopIds: [...r.stopIds].reverse() }
+  ]);
+});
+
+/** Усі відомі напрямки руху для маршруту (мінімум один — навіть якщо
+ *  дані з якоїсь причини не містили окремого зворотного напрямку). */
+function getRouteDirections(route: RouteItem): RouteDirectionVariant[] {
+  return routeDirectionsById.get(route.id) ?? [{ headsign: route.headsignForward, stopIds: route.stopIds }];
+}
+
 export interface TripOption {
   route: RouteItem;
+  /** Напрямок руху (кінцева зупинка/назва), у якому фактично їде пасажир
+   *  на цій ділянці — важливо, бо в один і той же боку доїхати можна лише
+   *  одним із двох напрямків маршруту. */
+  headsign: string;
+  /** Впорядкована послідовність зупинок ІМЕННО цього напрямку — на ній
+   *  побудовані boardStop/alightStop і саме вона (а не route.stopIds,
+   *  який завжди "туди") коректна для підрахунку кількості зупинок і
+   *  малювання шляху на карті. */
+  directionStopIds: string[];
   boardStop: StopItem;
   alightStop: StopItem;
   boardDistanceM: number;
@@ -108,13 +171,50 @@ function distanceMetersLatLng(aLat: number, aLng: number, bLat: number, bLng: nu
 }
 
 /**
+ * Шукає в межах ОДНОГО напрямку маршруту найближчу зупинку посадки (до
+ * `from`) і найближчу зупинку висадки (до `to`), і одразу відкидає
+ * результат, якщо висадка виявляється РАНІШЕ посадки в порядку руху —
+ * фізично неможлива поїздка проти напрямку транспорту.
+ */
+function bestPairForDirection(
+  direction: RouteDirectionVariant,
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number
+): { boardStop: StopItem; alightStop: StopItem; boardDist: number; alightDist: number } | null {
+  let nearestToStart: { stop: StopItem; dist: number; idx: number } | null = null;
+  let nearestToEnd: { stop: StopItem; dist: number; idx: number } | null = null;
+
+  direction.stopIds.forEach((stopId, idx) => {
+    const stop = stopsMap.get(stopId);
+    if (!stop) return;
+
+    const dStart = distanceMetersLatLng(fromLat, fromLng, stop.position.lat, stop.position.lng);
+    if (!nearestToStart || dStart < nearestToStart.dist) nearestToStart = { stop, dist: dStart, idx };
+
+    const dEnd = distanceMetersLatLng(toLat, toLng, stop.position.lat, stop.position.lng);
+    if (!nearestToEnd || dEnd < nearestToEnd.dist) nearestToEnd = { stop, dist: dEnd, idx };
+  });
+
+  if (!nearestToStart || !nearestToEnd) return null;
+  const start = nearestToStart as { stop: StopItem; dist: number; idx: number };
+  const end = nearestToEnd as { stop: StopItem; dist: number; idx: number };
+  if (start.stop.id === end.stop.id) return null;
+  // Основа виправлення точності: висадка має йти СТРОГО ПІСЛЯ посадки
+  // в порядку руху цього конкретного напрямку.
+  if (end.idx <= start.idx) return null;
+
+  return { boardStop: start.stop, alightStop: end.stop, boardDist: start.dist, alightDist: end.dist };
+}
+
+/**
  * Підбирає маршрути громадського транспорту, які проходять і біля точки
  * відправлення, і біля точки призначення — простий "будівник маршруту"
  * без бекенду (жодних live-даних, тільки статична геометрія routesReal.json).
  *
- * Для кожного маршруту шукає найближчу до `from` та найближчу до `to`
- * зупинку з-поміж його власних зупинок; якщо обидві в межах допустимого
- * радіусу (і це різні зупинки) — маршрут вважається придатним варіантом.
+ * Для кожного маршруту перевіряє ОБИДВА напрямки руху окремо (див.
+ * коментар вище про forward/backward) і бере найкращий валідний варіант.
  * Радіус пошуку поступово розширюється, якщо нічого не знайдено поруч.
  */
 export function buildTripOptions(
@@ -130,31 +230,29 @@ export function buildTripOptions(
     const candidates: TripOption[] = [];
 
     for (const route of routesData) {
-      let nearestToStart: { stop: StopItem; dist: number } | null = null;
-      let nearestToEnd: { stop: StopItem; dist: number } | null = null;
+      let best: (TripOption & { total: number }) | null = null;
 
-      for (const stopId of route.stopIds) {
-        const stop = stopsMap.get(stopId);
-        if (!stop) continue;
+      for (const direction of getRouteDirections(route)) {
+        const pair = bestPairForDirection(direction, fromLat, fromLng, toLat, toLng);
+        if (!pair) continue;
+        if (pair.boardDist > radius || pair.alightDist > radius) continue;
 
-        const dStart = distanceMetersLatLng(fromLat, fromLng, stop.position.lat, stop.position.lng);
-        if (!nearestToStart || dStart < nearestToStart.dist) nearestToStart = { stop, dist: dStart };
-
-        const dEnd = distanceMetersLatLng(toLat, toLng, stop.position.lat, stop.position.lng);
-        if (!nearestToEnd || dEnd < nearestToEnd.dist) nearestToEnd = { stop, dist: dEnd };
+        const total = pair.boardDist + pair.alightDist;
+        if (!best || total < best.total) {
+          best = {
+            route,
+            headsign: direction.headsign,
+            directionStopIds: direction.stopIds,
+            boardStop: pair.boardStop,
+            alightStop: pair.alightStop,
+            boardDistanceM: pair.boardDist,
+            alightDistanceM: pair.alightDist,
+            total
+          };
+        }
       }
 
-      if (!nearestToStart || !nearestToEnd) continue;
-      if (nearestToStart.stop.id === nearestToEnd.stop.id) continue;
-      if (nearestToStart.dist > radius || nearestToEnd.dist > radius) continue;
-
-      candidates.push({
-        route,
-        boardStop: nearestToStart.stop,
-        alightStop: nearestToEnd.stop,
-        boardDistanceM: nearestToStart.dist,
-        alightDistanceM: nearestToEnd.dist
-      });
+      if (best) candidates.push(best);
     }
 
     if (candidates.length > 0) {
@@ -168,15 +266,20 @@ export function buildTripOptions(
 }
 
 
-/** Знаходить найближчу до точки зупинку серед власних зупинок маршруту. */
-function nearestStopOnRoute(route: RouteItem, lat: number, lng: number): { stop: StopItem; dist: number } | null {
-  let best: { stop: StopItem; dist: number } | null = null;
-  for (const stopId of route.stopIds) {
+/** Знаходить найближчу до точки зупинку СЕРЕД КОНКРЕТНОГО НАПРЯМКУ
+ *  маршруту, разом з її позицією (індексом) у цьому напрямку. */
+function nearestStopInDirection(
+  direction: RouteDirectionVariant,
+  lat: number,
+  lng: number
+): { stop: StopItem; dist: number; idx: number } | null {
+  let best: { stop: StopItem; dist: number; idx: number } | null = null;
+  direction.stopIds.forEach((stopId, idx) => {
     const stop = stopsMap.get(stopId);
-    if (!stop) continue;
+    if (!stop) return;
     const dist = distanceMetersLatLng(lat, lng, stop.position.lat, stop.position.lng);
-    if (!best || dist < best.dist) best = { stop, dist };
-  }
+    if (!best || dist < best.dist) best = { stop, dist, idx };
+  });
   return best;
 }
 
@@ -213,6 +316,12 @@ function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number 
 
 export interface TripLeg {
   route: RouteItem;
+  /** Напрямок руху цієї ділянки (кінцева/назва) — див. RouteDirectionVariant. */
+  headsign: string;
+  /** Впорядкована послідовність зупинок ІМЕННО цього напрямку — коректна
+   *  основа для підрахунку кількості зупинок і малювання шляху на карті
+   *  (route.stopIds завжди відповідає лише напрямку "туди"). */
+  directionStopIds: string[];
   boardStop: StopItem;
   alightStop: StopItem;
   /** Пішки від виходу з попередньої ділянки до посадки на цю (перехід між
@@ -245,10 +354,10 @@ const MINUTES_PER_STOP: Record<TransportKind, number> = {
   bus: 1.9
 };
 
-/** Кількість зупинок, які фактично проїде пасажир на цій ділянці (за позицією в route.stopIds). */
+/** Кількість зупинок, які фактично проїде пасажир на цій ділянці (за позицією в directionStopIds — коректному напрямку). */
 function stopsRiddenOnLeg(leg: TripLeg): number {
-  const boardIdx = leg.route.stopIds.indexOf(leg.boardStop.id);
-  const alightIdx = leg.route.stopIds.indexOf(leg.alightStop.id);
+  const boardIdx = leg.directionStopIds.indexOf(leg.boardStop.id);
+  const alightIdx = leg.directionStopIds.indexOf(leg.alightStop.id);
   if (boardIdx === -1 || alightIdx === -1 || boardIdx === alightIdx) return 5; // розумний дефолт, якщо індекс не знайдено
   return Math.abs(alightIdx - boardIdx);
 }
@@ -290,7 +399,15 @@ export function buildTripPlans(
 ): TripPlan[] {
   const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions).map((o): TripPlan => {
     const plan: TripPlan = {
-      legs: [{ route: o.route, boardStop: o.boardStop, alightStop: o.alightStop }],
+      legs: [
+        {
+          route: o.route,
+          headsign: o.headsign,
+          directionStopIds: o.directionStopIds,
+          boardStop: o.boardStop,
+          alightStop: o.alightStop
+        }
+      ],
       boardWalkM: o.boardDistanceM,
       alightWalkM: o.alightDistanceM,
       transfersCount: 0,
@@ -318,43 +435,70 @@ export function buildTripPlans(
     const seenPairs = new Set<string>();
 
     for (const route1 of routesData) {
-      const board = nearestStopOnRoute(route1, fromLat, fromLng);
-      if (!board || board.dist > radius) continue;
+      for (const direction1 of getRouteDirections(route1)) {
+        const board = nearestStopInDirection(direction1, fromLat, fromLng);
+        if (!board || board.dist > radius) continue;
 
-      for (const stopId of route1.stopIds) {
-        if (stopId === board.stop.id) continue;
-        const transferStop = stopsMap.get(stopId);
-        if (!transferStop) continue;
+        // Пересадкою може бути лише зупинка, що йде ПІСЛЯ посадки в
+        // порядку руху цього напрямку — інакше транспорт мав би заїхати
+        // туди до того, як забрав пасажира.
+        for (let idx = board.idx + 1; idx < direction1.stopIds.length; idx++) {
+          const transferStop = stopsMap.get(direction1.stopIds[idx]);
+          if (!transferStop) continue;
 
-        // Пересадка можлива або на цій самій зупинці (routeId2 в її
-        // routeIds), або на пов'язаній пересадочній станції поруч
-        // (напр. метро: Майдан Конституції ↔ Історичний музей).
-        for (const candidate of getTransferCandidates(transferStop)) {
-          for (const routeId2 of candidate.stop.routeIds) {
-            if (routeId2 === route1.id) continue;
-            const route2 = routesData.find((r) => r.id === routeId2);
-            if (!route2) continue;
+          // Пересадка можлива або на цій самій зупинці (routeId2 в її
+          // routeIds), або на пов'язаній пересадочній станції поруч
+          // (напр. метро: Майдан Конституції ↔ Історичний музей).
+          for (const candidate of getTransferCandidates(transferStop)) {
+            for (const routeId2 of candidate.stop.routeIds) {
+              if (routeId2 === route1.id) continue;
+              const route2 = routesData.find((r) => r.id === routeId2);
+              if (!route2) continue;
 
-            const alight = nearestStopOnRoute(route2, toLat, toLng);
-            if (!alight || alight.dist > radius) continue;
-            if (alight.stop.id === candidate.stop.id) continue;
+              for (const direction2 of getRouteDirections(route2)) {
+                const boardIdx2 = direction2.stopIds.indexOf(candidate.stop.id);
+                if (boardIdx2 === -1) continue;
 
-            const pairKey = `${route1.id}|${transferStop.id}|${candidate.stop.id}|${route2.id}`;
-            if (seenPairs.has(pairKey)) continue;
-            seenPairs.add(pairKey);
+                let bestAlight: { stop: StopItem; dist: number; idx: number } | null = null;
+                for (let j = boardIdx2 + 1; j < direction2.stopIds.length; j++) {
+                  const s = stopsMap.get(direction2.stopIds[j]);
+                  if (!s) continue;
+                  const dist = distanceMetersLatLng(toLat, toLng, s.position.lat, s.position.lng);
+                  if (!bestAlight || dist < bestAlight.dist) bestAlight = { stop: s, dist, idx: j };
+                }
+                if (!bestAlight || bestAlight.dist > radius) continue;
 
-            const plan: TripPlan = {
-              legs: [
-                { route: route1, boardStop: board.stop, alightStop: transferStop },
-                { route: route2, boardStop: candidate.stop, alightStop: alight.stop, transferWalkFromM: candidate.walkM }
-              ],
-              boardWalkM: board.dist,
-              alightWalkM: alight.dist,
-              transfersCount: 1,
-              estimatedMinutes: 0
-            };
-            plan.estimatedMinutes = estimateTripMinutes(plan);
-            candidates.push(plan);
+                const pairKey = `${route1.id}|${direction1.headsign}|${transferStop.id}|${candidate.stop.id}|${route2.id}|${direction2.headsign}`;
+                if (seenPairs.has(pairKey)) continue;
+                seenPairs.add(pairKey);
+
+                const plan: TripPlan = {
+                  legs: [
+                    {
+                      route: route1,
+                      headsign: direction1.headsign,
+                      directionStopIds: direction1.stopIds,
+                      boardStop: board.stop,
+                      alightStop: transferStop
+                    },
+                    {
+                      route: route2,
+                      headsign: direction2.headsign,
+                      directionStopIds: direction2.stopIds,
+                      boardStop: candidate.stop,
+                      alightStop: bestAlight.stop,
+                      transferWalkFromM: candidate.walkM
+                    }
+                  ],
+                  boardWalkM: board.dist,
+                  alightWalkM: bestAlight.dist,
+                  transfersCount: 1,
+                  estimatedMinutes: 0
+                };
+                plan.estimatedMinutes = estimateTripMinutes(plan);
+                candidates.push(plan);
+              }
+            }
           }
         }
       }

@@ -96,8 +96,16 @@ export default function App() {
   // (там профіль підтягується автоматично), користувач ще не проходив
   // "знайомство" на цьому пристрої, і сплеш-екран вже пішов — щоб форма
   // не блимала поверх анімації запуску.
+  // Виняток — /install-app: це самостійна сторінка-гайд, яку навмисно
+  // відкривають ЗОВНІШНІМ браузером саме тому, що людина ще НЕ
+  // зареєстрована в цьому браузері (Telegram-профіль живе в іншому
+  // сховищі). Якщо не виключити цей маршрут, повноекранна форма
+  // реєстрації (z-[100]) перекриває інструкцію встановлення повністю —
+  // сторінка виглядає "не працює".
+  const isInstallAppRoute = location.pathname === '/install-app';
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
-  const showRegistration = telegramStatus === 'outside' && !hasCompletedOnboarding && !splashMounted;
+  const showRegistration =
+    telegramStatus === 'outside' && !hasCompletedOnboarding && !splashMounted && !isInstallAppRoute;
 
   // Карта — важкий компонент (ініціалізація MapLibre, завантаження стилю,
   // тайлів, шрифтів). Щоб вона відкривалась миттєво щоразу після першого
@@ -158,9 +166,9 @@ export default function App() {
         </div>
       )}
 
-      {telegramStatus === 'outside' && !showRegistration && <MemoizedTelegramGate />}
+      {telegramStatus === 'outside' && !showRegistration && !isInstallAppRoute && <MemoizedTelegramGate />}
 
-      <MemoizedBottomNav />
+      {!isInstallAppRoute && <MemoizedBottomNav />}
       <Toast />
       <PwaUpdateBanner />
       <DevToolsGuardOverlay />
