@@ -727,7 +727,6 @@ export function HomePage() {
             <span className="text-ink-muted">•</span>
             <span className="text-primary">v1.3.0 Pro</span>
           </div>
-          <p className="text-[11px] text-ink-muted font-medium">Найнадійніший міський навігатор Харкова</p>
         </footer>
 
       </div>

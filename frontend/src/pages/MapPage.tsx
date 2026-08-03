@@ -8,9 +8,6 @@ import {
   Minus, 
   Compass, 
   Navigation, 
-  Bus, 
-  Zap, 
-  TrainTrack,
   MapPin,
   ArrowUpDown,
   Route as RouteIcon,
@@ -30,18 +27,9 @@ import { localRoutes, localStops, type TripPlan, type StopItem } from '@/data/lo
 import { getRouteBounds } from '@/lib/mapLayers';
 import { refineTripPlansWithOSM } from '@/lib/tripPlanRefine';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import type { TransportKind } from '@/types/transport';
 
 const SUGGESTIONS_LIMIT = 6;
 const STORAGE_PREFIX = 'kharkiv_go_map_state_';
-
-const CHIP_FILTERS: { id: TransportKind | 'stops'; label: string; icon: typeof Bus }[] = [
-  { id: 'bus', label: 'Автобуси', icon: Bus },
-  { id: 'trolleybus', label: 'Тролейбуси', icon: Zap },
-  { id: 'tram', label: 'Трамваї', icon: TrainTrack },
-  { id: 'metro', label: 'Метро', icon: TrainTrack },
-  { id: 'stops', label: 'Зупинки', icon: Navigation },
-];
 
 export function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,7 +38,6 @@ export function MapPage() {
   
   const storeVisibleKinds = useSettingsStore((s) => s.visibleTransportKinds);
   const showStops = useSettingsStore((s) => s.showStopsOnMap);
-  const toggleStopsOnMap = useSettingsStore((s) => s.toggleStopsOnMap);
 
   const [map, setMap] = useState<MapLibreMap | null>(null);
 
@@ -308,16 +295,6 @@ export function MapPage() {
     clearSelection();
   }, [clearSelection]);
 
-  const toggleChip = useCallback((id: string) => {
-    setActiveFilterChips((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      if (id === 'stops') {
-        toggleStopsOnMap();
-      }
-      return next;
-    });
-  }, [toggleStopsOnMap]);
-
   useEffect(() => {
     if (!map) return;
 
@@ -543,28 +520,6 @@ export function MapPage() {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Швидкі фільтри */}
-        <div className="pointer-events-auto flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-          {CHIP_FILTERS.map((chip) => {
-            const isActive = activeFilterChips[chip.id];
-            const Icon = chip.icon;
-            return (
-              <button
-                key={chip.id}
-                onClick={() => toggleChip(chip.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all shrink-0 backdrop-blur-xl shadow-md ${
-                  isActive
-                    ? 'bg-primary text-white shadow-primary/30 border border-primary/40'
-                    : 'glass-surface text-ink-text hover:brightness-105'
-                }`}
-              >
-                <Icon size={14} className={isActive ? 'text-white' : 'text-ink-muted'} />
-                <span>{chip.label}</span>
-              </button>
-            );
-          })}
         </div>
 
         {activeField && fieldSuggestions.length > 0 && (
