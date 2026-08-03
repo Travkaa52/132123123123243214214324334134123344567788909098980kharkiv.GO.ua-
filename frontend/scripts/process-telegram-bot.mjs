@@ -36,6 +36,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import { replaceRouteAlerts, insertDelayReports } from './supabaseSync.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -162,6 +163,7 @@ async function processCycle() {
   let alerts = (await readJson(PUBLIC_ALERTS_PATH, { items: [] })).items || [];
 
   const now = Date.now() / 1000;
+  const delayReportsBefore = delayReports.length;
 
   const updatesRes = await tg('getUpdates', {
     offset: offsetState.lastUpdateId + 1,
@@ -313,11 +315,22 @@ async function processCycle() {
     pendingPrompts.push({ routeNumber, kind, createdAt: now });
   }
 
+  // --- Supabase: спершу лог нових скарг (до прибирання старих нижче) ------
+  const newDelayReports = delayReports.slice(delayReportsBefore);
+  if (newDelayReports.length && (await insertDelayReports(newDelayReports))) {
+    console.log(`[bot] Supabase: додано ${newDelayReports.length} нову(і) скаргу(и) на затримку.`);
+  }
+
   // --- прибирання: старі скарги/мапи/протухлі оголошення -------------------
   delayReports = delayReports.filter((r) => r.createdAt >= windowStart - 3600);
   supportMap = supportMap.slice(-500);
   pendingPrompts = pendingPrompts.filter((p) => now - p.createdAt < DELAY_REPORT_WINDOW_MINUTES * 60);
   alerts = alerts.filter((a) => a.expiresAt > now - 86400);
+
+  const activeAlerts = alerts.filter((a) => a.expiresAt > now);
+  if (await replaceRouteAlerts(activeAlerts)) {
+    console.log(`[bot] Supabase: route_alerts синхронізовано (${activeAlerts.length} активних).`);
+  }
 
   await writeJson(OFFSET_FILE, offsetState);
   await writeJson(DELAY_REPORTS_FILE, delayReports);
@@ -502,7 +515,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 5000));
     }
     if (changed) {
-      await gitCommitAndPush('chore: process telegram bot updates [skip ci]');
+      await gitCommitAndPush('chore: process telegram bot updates');
     }
   }
 

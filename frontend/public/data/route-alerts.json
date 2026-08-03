@@ -1,14 +1,4 @@
 {
-  "updatedAt": "2026-08-03T10:45:53.723Z",
-  "items": [
-    {
-      "id": 1785753953088,
-      "kind": "bus",
-      "routeNumber": "7",
-      "message": "Повідомлення про затримку",
-      "createdAt": 1785753948.413,
-      "expiresAt": 1785761148.413,
-      "source": "manual"
-    }
-  ]
+  "updatedAt": "2026-08-02T17:35:07.832Z",
+  "items": []
 }
