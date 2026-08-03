@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Kharkiv GO</title>
+    <script>
+      // Стандартний трюк "spa-github-pages": GitHub Pages не вміє
+      // переписувати довільний шлях на index.html (на відміну від
+      // vercel.json — там це вже не потрібно, цей файл ніколи не спрацює).
+      // Пряме відкриття посилання типу "/install-app" у новій вкладці
+      // (саме так відкривається гайд встановлення PWA — зовнішнім
+      // браузером, не client-side переходом) інакше давало б 404.
+      //
+      // pathSegmentsToKeep=1 — бо GitHub project-сторінка живе за адресою
+      // username.github.io/<repo>/..., тож перший сегмент шляху (<repo>)
+      // потрібно зберегти як базовий, а решту перекодувати в query-рядок,
+      // з якого main.tsx відновлює справжній шлях до монтування роутера.
+      (function () {
+        var segmentsToKeep = 1;
+        var l = window.location;
+        var parts = l.pathname.split('/').slice(1);
+        var base = parts.slice(0, segmentsToKeep).join('/');
+        var rest = parts.slice(segmentsToKeep).join('/');
+        l.replace(
+          l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+            '/' + (base ? base + '/' : '') +
+            '?/' + rest.replace(/&/g, '~and~') +
+            (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+            l.hash
+        );
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
