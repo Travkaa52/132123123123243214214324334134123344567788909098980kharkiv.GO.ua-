@@ -33,6 +33,13 @@ const STORAGE_PREFIX = 'kharkiv_go_map_state_';
 export function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') ?? '';
+  // Дозволяє відкривати конкретну зупинку одразу прямим посиланням виду
+  // /map?stop=<id> — саме так на цю сторінку веде "Найближчі зупинки" з
+  // HomePage. Захоплюємо початкове значення один раз: нижче одразу
+  // прибираємо його з URL, тому читати searchParams напряму в рендері
+  // після монтування вже не можна.
+  const initialDeepLinkStopIdRef = useRef(searchParams.get('stop'));
+  const deepLinkedStopId = searchParams.get('stop');
   const { position, heading, isMoving, isLocating, error, locate } = useGeolocation();
   
   const storeVisibleKinds = useSettingsStore((s) => s.visibleTransportKinds);
@@ -40,7 +47,7 @@ export function MapPage() {
 
   const [map, setMap] = useState<MapLibreMap | null>(null);
 
-  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(initialDeepLinkStopIdRef.current);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   // --- Побудова маршруту "Звідки -> Куди" -------------------------------
@@ -328,6 +335,24 @@ export function MapPage() {
   useEffect(() => {
     if (initialQuery) setToQuery(initialQuery);
   }, [initialQuery]);
+
+  // Якщо параметр stop у URL змінюється (наприклад, повторний перехід з
+  // головної сторінки на іншу найближчу зупинку), синхронізуємо вибір.
+  useEffect(() => {
+    if (deepLinkedStopId) setSelectedStopId(deepLinkedStopId);
+  }, [deepLinkedStopId]);
+
+  // Одразу після відкриття конкретної зупинки за deep-лінком прибираємо
+  // параметр з URL, щоб закриття модалки (onClose) і подальший пошук на
+  // карті поводились природно, без "залипання" на старій зупинці.
+  useEffect(() => {
+    if (deepLinkedStopId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('stop');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedStopId]);
 
   // Карта доступна одразу, без екрана завантаження — <MapView> рендериться
   // і стає інтерактивною відразу після переходу на розділ "Карта", а не

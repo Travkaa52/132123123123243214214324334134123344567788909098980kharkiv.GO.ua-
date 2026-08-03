@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { TRANSPORT_COLORS } from '@/config/map';
 import { TRANSPORT_SPRITES } from '@/config/transportSprites';
-import { useSpriteImage } from '@/hooks/useSpriteImage';
+import { useSpriteImage, resolveSpriteSrc } from '@/hooks/useSpriteImage';
 import { computeSpriteGeometry, pickFrameIndex } from '@/lib/sprite';
 import { RouteDisplay } from '@/components/RouteDisplay';
 import type { TransportKind, VehicleState } from '@/types/transport';
@@ -89,7 +89,7 @@ function TransportSpriteComponent({
             style={{
               width: geometry.displayWidth,
               height: geometry.displayHeight,
-              backgroundImage: `url(${config.src})`,
+              backgroundImage: `url(${resolveSpriteSrc(config.src)})`,
               backgroundSize: geometry.backgroundSize,
               backgroundPosition: geometry.backgroundPosition,
               backgroundRepeat: 'no-repeat',

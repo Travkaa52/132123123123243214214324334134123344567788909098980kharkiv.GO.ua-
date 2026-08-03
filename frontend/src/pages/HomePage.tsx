@@ -37,6 +37,7 @@ import {
   formatEtaCountdown
 } from '@/liveMetro/liveMetroEngine';
 import { METRO_STATION_GEO } from '@/liveMetro/metroStationsGeo';
+import { schematicStationId } from '@/liveMetro/stationIdMap';
 import type { TransportKind, TransportRoute } from '@/types/transport';
 
 // metroicono.png ще не покладений у public/icons (див. README.txt там же) —
@@ -122,7 +123,7 @@ export function HomePage() {
   const nearestMetroStation = useMemo(() => {
     if (!position) return null;
 
-    let best: { id: string; name: string; distM: number; lineColor?: string } | null = null;
+    let best: { id: string; schematicId: string; name: string; distM: number; lineColor?: string } | null = null;
 
     for (const { line } of BUILT_LINES) {
       for (const s of line.stations) {
@@ -132,7 +133,7 @@ export function HomePage() {
         const distM = calculateDistanceMeters(position.lat, position.lng, geo.lat, geo.lng);
 
         if (!best || distM < best.distM) {
-          best = { id: s.id, name: s.name, distM, lineColor: line.color };
+          best = { id: s.id, schematicId: schematicStationId(s.id), name: s.name, distM, lineColor: line.color };
         }
       }
     }
@@ -493,7 +494,7 @@ export function HomePage() {
           ) : nearestMetroStation ? (
             <div className="bg-white/10 backdrop-blur-sm rounded-[18px] p-3.5 border border-white/10 mb-4 space-y-2">
               <Link
-                to={`/metro/live?station=${nearestMetroStation.id}&tab=timetable`}
+                to={`/metro/live?station=${nearestMetroStation.schematicId}&tab=timetable`}
                 className="flex items-center justify-between hover:opacity-80 transition-opacity"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -518,7 +519,7 @@ export function HomePage() {
           )}
 
           <Link
-            to={nearestMetroStation ? `/metro/live?station=${nearestMetroStation.id}&tab=timetable` : '/metro/live'}
+            to={nearestMetroStation ? `/metro/live?station=${nearestMetroStation.schematicId}&tab=timetable` : '/metro/live'}
             className="relative w-full py-4 px-4 bg-white text-emerald-700 rounded-[18px] font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-200"
           >
             <img src={metroIcon} alt="Метро" className="w-4 h-4 object-contain" />
@@ -571,7 +572,7 @@ export function HomePage() {
               {nearbyStopsWithDistance.map((stop) => (
                 <Link
                   key={stop.id}
-                  to={`/map?q=${encodeURIComponent(stop.name)}`}
+                  to={`/map?stop=${encodeURIComponent(stop.id)}`}
                   onClick={() => addHistoryEntry({ query: stop.name, type: 'stop' })}
                   className="flex items-center justify-between p-3 rounded-[18px] bg-surface-soft hover:bg-primary/10 transition-colors border border-transparent hover:border-primary/15 group"
                 >
