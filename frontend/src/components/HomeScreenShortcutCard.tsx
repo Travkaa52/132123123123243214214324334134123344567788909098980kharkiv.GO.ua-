@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Smartphone, CheckCircle2, Share, ChevronRight, MoreVertical, PlusSquare } from 'lucide-react';
+import { Smartphone, CheckCircle2, Share, ChevronRight, MoreVertical, PlusSquare, Download } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHomeScreenShortcut } from '@/hooks/useHomeScreenShortcut';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
 
 /** Найпростіша евристика платформи для ручних інструкцій поза Telegram. */
 function detectPlatform(): 'ios' | 'android' | 'desktop' {
@@ -16,16 +17,32 @@ function detectPlatform(): 'ios' | 'android' | 'desktop' {
  * - Усередині Telegram (Bot API 8.0+) — одна кнопка, яка одразу відкриває
  *   рідний діалог Telegram WebApp.addToHomeScreen(), без ручних кроків.
  * - Усередині Telegram зі старим клієнтом — коротка підказка оновити застосунок.
- * - Поза Telegram (звичайний браузер / PWA) — покрокова інструкція під
- *   поточну платформу (iOS Safari / Android Chrome / десктоп), оскільки
- *   у браузері немає єдиного API для показу цього діалогу програмно.
+ * - Поза Telegram, у Chrome/Edge (Android і десктоп) — рідний системний
+ *   діалог встановлення PWA через beforeinstallprompt (usePwaInstall) —
+ *   так само одна кнопка, застосунок ставиться як окрема програма з
+ *   власною іконкою і працює локально на пристрої (офлайн-кеш через
+ *   сервіс-воркер, дані — localStorage/IndexedDB, без бекенду).
+ * - Поза Telegram в iOS Safari / Firefox — покрокова інструкція під
+ *   платформу, бо ці браузери не надають сторінці програмного доступу
+ *   до діалогу встановлення (обмеження браузера, не застосунку).
  */
 export function HomeScreenShortcutCard() {
   const isTelegramEnv = useAuthStore((s) => s.isTelegramEnv);
   const { isSupported, status, isChecking, createShortcut, justAdded } = useHomeScreenShortcut();
+  const { canInstall, isInstalled, promptInstall } = usePwaInstall();
   const [showManualSteps, setShowManualSteps] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [justInstalled, setJustInstalled] = useState(false);
 
   const alreadyAdded = status === 'added';
+
+  const handleNativeInstall = async () => {
+    if (isInstalling) return;
+    setIsInstalling(true);
+    const accepted = await promptInstall();
+    setIsInstalling(false);
+    if (accepted) setJustInstalled(true);
+  };
 
   if (isTelegramEnv && isSupported) {
     return (
@@ -84,8 +101,56 @@ export function HomeScreenShortcutCard() {
     );
   }
 
-  // Поза Telegram: показуємо кнопку, яка розкриває покрокову інструкцію
-  // під платформу — програмного API для цього в звичайному браузері немає.
+  // Поза Telegram, застосунок уже встановлено як PWA (запущено з ярлика) —
+  // пропонувати встановлення вдруге сенсу нема.
+  if (isInstalled || justInstalled) {
+    return (
+      <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-ink-text">Застосунок встановлено</span>
+            <span className="text-[11px] text-ink-muted">Kharkiv GO працює локально на пристрої — карта, маршрути й обране доступні офлайн</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Chrome/Edge (Android і десктоп) — рідний системний діалог встановлення
+  // в один тап, без ручних кроків.
+  if (canInstall) {
+    return (
+      <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm">
+        <button
+          type="button"
+          onClick={handleNativeInstall}
+          disabled={isInstalling}
+          className="w-full flex items-center justify-between p-4 transition-colors hover:bg-surface/90 active:bg-muted/50 min-h-[48px] text-left disabled:opacity-70"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface border border-border/40 text-ink-text">
+              <Download className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-ink-text">
+                {isInstalling ? 'Відкриваємо діалог встановлення…' : 'Встановити застосунок'}
+              </span>
+              <span className="text-[11px] text-ink-muted">
+                Окрема іконка на пристрої, запуск без браузера, працює офлайн
+              </span>
+            </div>
+          </div>
+          {!isInstalling && <ChevronRight className="h-4 w-4 text-ink-muted" />}
+        </button>
+      </div>
+    );
+  }
+
+  // iOS Safari / Firefox — програмного діалогу встановлення в браузері
+  // немає (обмеження самого браузера), тож покрокова інструкція під платформу.
   const platform = detectPlatform();
 
   return (

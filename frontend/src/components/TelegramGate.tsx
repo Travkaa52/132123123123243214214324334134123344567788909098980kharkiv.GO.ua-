@@ -1,7 +1,6 @@
 import { useState } from 'react';
+import { BOT_USERNAME, BOT_APP_NAME } from '@/lib/botConfig';
 
-const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined;
-const BOT_APP_NAME = import.meta.env.VITE_TELEGRAM_APP_NAME as string | undefined;
 const DISMISS_KEY = 'khgo-telegram-banner-dismissed';
 
 function getMiniAppLink(): string {

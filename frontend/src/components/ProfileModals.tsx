@@ -14,17 +14,18 @@ import {
 import { Modal } from '@/components/Modal';
 import { useToastStore } from '@/store/useToastStore';
 import { openSupportChat } from '@/lib/support';
+import { BOT_USERNAME } from '@/lib/botConfig';
 
 /**
- * НАЛАШТУВАННЯ, ЯКІ ТРЕБА ЗАМІНИТИ НА СВОЇ:
- * - TELEGRAM_BOT_URL — юзернейм свого бота (для кнопки-посилання нижче).
- *   Саму відправку повідомлення реалізує lib/support.ts через
- *   VITE_TELEGRAM_BOT_USERNAME (.env) — немає бекенду (GitHub Pages),
- *   тож повідомлення йде як deep link у чат з ботом, див. server-less
- *   обробку в scripts/process-telegram-bot.mjs.
+ * НАЛАШТУВАННЯ, ЯКІ МОЖНА ЗАМІНИТИ НА СВОЇ:
+ * - Юзернейм бота береться з lib/botConfig.ts (fallback вшито в код, можна
+ *   перевизначити змінною VITE_TELEGRAM_BOT_USERNAME). Саму відправку
+ *   повідомлення реалізує lib/support.ts — немає бекенду (GitHub Pages),
+ *   тож повідомлення йде як deep link у чат з ботом, обробка на боці бота
+ *   в bot/telegram_bot.py або scripts/process-telegram-bot.mjs.
  * - DONATION_CARD_NUMBER / DONATION_JAR_URL — реквізити для донатів.
  */
-const TELEGRAM_BOT_URL = 'https://t.me/your_bot_username';
+const TELEGRAM_BOT_URL = `https://t.me/${BOT_USERNAME}`;
 const DONATION_CARD_NUMBER = '0000 0000 0000 0000';
 const DONATION_JAR_URL = 'https://send.monobank.ua/jar/6S34HzcLMS';
 
