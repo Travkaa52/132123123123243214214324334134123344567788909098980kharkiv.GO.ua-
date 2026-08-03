@@ -21,6 +21,7 @@ import {
   Clock
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { assetUrl } from '@/lib/assetUrl';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
@@ -38,13 +39,13 @@ const SOCIAL_LINKS = [
   {
     name: 'Telegram',
     href: 'https://t.me/kharkiv_transpot_go',
-    icon: '/icons/iconotelegram.png',
+    icon: assetUrl('/icons/iconotelegram.png'),
     hint: 'Канал і новини'
   },
   {
     name: 'Threads',
     href: 'https://www.threads.com/@kharkivgo_official',
-    icon: '/icons/iconothreads.png',
+    icon: assetUrl('/icons/iconothreads.png'),
     hint: '@kharkivgo_official'
   }
 ];

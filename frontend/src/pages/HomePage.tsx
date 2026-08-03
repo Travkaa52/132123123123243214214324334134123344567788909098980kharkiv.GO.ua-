@@ -590,13 +590,13 @@ export function HomePage() {
                     </span>
                     <div className="flex items-center gap-1">
                       {stop.kinds.includes('bus') && (
-                        <img src="/sprites/iconsbus.png" alt="Автобус" className="w-4 h-4 object-contain rounded-sm" />
+                        <img src={assetUrl('/sprites/iconsbus.png')} alt="Автобус" className="w-4 h-4 object-contain rounded-sm" />
                       )}
                       {stop.kinds.includes('trolleybus') && (
-                        <img src="/sprites/iconstrolley.jpg" alt="Тролейбус" className="w-4 h-4 object-contain rounded-sm" />
+                        <img src={assetUrl('/sprites/iconstrolley.jpg')} alt="Тролейбус" className="w-4 h-4 object-contain rounded-sm" />
                       )}
                       {stop.kinds.includes('tram') && (
-                        <img src="/sprites/iconstramvay.jpg" alt="Трамвай" className="w-4 h-4 object-contain rounded-sm" />
+                        <img src={assetUrl('/sprites/iconstramvay.jpg')} alt="Трамвай" className="w-4 h-4 object-contain rounded-sm" />
                       )}
                     </div>
                   </div>
