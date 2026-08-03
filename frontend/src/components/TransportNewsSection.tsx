@@ -39,12 +39,13 @@ function alertTitle(alert: RouteAlert): string {
 export function TransportNewsSection() {
   const alerts = useRouteAlertsStore((s) => s.alerts);
   const startPolling = useRouteAlertsStore((s) => s.startPolling);
-  const { items: channelItems, fetchNotifications } = useNotificationsStore();
+  const { items: channelItems, fetchNotifications, startPolling: startNotificationsPolling } = useNotificationsStore();
 
   useEffect(() => {
     startPolling();
     fetchNotifications();
-  }, [startPolling, fetchNotifications]);
+    startNotificationsPolling();
+  }, [startPolling, fetchNotifications, startNotificationsPolling]);
 
   const sortedAlerts = [...alerts].sort((a, b) => b.createdAt - a.createdAt);
   const latestChannelAlert = channelItems.find((n) => n.kind === 'alert');

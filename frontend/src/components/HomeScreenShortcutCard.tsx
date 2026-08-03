@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import { Smartphone, CheckCircle2, Share, ChevronRight, MoreVertical, PlusSquare, Download } from 'lucide-react';
+import { Smartphone, CheckCircle2, Share, ChevronRight, MoreVertical, PlusSquare, Download, Send, Globe } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useHomeScreenShortcut } from '@/hooks/useHomeScreenShortcut';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { openInExternalBrowser } from '@/lib/telegram';
+
+/** Посилання на сторінку-гайд повного встановлення PWA — відкривається
+ *  ЗОВНІШНІМ браузером (не WebView Telegram), інакше Service Worker і
+ *  діалог встановлення просто не спрацюють. */
+function getInstallGuideUrl(): string {
+  return `${window.location.origin}/install-app`;
+}
 
 /** Найпростіша евристика платформи для ручних інструкцій поза Telegram. */
 function detectPlatform(): 'ios' | 'android' | 'desktop' {
@@ -46,7 +54,7 @@ export function HomeScreenShortcutCard() {
 
   if (isTelegramEnv && isSupported) {
     return (
-      <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm">
+      <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm divide-y divide-border/40">
         <button
           type="button"
           onClick={createShortcut}
@@ -61,11 +69,11 @@ export function HomeScreenShortcutCard() {
                   : 'bg-surface border-border/40 text-ink-text'
               }`}
             >
-              {alreadyAdded || justAdded ? <CheckCircle2 className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
+              {alreadyAdded || justAdded ? <CheckCircle2 className="h-4 w-4" /> : <Send className="h-4 w-4" />}
             </div>
             <div>
               <span className="block text-xs font-bold text-ink-text">
-                {alreadyAdded || justAdded ? 'Ярлик додано на головний екран' : 'Створити ярлик на головному екрані'}
+                {alreadyAdded || justAdded ? 'Ярлик Telegram додано' : 'Ярлик Telegram mini app'}
               </span>
               <span className="text-[11px] text-ink-muted">
                 {alreadyAdded || justAdded
@@ -77,6 +85,25 @@ export function HomeScreenShortcutCard() {
             </div>
           </div>
           {!alreadyAdded && !justAdded && <ChevronRight className="h-4 w-4 text-ink-muted" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openInExternalBrowser(getInstallGuideUrl())}
+          className="w-full flex items-center justify-between p-4 transition-colors hover:bg-surface/90 active:bg-muted/50 min-h-[48px] text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface border border-border/40 text-ink-text">
+              <Globe className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-ink-text">Встановити повний застосунок</span>
+              <span className="text-[11px] text-ink-muted">
+                Окрема іконка поза Telegram, працює офлайн — відкриється гайд у браузері
+              </span>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-ink-muted" />
         </button>
       </div>
     );

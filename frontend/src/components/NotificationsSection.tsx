@@ -16,7 +16,7 @@ function timeAgo(iso: string): string {
 
 /** Дзвіночок у шапці головної сторінки: відкриває шторку зі сповіщеннями з Telegram-каналів. */
 export function NotificationsBell() {
-  const { items, isLoading, error, fetchNotifications, markAllSeen, lastSeenCount } = useNotificationsStore();
+  const { items, isLoading, error, fetchNotifications, startPolling, markAllSeen, lastSeenCount } = useNotificationsStore();
   const unseenCount = Math.max(0, items.length - lastSeenCount);
   // items приходять від парсера відсортованими від найновіших — перші
   // unseenCount записів і є тими, що користувач ще не бачив.
@@ -24,7 +24,11 @@ export function NotificationsBell() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    // Дзвіночок змонтований весь час, поки застосунок відкритий, тому саме
+    // тут запускаємо періодичний опит — щоб термінове оголошення (закриття
+    // станції, повітряна тривога тощо) з'являлось без перезаходу в застосунок.
+    startPolling();
+  }, [fetchNotifications, startPolling]);
 
   return (
     <NotificationsBellButton
