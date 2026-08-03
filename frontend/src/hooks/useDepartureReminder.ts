@@ -3,6 +3,7 @@ import { useReminderStore } from '@/store/useReminderStore';
 import { useToastStore } from '@/store/useToastStore';
 import { computeLeavePlan, formatClock, isReminderInWindow } from '@/lib/reminderEngine';
 import { getPushPermissionState } from '@/lib/pushPermission';
+import { assetUrl } from '@/lib/assetUrl';
 import type { LeaveTimePlan } from '@/types/reminder';
 
 const CHECK_INTERVAL_MS = 20_000;
@@ -14,7 +15,7 @@ function isSameDay(a: Date, b: Date): boolean {
 function sendNativeNotification(title: string, body: string) {
   if (getPushPermissionState() !== 'granted') return false;
   try {
-    new Notification(title, { body, tag: 'kharkivgo-departure-reminder', icon: '/icons/kharkiv-metro-logo.png' });
+    new Notification(title, { body, tag: 'kharkivgo-departure-reminder', icon: assetUrl('/icons/kharkiv-metro-logo.png') });
     return true;
   } catch {
     return false;
