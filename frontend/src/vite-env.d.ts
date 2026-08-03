@@ -14,6 +14,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   /** Перевизначення URL резервного статичного route-alerts.json, якщо потрібно. */
   readonly VITE_ROUTE_ALERTS_URL?: string;
+  readonly VITE_NOTIFICATIONS_URL?: string;
 }
 
 interface ImportMeta {
