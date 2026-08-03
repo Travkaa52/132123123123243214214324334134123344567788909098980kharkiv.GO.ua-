@@ -1,4 +1,5 @@
 import { getTelegramWebApp } from '@/lib/telegram';
+import { BOT_USERNAME } from '@/lib/botConfig';
 import type { TransportKind } from '@/types/transport';
 
 export interface DelayReportInput {
@@ -96,11 +97,6 @@ function markReported(kind: TransportKind | null, routeNumber: string) {
  * у звичайному чаті, як і будь-який текст повідомлення.
  */
 export function sendDelayReport(input: DelayReportInput): DelayReportResult {
-  const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
-  if (!botUsername) {
-    return { ok: false, reason: 'not-configured' };
-  }
-
   const kindTag = input.kind ?? '_';
   const kindLabel = input.kind ? KIND_LABELS[input.kind] : 'Транспорт';
 
@@ -108,7 +104,7 @@ export function sendDelayReport(input: DelayReportInput): DelayReportResult {
   if (input.stopName?.trim()) text += `\nЗупинка: ${input.stopName.trim()}`;
   if (input.comment?.trim()) text += `\nКоментар: ${input.comment.trim()}`;
 
-  const url = `https://t.me/${botUsername}?text=${encodeURIComponent(text)}`;
+  const url = `https://t.me/${BOT_USERNAME}?text=${encodeURIComponent(text)}`;
   const tg = getTelegramWebApp();
 
   tg?.HapticFeedback?.impactOccurred('medium');

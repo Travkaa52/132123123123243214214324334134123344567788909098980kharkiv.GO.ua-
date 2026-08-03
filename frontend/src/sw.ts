@@ -25,7 +25,11 @@ import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategi
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
-declare const self: ServiceWorkerGlobalScope;
+declare const self: ServiceWorkerGlobalScope & {
+  // vite-plugin-pwa (injectManifest) підставляє сюди список файлів для
+  // прекешування на етапі білда — типу за замовчуванням у ServiceWorkerGlobalScope нема.
+  __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
+};
 
 // ---------------------------------------------------------------------------
 // Precache (список файлів і їхні ревізії підставляє vite-plugin-pwa на білді)

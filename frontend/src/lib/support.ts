@@ -1,4 +1,5 @@
 import { getTelegramWebApp } from '@/lib/telegram';
+import { BOT_USERNAME } from '@/lib/botConfig';
 
 /**
  * Немає бекенду (GitHub Pages + Actions) — замість POST-запиту ми відкриваємо
@@ -14,13 +15,8 @@ import { getTelegramWebApp } from '@/lib/telegram';
  * вся розмова відбувається нативно в чаті Telegram.
  */
 export function openSupportChat(message: string): { ok: true } | { ok: false; reason: 'not-configured' } {
-  const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
-  if (!botUsername) {
-    return { ok: false, reason: 'not-configured' };
-  }
-
   const text = `#support# ${message.trim()}`;
-  const url = `https://t.me/${botUsername}?text=${encodeURIComponent(text)}`;
+  const url = `https://t.me/${BOT_USERNAME}?text=${encodeURIComponent(text)}`;
   const tg = getTelegramWebApp();
 
   if (tg?.openTelegramLink) {

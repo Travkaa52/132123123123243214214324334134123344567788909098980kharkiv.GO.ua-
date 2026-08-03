@@ -2,6 +2,7 @@ import { Suspense, useState, useEffect, memo, startTransition } from 'react';
 import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { BottomNav } from '@/components/BottomNav';
 import { TelegramGate } from '@/components/TelegramGate';
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner';
 import { RegistrationModal } from '@/components/RegistrationModal';
 import { PageTransition } from '@/components/PageTransition';
 import { Toast } from '@/components/ui';
@@ -158,6 +159,7 @@ export default function App() {
 
       <MemoizedBottomNav />
       <Toast />
+      <PwaUpdateBanner />
 
       {showRegistration && <RegistrationModal />}
 
