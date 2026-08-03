@@ -8,6 +8,12 @@ interface ImportMetaEnv {
   readonly VITE_TELEGRAM_BOT_USERNAME?: string;
   /** Назва Mini App, задана через BotFather /newapp, напр. "app". */
   readonly VITE_TELEGRAM_APP_NAME?: string;
+  /** URL проєкту Supabase (Project Settings → Data API), напр. https://xxxx.supabase.co */
+  readonly VITE_SUPABASE_URL?: string;
+  /** Публічний anon-ключ Supabase (Project Settings → API Keys) — НЕ service_role. */
+  readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Перевизначення URL резервного статичного route-alerts.json, якщо потрібно. */
+  readonly VITE_ROUTE_ALERTS_URL?: string;
 }
 
 interface ImportMeta {

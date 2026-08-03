@@ -16,21 +16,58 @@ interface RouteAlertsFeed {
   items: RouteAlert[];
 }
 
+// Рядок route_alerts у Supabase (snake_case, як у таблиці supabase/schema.sql)
+interface SupabaseRouteAlertRow {
+  id: number;
+  kind: TransportKind | null;
+  route_number: string;
+  message: string;
+  created_at: number;
+  expires_at: number;
+  source?: 'manual' | 'auto';
+}
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
 /**
- * Активні оголошення про затримку транспорту. Немає бекенду (застосунок на
- * GitHub Pages) — файл генерується і комітиться в репозиторій воркфлоу
- * .github/workflows/telegram-bot.yml (scripts/process-telegram-bot.mjs),
- * так само як public/data/notifications.json для каналів. Тут просто fetch
- * звичайного статичного JSON, жодних заголовків авторизації не потрібно.
+ * Активні оголошення про затримку транспорту.
  *
- * VITE_ROUTE_ALERTS_URL можна задати, якщо файл роздається з іншого домену
- * (напр. фронтенд і дані живуть в різних деплоях). За замовчуванням
- * використовується assetUrl() (див. lib/assetUrl.ts) — важливо саме так,
- * а не жорстко "/data/...", бо GitHub Pages для репозиторіїв виду
- * <user>.github.io/<repo>/ роздає сайт з підпапки: абсолютний шлях від
- * кореня домену повернув би 404.
+ * Основне джерело — таблиця route_alerts у Supabase (пише бот, дивись
+ * supabase/schema.sql і bot/supabase_sync.py): анонімний ключ має право
+ * лише на SELECT, дані з'являються практично одразу після дій бота, без
+ * очікування коміту/редеплою.
+ *
+ * Якщо VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY не задані (або запит до
+ * Supabase не вдався) — застосунок падає назад на статичний
+ * public/data/route-alerts.json, який бот і далі оновлює як резервну копію.
  */
-export async function fetchRouteAlerts(): Promise<RouteAlert[]> {
+async function fetchFromSupabase(): Promise<RouteAlert[] | null> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+  try {
+    const now = Date.now() / 1000;
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/route_alerts?select=*&expires_at=gt.${now}`;
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      cache: 'no-store'
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as SupabaseRouteAlertRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      routeNumber: r.route_number,
+      message: r.message,
+      createdAt: r.created_at,
+      expiresAt: r.expires_at,
+      source: r.source
+    }));
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFromStaticJson(): Promise<RouteAlert[]> {
   const url = import.meta.env.VITE_ROUTE_ALERTS_URL || assetUrl('data/route-alerts.json');
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -41,6 +78,12 @@ export async function fetchRouteAlerts(): Promise<RouteAlert[]> {
   } catch {
     return [];
   }
+}
+
+export async function fetchRouteAlerts(): Promise<RouteAlert[]> {
+  const fromSupabase = await fetchFromSupabase();
+  if (fromSupabase !== null) return fromSupabase;
+  return fetchFromStaticJson();
 }
 
 /**
