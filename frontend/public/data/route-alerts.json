@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-03T19:23:48.471Z",
+  "updatedAt": "2026-08-03T19:24:05.823Z",
   "items": [
     {
       "id": 1785760899383,
@@ -26,6 +26,15 @@
       "message": "ТЕСТ",
       "createdAt": 1785776309.175,
       "expiresAt": 1785783509.175,
+      "source": "manual"
+    },
+    {
+      "id": 1785785044977,
+      "kind": null,
+      "routeNumber": "All",
+      "message": "ТЕСТ",
+      "createdAt": 1785785029.55,
+      "expiresAt": 1785792229.55,
       "source": "manual"
     }
   ]
