@@ -199,7 +199,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     name: 'Центральний ринок',
     nameEn: 'Tsentralnyi Rynok',
     point: { x: 571, y: 377 },
-    labelOffset: { x: 0, y: -18 },
+    labelOffset: { x: -16, y: -14 },
     lineId: 'route-metro-1',
     opened: '1975-08-23',
     type: 'deep',
@@ -210,7 +210,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     name: 'Майдан Конституції',
     nameEn: 'Maidan Konstytutsii',
     point: { x: 636, y: 428 },
-    labelOffset: { x: 0, y: -18 },
+    labelOffset: { x: -16, y: -14 },
     interchangeWith: ['istorychnyi-muzei'],
     lineId: 'route-metro-1',
     opened: '1975-08-23',
@@ -222,7 +222,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     name: 'Левада',
     nameEn: 'Levada',
     point: { x: 672, y: 486 },
-    labelOffset: { x: 0, y: -18 },
+    labelOffset: { x: -16, y: -14 },
     lineId: 'route-metro-1',
     opened: '1975-08-23',
     type: 'deep',
@@ -233,7 +233,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     name: 'Спортивна',
     nameEn: 'Sportyvna',
     point: { x: 716, y: 543 },
-    labelOffset: { x: 0, y: -18 },
+    labelOffset: { x: 16, y: -14 },
     interchangeWith: ['metrobudivnykiv'],
     lineId: 'route-metro-1',
     opened: '1975-08-23',
@@ -1239,14 +1239,6 @@ export function LiveMetroPage() {
           </pattern>
           <rect width={VIEW_W} height={VIEW_H} fill="url(#grid)" opacity={0.3} />
 
-          {/* Річки */}
-          <g opacity={0.5}>
-            <path d="M 200 50 C 250 200, 300 350, 400 450 C 480 520, 580 550, 700 530 C 820 510, 880 520, 950 600 C 1020 680, 950 800, 850 880" fill="none" stroke="rgb(var(--color-surface-soft))" strokeWidth={28} strokeLinecap="round" />
-            <path d="M 200 50 C 250 200, 300 350, 400 450 C 480 520, 580 550, 700 530 C 820 510, 880 520, 950 600 C 1020 680, 950 800, 850 880" fill="none" stroke="rgb(var(--color-border))" strokeOpacity={0.3} strokeWidth={18} strokeLinecap="round" />
-            <path d="M 80 380 Q 260 390 400 450" fill="none" stroke="rgb(var(--color-surface-soft))" strokeWidth={20} strokeLinecap="round" />
-            <path d="M 80 380 Q 260 390 400 450" fill="none" stroke="rgb(var(--color-border))" strokeOpacity={0.3} strokeWidth={12} strokeLinecap="round" />
-          </g>
-
           {/* Заголовок */}
           <g transform="translate(60, 70)">
             <image href={assetUrl('/icons/kharkiv-metro-logo.png')} x={-6} y={-40} width={48} height={40} preserveAspectRatio="xMidYMid meet" />
@@ -1536,7 +1528,6 @@ function TrainMarker({
   const isDwell = train.phase === 'dwell';
   const facingLeft = train.headingDeg > 90 && train.headingDeg < 270;
   const size = selected ? 36 : 28;
-  const clipId = `clip-${train.id.replace(/[^a-zA-Z0-9-_]/g, '')}`;
 
   return (
     <g
@@ -1557,21 +1548,13 @@ function TrainMarker({
         </circle>
       )}
 
-      {/* Основне коло */}
-      <circle r={size / 2 + 2} fill={train.lineColor} stroke="#FFFFFF" strokeWidth={2.5} />
-
-      <clipPath id={clipId}>
-        <circle r={size / 2 - 2} />
-      </clipPath>
-
       <image
         href={spriteSrc}
         x={-size / 2}
         y={-size / 2}
         width={size}
         height={size}
-        clipPath={`url(#${clipId})`}
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio="xMidYMid meet"
         transform={facingLeft ? 'scale(-1,1)' : undefined}
         opacity={isDwell ? 0.8 : 1}
       />
