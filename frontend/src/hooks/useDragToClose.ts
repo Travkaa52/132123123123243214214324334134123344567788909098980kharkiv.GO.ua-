@@ -23,7 +23,7 @@ interface UseDragToCloseOptions {
  * навіть якщо не пройдено повну дистанцію threshold.
  */
 export function useDragToClose(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   { onDismiss, threshold = 80, velocityThreshold = 0.6 }: UseDragToCloseOptions
 ) {
   const drag = useRef({
