@@ -235,6 +235,17 @@ def prune_rate_limits(rate_limits: dict, now: float) -> dict:
 def git_commit_and_push() -> None:
     if not AUTO_GIT_PUSH:
         return
+
+    branch = os.getenv("GIT_BRANCH", "main")
+
+    def run(*args: str, check: bool = False) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=REPO_ROOT, check=check, capture_output=True, text=True)
+
+    # Прибираємо незавершений rebase/merge, якщо лишився з попередньої
+    # невдалої спроби в цьому ж процесі.
+    run("rebase", "--abort")
+    run("merge", "--abort")
+
     try:
         subprocess.run(["git", "config", "user.name", "kharkivgo-bot"], cwd=REPO_ROOT, check=False)
         subprocess.run(["git", "config", "user.email", "bot@kharkivgo.local"], cwd=REPO_ROOT, check=False)
@@ -246,18 +257,41 @@ def git_commit_and_push() -> None:
         diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
         if diff.returncode == 0:
             return  # нема змін
+
         subprocess.run(
             ["git", "commit", "-m", "chore: process telegram bot updates"],
             cwd=REPO_ROOT,
             check=False,
         )
-        result = subprocess.run(["git", "push"], cwd=REPO_ROOT, check=False, capture_output=True, text=True)
-        if result.returncode != 0:
-            log.warning("git push завершився з помилкою: %s", (result.stderr or "").strip()[:300])
-        else:
-            log.info("Зміни закомічено й запушено в git.")
+
+        # Ці файли — лише РЕЗЕРВНА копія (Supabase тепер основне джерело
+        # правди), тож замість rebase з можливими конфліктами просто
+        # синхронізуємось із origin і накочуємо свій актуальний варіант
+        # цих конкретних файлів поверх, без ручного злиття.
+        for attempt in range(1, 4):
+            result = subprocess.run(["git", "push"], cwd=REPO_ROOT, check=False, capture_output=True, text=True)
+            if result.returncode == 0:
+                log.info("Зміни закомічено й запушено в git.")
+                return
+            if attempt == 3:
+                log.warning("git push завершився з помилкою після 3 спроб: %s", (result.stderr or "").strip()[:300])
+                return
+            run("fetch", "origin", branch)
+            run("reset", "--mixed", f"origin/{branch}")
+            subprocess.run(
+                ["git", "add", "frontend/data-runtime", "frontend/public/data/route-alerts.json"],
+                cwd=REPO_ROOT,
+                check=False,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "chore: process telegram bot updates"],
+                cwd=REPO_ROOT,
+                check=False,
+            )
     except Exception as e:  # noqa: BLE001
         log.error("Не вдалося закомітити/запушити зміни: %s", e)
+        run("rebase", "--abort")
+        run("merge", "--abort")
 
 
 # --- команди для setMyCommands (щоб з'явилось меню "/" у Telegram) ---------

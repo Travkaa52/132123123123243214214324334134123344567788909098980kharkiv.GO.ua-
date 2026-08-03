@@ -20,14 +20,15 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Optional
 
 import requests
 
 log = logging.getLogger("kharkivgo-bot.supabase")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
 
 ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
 
@@ -39,6 +40,12 @@ _HEADERS = {
 
 if not ENABLED:
     log.info("SUPABASE_URL/SUPABASE_SERVICE_KEY не задано — синхронізація вимкнена, працюю тільки з JSON.")
+elif re.search(r"/(rest|auth|storage)(/|$)", SUPABASE_URL, re.IGNORECASE):
+    log.warning(
+        "SUPABASE_URL схоже містить зайвий шлях (%s) — має бути лише базовий домен проєкту, "
+        "напр. https://xxxx.supabase.co, без /rest/v1 чи іншого хвоста.",
+        SUPABASE_URL,
+    )
 
 
 def _rest(method: str, table: str, *, params: Optional[dict] = None, json_body: Any = None, prefer: str = "") -> Optional[Any]:
@@ -57,7 +64,7 @@ def _rest(method: str, table: str, *, params: Optional[dict] = None, json_body: 
             timeout=15,
         )
         if res.status_code >= 400:
-            log.warning("Supabase %s %s -> %s: %s", method, table, res.status_code, res.text[:300])
+            log.warning("Supabase %s %s -> %s: %s", method, res.url, res.status_code, res.text[:300])
             return None
         if not res.text:
             return []
