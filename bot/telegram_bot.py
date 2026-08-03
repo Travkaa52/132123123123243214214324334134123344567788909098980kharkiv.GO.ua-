@@ -16,7 +16,11 @@ Python-версія бота підтримки/затримок Kharkiv GO — 
          бот розпізнає це як структуровану скаргу на затримку)
 
     Адміни (ADMIN_CHAT_IDS):
-        /alert <номер> [вид] <текст>  — вручну оголосити затримку
+        /alert <номер|all> [вид] <текст>  — вручну оголосити затримку.
+                                            "all" замість номера маршруту —
+                                            загальне оголошення (весь вид
+                                            транспорту, якщо вказано, або
+                                            геть увесь розділ "Транспорт").
         /alerts                        — список активних оголошень + кнопки скасування
         /stats                         — короткий дашборд (скарги, оголошення, черга)
         Reply на переслане звернення   — відповідь іде користувачу
@@ -451,10 +455,11 @@ def handle_help(chat_id: int, is_admin: bool) -> None:
     if is_admin:
         text += (
             "\n<b>Адмінські команди:</b>\n"
-            "/alert &lt;номер&gt; [bus|tram|trolleybus|metro] &lt;текст&gt; — оголосити затримку вручну\n"
+            "/alert &lt;номер|all&gt; [bus|tram|trolleybus|metro] &lt;текст&gt; — оголосити затримку вручну\n"
             "/alerts — активні оголошення зі скасуванням в 1 тап\n"
             "/stats — короткий дашборд\n"
-            "Reply на переслане звернення користувача — відповідь піде йому напряму.\n"
+            "Reply на переслане звернення користувача — відповідь піде йому напряму.\n\n"
+            "<i>\"all\" замість номера маршруту — загальне оголошення (весь вид транспорту або весь розділ \"Транспорт\").</i>\n"
         )
     send_message(chat_id, text)
 
@@ -617,7 +622,14 @@ def handle_alert_command(message: dict, alerts: list, now: float) -> None:
     chat_id = message["chat"]["id"]
     parts = message["text"].split()
     if len(parts) < 3:
-        send_message(chat_id, "Формат: <code>/alert &lt;номер_маршруту&gt; [вид: bus/tram/trolleybus/metro] &lt;текст&gt;</code>")
+        send_message(
+            chat_id,
+            "Формат: <code>/alert &lt;номер_маршруту або all&gt; [вид: bus/tram/trolleybus/metro] &lt;текст&gt;</code>\n\n"
+            "Приклади:\n"
+            "<code>/alert 27 Затримка 15+ хв через ДТП</code>\n"
+            "<code>/alert all bus Затримки на всіх автобусних маршрутах через негоду</code>\n"
+            "<code>/alert all Тимчасові збої руху транспорту по всьому місту</code>",
+        )
         return
 
     route_number = parts[1]
