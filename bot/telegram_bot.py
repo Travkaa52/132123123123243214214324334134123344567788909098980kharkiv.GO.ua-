@@ -68,6 +68,8 @@ from typing import Any, Optional
 import requests
 from dotenv import load_dotenv
 
+import supabase_sync
+
 load_dotenv()
 
 # --- конфігурація ------------------------------------------------------------
@@ -301,6 +303,7 @@ def process_once() -> None:
 
     now = time.time()
     changed = False
+    delay_reports_before = len(delay_reports)
 
     for update in updates:
         offset_state["lastUpdateId"] = max(offset_state["lastUpdateId"], update["update_id"])
@@ -414,12 +417,21 @@ def process_once() -> None:
         pending_prompts.append({"routeNumber": route_number, "kind": kind, "createdAt": now})
         log.info("Поріг скарг досягнуто: маршрут %s (%s), %d користувачів.", route_number, kind or "-", len(user_set))
 
+    # --- Supabase: спершу лог нових скарг (до прибирання старих нижче) ------
+    new_delay_reports = delay_reports[delay_reports_before:]
+    if new_delay_reports and supabase_sync.insert_delay_reports(new_delay_reports):
+        log.info("Supabase: додано %d нову(і) скаргу(и) на затримку.", len(new_delay_reports))
+
     # --- прибирання: старі скарги/мапи/протухлі оголошення/rate-limit'и -----
     delay_reports = [r for r in delay_reports if r["createdAt"] >= window_start - 3600]
     support_map = support_map[-500:]
     pending_prompts = [p for p in pending_prompts if now - p["createdAt"] < DELAY_REPORT_WINDOW_MINUTES * 60]
     alerts = [a for a in alerts if a["expiresAt"] > now - 86400]
     rate_limits = prune_rate_limits(rate_limits, now)
+
+    active_alerts = [a for a in alerts if a["expiresAt"] > now]
+    if supabase_sync.replace_route_alerts(active_alerts):
+        log.info("Supabase: route_alerts синхронізовано (%d активних).", len(active_alerts))
 
     write_json(OFFSET_FILE, offset_state)
     write_json(DELAY_REPORTS_FILE, delay_reports)
