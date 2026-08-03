@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kharkiv-go",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+
+  // Роздає зібраний фронтенд (frontend/dist). Спершу зберіть фронтенд
+  // (npm run build у frontend/) — цей шлях вказує саме на зібрану папку,
+  // не на вихідники.
+  "assets": {
+    "directory": "../frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+
+  // KV для стану чатів (крок "введіть номер маршруту") і антиспаму.
+  // Створіть намespace: `wrangler kv namespace create KV`
+  // і підставте реальний id сюди замість "REPLACE_ME".
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "REPLACE_ME"
+    }
+  ],
+
+  // Секрети (НЕ кладіть значення сюди, тільки імена — реальні значення
+  // задаються через `wrangler secret put <NAME>`):
+  //   BOT_TOKEN
+  //   TELEGRAM_WEBHOOK_SECRET
+  //   SUPABASE_URL
+  //   SUPABASE_SERVICE_KEY
+  "vars": {
+    "DELAY_REPORT_THRESHOLD": "5",
+    "DELAY_REPORT_WINDOW_MINUTES": "60",
+    "DELAY_ALERT_DURATION_HOURS": "2",
+    "USER_RATE_LIMIT_SECONDS": "20"
+  }
+}
