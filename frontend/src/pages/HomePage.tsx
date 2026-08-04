@@ -528,8 +528,6 @@ export function HomePage() {
           </Link>
         </section>
 
-        <NotificationsSection />
-
         {/* 5. NEAREST STOPS WITH GEO PERMISSION/STATE */}
         <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">
           <div className="flex items-center justify-between mb-3.5">
@@ -606,6 +604,8 @@ export function HomePage() {
             </div>
           )}
         </section>
+
+        <NotificationsSection />
 
         {/* 6. FAVORITES SECTION */}
         <section className="bg-surface-raised rounded-[24px] p-4 border border-border/40 shadow-sm">

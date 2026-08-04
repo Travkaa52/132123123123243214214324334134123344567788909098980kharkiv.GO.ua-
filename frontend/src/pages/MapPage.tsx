@@ -373,7 +373,12 @@ export function MapPage() {
   useEffect(() => {
     if (!map) return;
     const routeId = searchParams.get('route');
-    const stopId = searchParams.get('stop');
+    // Якщо параметр "stop" вже встигли прибрати з URL (ефект вище, що
+    // синхронізує selectedStopId, видаляє його одразу — ще до того, як
+    // карта стане готовою), беремо початкове значення з рефа. Інакше
+    // flyTo нижче ніколи не спрацьовував би при першому відкритті
+    // /map?stop=... — модалка відкривалась, а карта не перелітала.
+    const stopId = searchParams.get('stop') ?? initialDeepLinkStopIdRef.current;
     if (!routeId && !stopId) return;
 
     if (routeId) {
@@ -392,6 +397,11 @@ export function MapPage() {
     } else if (stopId) {
       handleStopSelect(stopId);
     }
+
+    // Реф потрібен лише для першого спрацювання (поки карта ще не готова),
+    // після використання одразу скидаємо його, щоб наступні зміни
+    // searchParams (без "stop") не викликали повторний flyTo до старої зупинки.
+    initialDeepLinkStopIdRef.current = null;
 
     const next = new URLSearchParams(searchParams);
     next.delete('route');
