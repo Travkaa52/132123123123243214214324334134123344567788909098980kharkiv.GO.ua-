@@ -66,13 +66,19 @@ export async function refineTripPlansWithOSM(
     const legs = plan.legs.map((leg) => ({ ...leg }));
     const transferPos = transferIndices.indexOf(i);
     if (transferPos !== -1) {
-      legs[1] = { ...legs[1], transferWalkFromM: transferResults[transferPos].distanceM };
+      legs[1] = {
+        ...legs[1],
+        transferWalkFromM: transferResults[transferPos].distanceM,
+        transferWalkPath: transferResults[transferPos].coordinates
+      };
     }
     const updated: TripPlan = {
       ...plan,
       legs,
       boardWalkM: boardResults[i].distanceM,
       alightWalkM: alightResults[i].distanceM,
+      boardWalkPath: boardResults[i].coordinates,
+      alightWalkPath: alightResults[i].coordinates,
       estimatedMinutes: plan.estimatedMinutes
     };
     updated.estimatedMinutes = estimateTripMinutes(updated);

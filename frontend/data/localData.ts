@@ -327,6 +327,10 @@ export interface TripLeg {
   /** Пішки від виходу з попередньої ділянки до посадки на цю (перехід між
    *  двома різними, але пов'язаними пересадочними станціями, напр. метро). */
   transferWalkFromM?: number;
+  /** Реальна геометрія цього пішого переходу вздовж вуличної мережі OSM
+   *  (заповнюється refineTripPlansWithOSM) — без неї карта раніше малювала
+   *  пряму лінію "навпростець" через будівлі/річку. */
+  transferWalkPath?: [number, number][];
 }
 
 export interface TripPlan {
@@ -339,6 +343,11 @@ export interface TripPlan {
   transfersCount: number;
   /** Орієнтовний загальний час поїздки, хв: ходьба + очікування + сам рух + пересадка. */
   estimatedMinutes: number;
+  /** Реальна геометрія пішого шляху "Звідки" → перша зупинка посадки,
+   *  вздовж вуличної мережі OSM (заповнюється refineTripPlansWithOSM). */
+  boardWalkPath?: [number, number][];
+  /** Те саме для ділянки "остання зупинка виходу" → "Куди". */
+  alightWalkPath?: [number, number][];
 }
 
 const WALK_SPEED_M_PER_MIN = 80; // ≈4.8 км/год — середній пішохідний темп у місті
