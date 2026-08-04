@@ -1468,22 +1468,22 @@ function StationMarker({
   // Пересадочні станції — більший логотип-бейдж, звичайні — компактний, але завжди чіткий.
   const logoSize = isInterchange ? 22 : 16;
 
-  // Виносна лінія-«вус» до підпису — пряма діагональ від краю станції до
-  // початку тексту. Текст нахилений під тим самим кутом, що й ця лінія
-  // (як на офіційній схемі Т. Білецького), а не завжди горизонтальний.
+  // Виносна лінія-«вус» до підпису — так само, як на офіційній схемі Т. Білецького:
+  // від краю станції коротка діагональ під 45°, потім рівний горизонтальний
+  // відрізок, що доводить до початку тексту з назвою станції.
   const innerR = logoSize / 2 + 4;
-  const leaderLen = Math.hypot(offsetX, offsetY) || 1;
-  const ux = offsetX / leaderLen;
-  const uy = offsetY / leaderLen;
+  const signX = offsetX >= 0 ? 1 : offsetX < 0 ? -1 : 0;
+  const dirX = signX === 0 ? 0 : signX;
+  const dirY = offsetY >= 0 ? 1 : -1;
+  const leaderStart = { x: dirX * innerR * 0.75, y: dirY * innerR * 0.75 };
+  const vertRun = Math.abs(offsetY - leaderStart.y);
+  const bend = { x: leaderStart.x + dirX * vertRun, y: offsetY };
   const gap = 6;
-  const leaderStart = { x: ux * innerR, y: uy * innerR };
-  const leaderEnd = { x: offsetX - ux * gap, y: offsetY - uy * gap };
-
-  // Кут нахилу підпису — той самий, що й у лінії-вуса, але нормалізований
-  // у діапазон -90..90°, щоб текст ніколи не виявився "догори ногами".
-  let labelAngleDeg = Math.atan2(offsetY, offsetX) * (180 / Math.PI);
-  if (labelAngleDeg > 90) labelAngleDeg -= 180;
-  else if (labelAngleDeg < -90) labelAngleDeg += 180;
+  const flatEndX = offsetX - dirX * gap;
+  const needsFlatSegment = dirX === 0 || Math.abs(flatEndX - leaderStart.x) > Math.abs(bend.x - leaderStart.x);
+  const leaderPoints = needsFlatSegment
+    ? `${leaderStart.x},${leaderStart.y} ${bend.x},${bend.y} ${flatEndX},${offsetY}`
+    : `${leaderStart.x},${leaderStart.y} ${flatEndX},${offsetY}`;
 
   return (
     <g
@@ -1498,13 +1498,12 @@ function StationMarker({
       <circle r={30} fill="transparent" />
 
       {/* Виносна лінія-«вус» від станції до підпису назви */}
-      <line
-        x1={leaderStart.x}
-        y1={leaderStart.y}
-        x2={leaderEnd.x}
-        y2={leaderEnd.y}
+      <polyline
+        points={leaderPoints}
+        fill="none"
         stroke={color}
         strokeWidth={1.6}
+        strokeLinejoin="round"
         strokeLinecap="round"
         opacity={0.85}
       />
@@ -1530,8 +1529,8 @@ function StationMarker({
         preserveAspectRatio="xMidYMid meet"
       />
 
-      {/* Підпис — нахилений паралельно лінії-вусу */}
-      <g transform={`translate(${offsetX}, ${offsetY}) rotate(${labelAngleDeg})`} className="pointer-events-none select-none">
+      {/* Підпис */}
+      <g transform={`translate(${offsetX}, ${offsetY})`} className="pointer-events-none select-none">
         <text
           x={0} y={0}
           textAnchor={textAnchor}
