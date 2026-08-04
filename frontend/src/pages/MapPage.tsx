@@ -26,6 +26,10 @@ import { localRoutes, localStops, type TripPlan, type StopItem } from '@/data/lo
 import { getRouteBounds } from '@/lib/mapLayers';
 import { refineTripPlansWithOSM } from '@/lib/tripPlanRefine';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { useToastStore } from '@/store/useToastStore';
+import { ActiveTripBar } from '@/components/ActiveTripBar';
+import { useActiveTripProgress } from '@/hooks/useActiveTripProgress';
+import { type ActiveTrip, startActiveTrip, loadActiveTrip, saveActiveTrip } from '@/lib/activeTrip';
 
 const SUGGESTIONS_LIMIT = 6;
 const STORAGE_PREFIX = 'kharkiv_go_map_state_';
@@ -61,6 +65,20 @@ export function MapPage() {
   const refineRequestIdRef = useRef(0);
   const [selectedPlanIndex, setSelectedPlanIndex] = useState<number | null>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Шторка "Варіанти поїздки" — окремий прапорець видимості, НЕ пов'язаний
+  // із самими даними (tripPlans). Раніше закриття шторки (onClose) одразу
+  // очищало tripPlans, і маршрут зникав з карти. Тепер закриття шторки лише
+  // ховає її, а побудований маршрут лишається намальованим на карті, поки
+  // користувач явно не прибере його (кнопка "×" на міні-плашці нижче) або
+  // не побудує інший.
+  const [isTripSheetOpen, setIsTripSheetOpen] = useState(false);
+  // Деталі активної поїздки (розгортаються по тапу на плаваючу плашку "У дорозі").
+  const [isActiveTripSheetOpen, setIsActiveTripSheetOpen] = useState(false);
+  // "Активна поїздка" — підтверджений кнопкою "В дорогу" варіант, який
+  // живе окремо від tripPlans/шторки: зберігається між перезавантаженнями
+  // і відстежується за живою геопозицією (useActiveTripProgress нижче).
+  const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(() => loadActiveTrip());
+  const showToast = useToastStore((s) => s.show);
 
   const [activeFilterChips, setActiveFilterChips] = useState<Record<string, boolean>>(() => {
     try {
@@ -209,9 +227,14 @@ export function MapPage() {
   const handleBuildTrip = useCallback(() => {
     if (!fromPoint || !toPoint) return;
     clearSelection();
+    // Побудова нового маршруту скасовує попередню активну поїздку (якщо
+    // була) — інакше на карті одночасно "боролись" би два різні маршрути.
+    setActiveTrip(null);
+    saveActiveTrip(null);
     const plans = localRoutes.buildTripPlans(fromPoint.lat, fromPoint.lng, toPoint.lat, toPoint.lng);
     setTripPlans(plans);
     setSelectedPlanIndex(plans.length > 0 ? 0 : null);
+    setIsTripSheetOpen(true);
 
     if (map) {
       map.fitBounds(
@@ -244,10 +267,49 @@ export function MapPage() {
     }
   }, [fromPoint, toPoint, map, clearSelection]);
 
-  const selectedTripPlan = useMemo(
-    () => (tripPlans && selectedPlanIndex !== null ? tripPlans[selectedPlanIndex] : null),
-    [tripPlans, selectedPlanIndex]
+  const selectedTripPlan = useMemo(() => {
+    if (activeTrip) return activeTrip.plan;
+    return tripPlans && selectedPlanIndex !== null ? tripPlans[selectedPlanIndex] : null;
+  }, [activeTrip, tripPlans, selectedPlanIndex]);
+
+  // Точки "Звідки"/"Куди" для відмальовування маршруту на карті: під час
+  // активної поїздки прив'язуємось саме до її точок, щоб лінія й піни не
+  // "стрибали", навіть якщо користувач тим часом почне редагувати пошукові
+  // поля для нового маршруту.
+  const drawnFromPoint = activeTrip ? activeTrip.fromPoint : fromPoint;
+  const drawnToPoint = activeTrip ? activeTrip.toPoint : toPoint;
+
+  const handleStartTrip = useCallback(
+    (index: number) => {
+      const plan = tripPlans?.[index];
+      if (!plan) return;
+      const trip = startActiveTrip(plan, fromPoint, toPoint);
+      setActiveTrip(trip);
+      saveActiveTrip(trip);
+      setIsTripSheetOpen(false);
+      showToast('Поїздку розпочато — підказуватимемо по дорозі', 'success');
+    },
+    [tripPlans, fromPoint, toPoint, showToast]
   );
+
+  const handleCancelActiveTrip = useCallback(() => {
+    setActiveTrip(null);
+    saveActiveTrip(null);
+    setIsActiveTripSheetOpen(false);
+  }, []);
+
+  const tripProgress = useActiveTripProgress({
+    activeTrip,
+    position,
+    onUpdate: setActiveTrip,
+    onArrived: () => setActiveTrip(null)
+  });
+
+  const handleClearBuiltRoute = useCallback(() => {
+    setTripPlans(null);
+    setSelectedPlanIndex(null);
+    setIsTripSheetOpen(false);
+  }, []);
 
   useEffect(() => {
     if (tripPlans === null) {
@@ -424,8 +486,8 @@ export function MapPage() {
           visibleKinds={visibleKinds}
           showStops={showStops}
           onMapReady={handleMapReady}
-          fromPoint={fromPoint}
-          toPoint={toPoint}
+          fromPoint={drawnFromPoint}
+          toPoint={drawnToPoint}
           tripPlan={selectedTripPlan}
         />
       </div>
@@ -622,13 +684,12 @@ export function MapPage() {
         {selectedRoute && <RouteSheet route={selectedRoute} onClose={clearSelection} onStopSelect={handleStopSelect} />}
       </Sheet>
 
-      {/* 4б. НИЖНЯ ШТОРКА: варіанти побудованої поїздки — теж виїжджає знизу */}
+      {/* 4б. НИЖНЯ ШТОРКА: варіанти побудованої поїздки — теж виїжджає знизу.
+          Закриття (onClose) лише ховає шторку — сам маршрут (tripPlans)
+          лишається і продовжує малюватись на карті через selectedTripPlan. */}
       <Sheet
-        open={tripPlans !== null}
-        onClose={() => {
-          setTripPlans(null);
-          setSelectedPlanIndex(null);
-        }}
+        open={tripPlans !== null && isTripSheetOpen}
+        onClose={() => setIsTripSheetOpen(false)}
         title="Варіанти поїздки"
       >
         {tripPlans !== null && (
@@ -640,12 +701,99 @@ export function MapPage() {
               </div>
             )}
             <div className="max-h-[50vh] overflow-y-auto">
-              <TripPlanSheet plans={tripPlans} selectedIndex={selectedPlanIndex} onSelect={handleSelectTripOption} />
+              <TripPlanSheet
+                plans={tripPlans}
+                selectedIndex={selectedPlanIndex}
+                onSelect={handleSelectTripOption}
+                onStartTrip={handleStartTrip}
+              />
             </div>
           </div>
         )}
       </Sheet>
 
+      {/* 4в. Плаваюча плашка над нижньою навігацією: коли активна поїздка —
+          показує живу підказку "куди йти зараз"; коли маршрут просто
+          побудований, але шторку закрито — компактне нагадування з
+          можливістю знову відкрити варіанти або прибрати маршрут з карти. */}
+      {activeTrip && tripProgress ? (
+        <div className="pointer-events-none absolute left-4 right-20 bottom-24 z-30">
+          <ActiveTripBar
+            instruction={tripProgress.instruction}
+            progress={tripProgress.progress}
+            onCancel={handleCancelActiveTrip}
+            onExpand={() => setIsActiveTripSheetOpen(true)}
+          />
+        </div>
+      ) : (
+        tripPlans !== null &&
+        !isTripSheetOpen && (
+          <div className="pointer-events-none absolute left-4 right-20 bottom-24 z-30">
+            <div className="pointer-events-auto flex items-center gap-2.5 overflow-hidden rounded-[22px] glass-surface border border-border/40 px-3.5 py-3 shadow-xl shadow-black/10">
+              <button
+                type="button"
+                onClick={() => setIsTripSheetOpen(true)}
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <RouteIcon size={17} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-ink-muted">Маршрут на карті</p>
+                  <p className="truncate text-xs font-bold text-ink-text">Показати варіанти поїздки</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={handleClearBuiltRoute}
+                aria-label="Прибрати маршрут з карти"
+                className="shrink-0 rounded-full p-2 text-ink-muted hover:bg-surface-soft hover:text-ink-text transition-colors active:scale-90"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+
+      {/* 4г. НИЖНЯ ШТОРКА: деталі активної поїздки — ланцюжок ділянок і
+          поточна підказка, з можливістю завершити поїздку вручну. */}
+      <Sheet open={isActiveTripSheetOpen} onClose={() => setIsActiveTripSheetOpen(false)} title="Поточна поїздка">
+        {activeTrip && tripProgress && (
+          <div className="-mx-1 space-y-3">
+            <div className="rounded-2xl bg-primary/10 px-3.5 py-3 text-xs font-bold text-primary">
+              {tripProgress.instruction}
+            </div>
+            <div className="space-y-2">
+              {activeTrip.plan.legs.map((leg, legIndex) => (
+                <div key={legIndex} className="flex items-center gap-2.5 rounded-2xl border border-border/40 bg-surface-soft px-3 py-2.5">
+                  <span
+                    className="flex h-8 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-black text-white shadow-xs"
+                    style={{ backgroundColor: leg.route.color }}
+                  >
+                    {leg.route.number}
+                  </span>
+                  <div className="min-w-0 text-xs">
+                    <div className="truncate font-bold text-ink-text">{leg.headsign}</div>
+                    <div className="truncate text-[11px] text-ink-muted">
+                      {leg.boardStop.name} → {leg.alightStop.name}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleCancelActiveTrip}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-500 transition-all active:scale-[0.98] hover:bg-red-500/15"
+            >
+              <X size={15} />
+              <span>Завершити поїздку</span>
+            </button>
+          </div>
+        )}
+      </Sheet>
 
       {/* 5. МОДАЛКА ЗУПИНКИ */}
       <StopDetailModal
