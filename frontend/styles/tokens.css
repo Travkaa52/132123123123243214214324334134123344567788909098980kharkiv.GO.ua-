@@ -1,0 +1,310 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Шрифтова пара — Unbounded (заголовки, цифри маршрутів, дисплей) +
+ * Inter (основний текст інтерфейсу). Обидва мають повну підтримку
+ * кирилиці й читаються однаково чисто на всіх сторінках застосунку.
+ * Підключено напряму через @import і CSS-змінні, а не лише через
+ * tailwind.config, щоб пара гарантовано застосовувалась усюди.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-display: 'Unbounded', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/**
+ * Kharkiv GO — єдина дизайн-система.
+ * Всі кольори визначені як CSS-змінні для миттєвого перемикання тем.
+ */
+
+:root {
+  /* Brand — узгоджено з гербом і прапором Харкова */
+  --color-forest: 8 168 92;
+  --color-forest-light: 52 224 138;
+  --color-forest-dark: 4 56 32;
+  --color-gold: 214 163 22;
+  --color-gold-light: 240 195 79;
+  --color-gold-dark: 160 116 10;
+  --color-mint: 173 230 200;
+  --color-blue: 62 140 240;
+  --color-graphite: 27 31 29;
+  /* Неоновий зелений акцент — підсвітка та активний стан */
+  --color-neon: 57 255 148;
+  /* Семантичний колір для помилок/видалення — однаковий у всіх темах */
+  --color-destructive: 239 68 68;
+
+  /* Primary Brand Dynamic Variable */
+  --color-primary: var(--color-forest-light);
+
+  /* Surfaces — Темна тема за замовчуванням */
+  --color-bg: 6 10 9;
+  --color-surface: 11 16 14;
+  --color-surface-soft: 9 13 12;
+  --color-surface-raised: 17 24 21;
+  
+  /* Borders & Text Channels (чисті RGB значення для сумісності з альфа-каналами) */
+  --color-border: 255 255 255;
+  --color-border-alpha: 0.08;
+  --color-text: 255 255 255;
+  --color-text-muted: 255 255 255;
+  --color-text-muted-alpha: 0.6;
+  --color-text-inverted: 8 12 10;
+
+  /* Аліаси "ink" */
+  --color-ink: var(--color-bg);
+  --color-ink-surface: var(--color-surface-raised);
+  --color-ink-border: 255 255 255 / 0.08;
+
+  /* Shadows & Glassmorphic Effects */
+  --shadow-glass: 0 14px 40px -6px rgba(0, 0, 0, 0.5), 0 2px 8px -1px rgba(0, 0, 0, 0.3);
+  --shadow-glass-lg: 0 24px 64px -8px rgba(0, 0, 0, 0.62), 0 4px 14px -2px rgba(0, 0, 0, 0.35);
+  --shadow-glass-dark: 0 10px 30px -4px rgba(0, 0, 0, 0.55);
+
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* Liquid Glass (iOS-style) — specular/заломлення, спільні для обох тем */
+  --glass-sheen: 255 255 255;
+  --glass-sheen-strong: 0.42;
+  --glass-sheen-soft: 0.12;
+  --glass-tint-top-alpha: 0.14;
+  --glass-blur: 26px;
+  --glass-saturate: 1.7;
+  --glass-border-alpha: 0.16;
+}
+
+/* Світла тема — опційна, вмикається в Налаштуваннях */
+[data-theme='light'] {
+  --color-primary: var(--color-forest);
+
+  --color-bg: 246 248 245;
+  --color-surface: 255 255 255;
+  --color-surface-soft: 240 244 241;
+  --color-surface-raised: 255 255 255;
+
+  --color-border: 14 20 18;
+  --color-border-alpha: 0.08;
+  --color-text: 27 31 29;
+  --color-text-muted: 27 31 29;
+  --color-text-muted-alpha: 0.6;
+  --color-text-inverted: 255 255 255;
+
+  --color-ink: var(--color-bg);
+  --color-ink-surface: var(--color-surface-raised);
+  --color-ink-border: 14 20 18 / 0.08;
+
+  --shadow-glass: 0 14px 36px -8px rgba(6, 66, 38, 0.14), 0 2px 8px -1px rgba(6, 66, 38, 0.08);
+  --shadow-glass-lg: 0 22px 56px -8px rgba(6, 66, 38, 0.18), 0 4px 14px -2px rgba(6, 66, 38, 0.1);
+  --shadow-glass-dark: 0 8px 32px 0 rgba(6, 66, 38, 0.08);
+
+  --glass-sheen-strong: 0.65;
+  --glass-sheen-soft: 0.3;
+  --glass-tint-top-alpha: 0.5;
+  --glass-border-alpha: 0.5;
+}
+
+/* AMOLED — справжня третя тема: чистий чорний фон для OLED-екранів
+   і неоновий зелений акцент замість золотисто-лісового primary. Це не
+   аліас на темну тему — палітра свідомо інша (глибший чорний, яскравіший
+   акцент, різкіші тіні), щоб перемикач тем дійсно давав 3 різні вигляди. */
+[data-theme='amoled'] {
+  --color-primary: var(--color-neon);
+
+  --color-bg: 0 0 0;
+  --color-surface: 4 6 5;
+  --color-surface-soft: 2 4 3;
+  --color-surface-raised: 10 14 12;
+
+  --color-border: 57 255 148;
+  --color-border-alpha: 0.14;
+  --color-text: 255 255 255;
+  --color-text-muted: 255 255 255;
+  --color-text-muted-alpha: 0.6;
+  --color-text-inverted: 0 0 0;
+
+  --color-ink: var(--color-bg);
+  --color-ink-surface: var(--color-surface-raised);
+  --color-ink-border: 255 255 255 / 0.08;
+
+  --shadow-glass: 0 14px 40px -6px rgba(0, 0, 0, 0.8), 0 0 20px -4px rgba(57, 255, 148, 0.12);
+  --shadow-glass-lg: 0 24px 64px -8px rgba(0, 0, 0, 0.85), 0 0 28px -4px rgba(57, 255, 148, 0.16);
+  --shadow-glass-dark: 0 10px 30px -4px rgba(0, 0, 0, 0.9);
+
+  --glass-sheen-strong: 0.5;
+  --glass-sheen-soft: 0.16;
+  --glass-tint-top-alpha: 0.18;
+  --glass-border-alpha: 0.22;
+}
+
+/* Base resets & Mobile UX optimizations */
+@layer base {
+  * {
+    border-color: rgb(var(--color-border) / var(--color-border-alpha, 0.08));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+    font-family: var(--font-body);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Плавна зміна теми при перемиканні (light/dark/amoled) без різкого миготіння */
+    transition: background-color 0.35s ease, color 0.35s ease;
+  }
+
+  /* Єдиний, помітний, але не крикливий фокус-стан для клавіатури/доступності —
+     однаковий на всіх сторінках і всіх інтерактивних елементах. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-primary) / 0.6);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Плавне з'явлення вмісту сторінки при навігації — робить перемикання
+     між екранами єдиним, "живим" відчуттям, а не різким перескоком. */
+  main,
+  #root > div {
+    animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom Utility Classes & Design System Typography */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body,
+  .font-sans {
+    font-family: var(--font-body);
+  }
+
+  /* Typography Scale */
+  .text-display-xl {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 2rem;
+    line-height: 2.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .text-display-lg {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.5rem;
+    line-height: 1.875rem;
+    letter-spacing: -0.01em;
+  }
+
+  .text-display-md {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.25rem;
+    line-height: 1.625rem;
+  }
+
+  .text-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.0625rem;
+    line-height: 1.375rem;
+  }
+
+  .text-body-lg {
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 1.0625rem;
+    line-height: 1.5rem;
+  }
+
+  .text-body {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+  }
+
+  .text-body-sm {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  .text-caption {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.6875rem;
+    line-height: 0.875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* Liquid Glass — картки та панелі з ефектом заломлення світла, як у iOS */
+  .glass-panel {
+    position: relative;
+    background:
+      linear-gradient(160deg, rgb(var(--color-surface) / 0.55), rgb(var(--color-surface) / 0.82)),
+      radial-gradient(120% 140% at 12% -20%, rgb(var(--glass-sheen) / var(--glass-tint-top-alpha)), transparent 60%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid rgb(var(--glass-sheen) / var(--glass-border-alpha));
+    box-shadow:
+      inset 0 1px 0.5px rgb(var(--glass-sheen) / var(--glass-sheen-strong)),
+      inset 0 -14px 20px -14px rgb(0 0 0 / 0.14);
+  }
+
+  .glass-card {
+    position: relative;
+    background:
+      linear-gradient(160deg, rgb(var(--color-surface-raised) / 0.5), rgb(var(--color-surface-raised) / 0.8)),
+      radial-gradient(120% 140% at 14% -25%, rgb(var(--glass-sheen) / var(--glass-tint-top-alpha)), transparent 60%);
+    backdrop-filter: blur(calc(var(--glass-blur) - 8px)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) - 8px)) saturate(var(--glass-saturate));
+    border: 1px solid rgb(var(--glass-sheen) / var(--glass-border-alpha));
+    box-shadow:
+      inset 0 1px 0.5px rgb(var(--glass-sheen) / var(--glass-sheen-strong)),
+      inset 0 -10px 16px -12px rgb(0 0 0 / 0.12);
+  }
+
+  /* Tactical Glow Effects */
+  .glow-neon {
+    box-shadow: 0 0 20px -3px rgb(var(--color-neon) / 0.35);
+  }
+
+  .glow-forest {
+    box-shadow: 0 0 24px -4px rgb(var(--color-forest-light) / 0.3);
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 20px -3px rgb(var(--color-gold) / 0.35);
+  }
+
+  /* Utility: Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
