@@ -1468,6 +1468,23 @@ function StationMarker({
   // Пересадочні станції — більший логотип-бейдж, звичайні — компактний, але завжди чіткий.
   const logoSize = isInterchange ? 22 : 16;
 
+  // Виносна лінія-«вус» до підпису — так само, як на офіційній схемі Т. Білецького:
+  // від краю станції коротка діагональ під 45°, потім рівний горизонтальний
+  // відрізок, що доводить до початку тексту з назвою станції.
+  const innerR = logoSize / 2 + 4;
+  const signX = offsetX >= 0 ? 1 : offsetX < 0 ? -1 : 0;
+  const dirX = signX === 0 ? 0 : signX;
+  const dirY = offsetY >= 0 ? 1 : -1;
+  const leaderStart = { x: dirX * innerR * 0.75, y: dirY * innerR * 0.75 };
+  const vertRun = Math.abs(offsetY - leaderStart.y);
+  const bend = { x: leaderStart.x + dirX * vertRun, y: offsetY };
+  const gap = 6;
+  const flatEndX = offsetX - dirX * gap;
+  const needsFlatSegment = dirX === 0 || Math.abs(flatEndX - leaderStart.x) > Math.abs(bend.x - leaderStart.x);
+  const leaderPoints = needsFlatSegment
+    ? `${leaderStart.x},${leaderStart.y} ${bend.x},${bend.y} ${flatEndX},${offsetY}`
+    : `${leaderStart.x},${leaderStart.y} ${flatEndX},${offsetY}`;
+
   return (
     <g
       transform={`translate(${station.point.x}, ${station.point.y})`}
@@ -1479,6 +1496,17 @@ function StationMarker({
     >
       {/* Прозора зона для тапа — збільшена, щоб влучати пальцем було легше на будь-якому зумі */}
       <circle r={30} fill="transparent" />
+
+      {/* Виносна лінія-«вус» від станції до підпису назви */}
+      <polyline
+        points={leaderPoints}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity={0.85}
+      />
 
       {/* Світіння при виборі */}
       {selected && (
