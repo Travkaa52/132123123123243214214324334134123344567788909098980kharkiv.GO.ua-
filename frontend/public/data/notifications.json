@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-04T01:03:54.639Z",
+  "updatedAt": "2026-08-04T04:23:27.977Z",
   "items": [
+    {
+      "id": "kh_metro:2835",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌На станції «Тракторний завод» тимчасово зачинено пішохідний вихід №5\n\nСьогодні, 4 серпня, вихід №5 (у бік зупинки транспорту) з підвуличного пішохідного переходу на станції «Тракторний завод» тимчасово зачинено до для користування пасажирів у звʼязку з проведенням ремонтних робіт.\n\nПро відновлення роботи виходу буде повідомлено додатково.\n\nПриносимо вибачення за тимчасові незручності&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-08-04T02:52:43.000Z",
+      "link": "https://t.me/kh_metro/2835",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "1.24K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2826",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2826",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "6.51K",
+      "views": "7.47K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2825",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "13.7K",
+      "views": "14.2K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2824",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "17.1K",
+      "views": "17.3K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2817",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "8.62K",
+      "views": "9.05K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2813",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "11K",
+      "views": "11.1K",
       "kind": "info",
       "lineIds": []
     }
