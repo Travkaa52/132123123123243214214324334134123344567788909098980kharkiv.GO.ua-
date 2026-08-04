@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Repeat, Route as RouteIcon, Zap } from 'lucide-react';
+import { ArrowRight, ChevronRight, Navigation2, Repeat, Route as RouteIcon, Zap } from 'lucide-react';
 import { KIND_LABELS_UK } from '@/components/TransportKindIcon';
 import type { TripPlan } from '@/data/localData';
 
@@ -6,6 +6,8 @@ interface TripPlanSheetProps {
   plans: TripPlan[];
   selectedIndex: number | null;
   onSelect: (index: number) => void;
+  /** Підтвердити обраний варіант і почати відстеження живої поїздки. */
+  onStartTrip: (index: number) => void;
 }
 
 function formatWalk(m: number): string {
@@ -20,7 +22,7 @@ function formatWalk(m: number): string {
  * орієнтовним часом у дорозі (ходьба + очікування + рух + пересадка),
  * тож перший у списку — справді найшвидший, а не просто "найближчий пішки".
  */
-export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetProps) {
+export function TripPlanSheet({ plans, selectedIndex, onSelect, onStartTrip }: TripPlanSheetProps) {
   if (plans.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 p-6 text-center">
@@ -44,12 +46,13 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetP
         const isFastest = plan.estimatedMinutes === fastestMinutes;
 
         return (
-          <button
+          <div
             key={index}
+            className={`w-full rounded-2xl transition-colors ${isSelected ? 'bg-primary/10' : 'hover:bg-surface-soft'}`}
+          >
+          <button
             onClick={() => onSelect(index)}
-            className={`flex w-full flex-col gap-2 rounded-2xl px-2.5 py-2.5 text-left transition-colors active:scale-[0.99] ${
-              isSelected ? 'bg-primary/10' : 'hover:bg-surface-soft'
-            }`}
+            className="flex w-full flex-col gap-2 px-2.5 py-2.5 text-left active:scale-[0.99]"
           >
             <div className="flex items-center gap-1.5">
               {plan.legs.map((leg, legIndex) => (
@@ -101,6 +104,20 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect }: TripPlanSheetP
               </div>
             </div>
           </button>
+
+          {isSelected && (
+            <div className="px-2.5 pb-2.5">
+              <button
+                type="button"
+                onClick={() => onStartTrip(index)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest px-3 py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.98] hover:brightness-105"
+              >
+                <Navigation2 size={14} />
+                <span>В дорогу</span>
+              </button>
+            </div>
+          )}
+          </div>
         );
       })}
     </div>
