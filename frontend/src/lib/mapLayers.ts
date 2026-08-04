@@ -97,11 +97,17 @@ export function buildTripPathGeoJson(
 ): FeatureCollection<LineString> {
   const features: Feature<LineString>[] = [];
 
-  const addWalk = (a: [number, number], b: [number, number]) => {
+  const addWalk = (a: [number, number], b: [number, number], realPath?: [number, number][]) => {
+    // Якщо є реальна геометрія (OSRM, після refineTripPlansWithOSM) —
+    // малюємо саме її, вздовж вулиць/переходів. Раніше тут завжди була
+    // пряма лінія "навпростець" між двома точками — навіть коли між ними
+    // будівля, річка чи проспект без переходу — що виглядало як "іди
+    // напряму" і не відповідало жодному реальному пішому маршруту.
+    const coordinates = realPath && realPath.length >= 2 ? realPath : [a, b];
     features.push({
       type: 'Feature',
       properties: { kind: 'walk', color: '#9AA3AE' },
-      geometry: { type: 'LineString', coordinates: [a, b] }
+      geometry: { type: 'LineString', coordinates }
     });
   };
 
@@ -178,7 +184,8 @@ export function buildTripPathGeoJson(
     if (prevLeg) {
       addWalk(
         [prevLeg.alightStop.position.lng, prevLeg.alightStop.position.lat],
-        [leg.boardStop.position.lng, leg.boardStop.position.lat]
+        [leg.boardStop.position.lng, leg.boardStop.position.lat],
+        leg.transferWalkPath
       );
     }
   });
@@ -187,10 +194,18 @@ export function buildTripPathGeoJson(
   const lastLeg = plan.legs[plan.legs.length - 1];
 
   if (fromPoint && firstLeg) {
-    addWalk([fromPoint.lng, fromPoint.lat], [firstLeg.boardStop.position.lng, firstLeg.boardStop.position.lat]);
+    addWalk(
+      [fromPoint.lng, fromPoint.lat],
+      [firstLeg.boardStop.position.lng, firstLeg.boardStop.position.lat],
+      plan.boardWalkPath
+    );
   }
   if (toPoint && lastLeg) {
-    addWalk([lastLeg.alightStop.position.lng, lastLeg.alightStop.position.lat], [toPoint.lng, toPoint.lat]);
+    addWalk(
+      [lastLeg.alightStop.position.lng, lastLeg.alightStop.position.lat],
+      [toPoint.lng, toPoint.lat],
+      plan.alightWalkPath
+    );
   }
 
   return { type: 'FeatureCollection', features };
