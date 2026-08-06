@@ -1,23 +1,104 @@
 /**
- * Шрифтова пара — Unbounded (заголовки, цифри маршрутів, дисплей) +
- * Inter (основний текст інтерфейсу). Обидва мають повну підтримку
+ * Шрифтова пара — e-Ukraine Head (заголовки, цифри маршрутів, дисплей) +
+ * e-Ukraine (основний текст інтерфейсу). Обидва мають повну підтримку
  * кирилиці й читаються однаково чисто на всіх сторінках застосунку.
- * Підключено напряму через @import і CSS-змінні, а не лише через
- * tailwind.config, щоб пара гарантовано застосовувалась усюди.
- *
- * @import мусить йти першим у файлі (до будь-яких інших правил, у т.ч.
- * @tailwind) — інакше PostCSS видає попередження "@import must precede
- * all other statements" і деякі бандлери можуть відкинути імпорт.
+ * Шрифти самохостяться з /public/fonts (без Google Fonts і без запитів
+ * до зовнішніх серверів) та підключені через CSS-змінні, а не лише
+ * через tailwind.config, щоб пара гарантовано застосовувалась усюди.
  */
-@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-UltraLight.woff2') format('woff2');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine Head';
+  src: url('/fonts/e-UkraineHead/e-UkraineHead-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-UltraLight.woff2') format('woff2');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'e-Ukraine';
+  src: url('/fonts/e-Ukraine/e-Ukraine-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --font-display: 'Unbounded', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'e-Ukraine Head', 'e-Ukraine', system-ui, -apple-system, sans-serif;
+  --font-body: 'e-Ukraine', system-ui, -apple-system, sans-serif;
 }
 
 /**
