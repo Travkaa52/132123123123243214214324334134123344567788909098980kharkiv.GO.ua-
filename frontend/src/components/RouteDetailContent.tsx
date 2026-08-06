@@ -1,4 +1,5 @@
-import { Clock, Timer, MapPin, Map as MapIcon } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, Timer, MapPin, Map as MapIcon, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { localStops } from '@/data/localData';
 import { TransportKindIcon, KIND_LABELS_UK } from '@/components/TransportKindIcon';
@@ -22,6 +23,12 @@ export function RouteDetailContent({ route, onNavigate }: { route: TransportRout
   const routeColor = route.color || '#10b981';
   const navigate = useNavigate();
 
+  // "Маршрут руху" (повна послідовність зупинок) за замовчуванням згорнутий —
+  // список буває на 40+ пунктів і одразу займає весь екран модалки. Замість
+  // цього показуємо компактний прев'ю (перша → остання зупинка) з кнопкою
+  // "Розгорнути".
+  const [stopsExpanded, setStopsExpanded] = useState(false);
+
   // Клік на "Показати на карті" (для будь-якого виду — автобус, тролейбус,
   // трамвай, метро) веде на /map?route=<id>: карта одразу підсвічує лінію
   // маршруту, підганяє камеру під його межі (fitBounds) і підсвічує його
@@ -41,6 +48,10 @@ export function RouteDetailContent({ route, onNavigate }: { route: TransportRout
   const timetable = timetableSource?.getByRouteNumber(route.number) ?? null;
   const timetableInfo = timetableSource?.getInfoByRouteNumber(route.number);
   const hasTimetable = !!timetable && timetable.stations.length > 0;
+
+  const firstStopName = localStops.getById(route.stopIds[0])?.name ?? `Зупинка ${route.stopIds[0]}`;
+  const lastStopName =
+    localStops.getById(route.stopIds[route.stopIds.length - 1])?.name ?? `Зупинка ${route.stopIds[route.stopIds.length - 1]}`;
 
   return (
     <div className="space-y-5">
@@ -118,82 +129,114 @@ export function RouteDetailContent({ route, onNavigate }: { route: TransportRout
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-body font-bold text-ink-text">Маршрут руху</h2>
-          <span className="text-caption font-semibold text-ink-muted">Послідовність зупинок</span>
+          <button
+            type="button"
+            onClick={() => setStopsExpanded((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-lg py-1 pl-2 pr-1 text-caption font-semibold text-ink-muted transition-all active:scale-95 hover:text-ink-text"
+          >
+            <span>{stopsExpanded ? 'Згорнути' : `Розгорнути · ${route.stopIds.length} зупинок`}</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${stopsExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
         </div>
 
-        <div className="relative rounded-3xl border border-border/60 bg-surface/50 p-4 backdrop-blur-xl shadow-sm">
-          <div
-            className="absolute left-[1.65rem] top-8 bottom-8 w-0.5 rounded-full opacity-60"
-            style={{ backgroundColor: routeColor }}
-          />
+        {!stopsExpanded ? (
+          <button
+            type="button"
+            onClick={() => setStopsExpanded(true)}
+            className="flex w-full items-center gap-3 rounded-3xl border border-border/60 bg-surface/50 p-4 text-left backdrop-blur-xl shadow-sm transition-all active:scale-[0.99] hover:bg-surface/70"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${routeColor}1f` }}>
+              <MapPin className="h-4.5 w-4.5" style={{ color: routeColor }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-body-sm font-semibold text-ink-text">
+                <span className="truncate">{firstStopName}</span>
+                <span className="shrink-0 text-ink-muted">→</span>
+                <span className="truncate">{lastStopName}</span>
+              </div>
+              <div className="mt-0.5 text-caption text-ink-muted">
+                {route.stopIds.length} зупинок · натисніть, щоб побачити весь маршрут
+              </div>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-ink-muted" />
+          </button>
+        ) : (
+          <div className="relative rounded-3xl border border-border/60 bg-surface/50 p-4 backdrop-blur-xl shadow-sm">
+            <div
+              className="absolute left-[1.65rem] top-8 bottom-8 w-0.5 rounded-full opacity-60"
+              style={{ backgroundColor: routeColor }}
+            />
 
-          <ol className="relative flex flex-col gap-3">
-            {route.stopIds.map((stopId, idx) => {
-              const photo = getStationPhoto(stopId);
-              const stopData = localStops.getById(stopId);
-              const stopName = stopData?.name ?? `Зупинка ${stopId}`;
-              const isFirst = idx === 0;
-              const isLast = idx === route.stopIds.length - 1;
+            <ol className="relative flex flex-col gap-3">
+              {route.stopIds.map((stopId, idx) => {
+                const photo = getStationPhoto(stopId);
+                const stopData = localStops.getById(stopId);
+                const stopName = stopData?.name ?? `Зупинка ${stopId}`;
+                const isFirst = idx === 0;
+                const isLast = idx === route.stopIds.length - 1;
 
-              return (
-                <li
-                  key={`${stopId}-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleStopOnMap(stopId)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleStopOnMap(stopId);
-                    }
-                  }}
-                  className="relative flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-surface/80 active:scale-[0.99]"
-                >
-                  <div className="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center">
-                    <div
-                      className={`h-3.5 w-3.5 rounded-full border-2 border-surface shadow-2xs transition-transform ${
-                        isFirst || isLast ? 'scale-125 ring-2 ring-primary/20' : ''
-                      }`}
-                      style={{ backgroundColor: routeColor }}
-                    />
-                  </div>
-
-                  {photo ? (
-                    <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-xl border border-border/40 shadow-2xs">
-                      <img
-                        src={photo}
-                        alt={stopName}
-                        className="h-full w-full object-cover transition-transform hover:scale-105"
+                return (
+                  <li
+                    key={`${stopId}-${idx}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleStopOnMap(stopId)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleStopOnMap(stopId);
+                      }
+                    }}
+                    className="relative flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-surface/80 active:scale-[0.99]"
+                  >
+                    <div className="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div
+                        className={`h-3.5 w-3.5 rounded-full border-2 border-surface shadow-2xs transition-transform ${
+                          isFirst || isLast ? 'scale-125 ring-2 ring-primary/20' : ''
+                        }`}
+                        style={{ backgroundColor: routeColor }}
                       />
                     </div>
-                  ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-surface/80 text-ink-muted/60">
-                      <MapPin className="h-5 w-5" />
-                    </div>
-                  )}
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-body-sm font-semibold text-ink-text">{stopName}</span>
-                    </div>
-
-                    {(isFirst || isLast) && (
-                      <span
-                        className={`inline-block mt-0.5 text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.2 rounded-md border ${
-                          isFirst
-                            ? 'bg-surface-soft text-ink-text border-border/40'
-                            : 'bg-surface-soft text-ink-muted border-border/40'
-                        }`}
-                      >
-                        {isFirst ? 'Початкова' : 'Кінцева'}
-                      </span>
+                    {photo ? (
+                      <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-xl border border-border/40 shadow-2xs">
+                        <img
+                          src={photo}
+                          alt={stopName}
+                          className="h-full w-full object-cover transition-transform hover:scale-105"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-surface/80 text-ink-muted/60">
+                        <MapPin className="h-5 w-5" />
+                      </div>
                     )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-body-sm font-semibold text-ink-text">{stopName}</span>
+                      </div>
+
+                      {(isFirst || isLast) && (
+                        <span
+                          className={`inline-block mt-0.5 text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.2 rounded-md border ${
+                            isFirst
+                              ? 'bg-surface-soft text-ink-text border-border/40'
+                              : 'bg-surface-soft text-ink-muted border-border/40'
+                          }`}
+                        >
+                          {isFirst ? 'Початкова' : 'Кінцева'}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
       </div>
 
       {/* Розклад руху — той самий компонент, тепер теж доступний прямо в модалці,

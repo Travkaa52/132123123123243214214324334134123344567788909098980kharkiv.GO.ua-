@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { CalendarDays, Clock3, Route as RouteIcon, Bus, Zap } from 'lucide-react';
+import { CalendarDays, Clock3, Route as RouteIcon, Bus, Zap, ChevronDown } from 'lucide-react';
 import type { TrolleyRouteInfo, TrolleyRouteTimetable } from '@/data/trolleyTimetables';
 
 interface RouteTimetableProps {
@@ -59,6 +59,11 @@ export function RouteTimetable({ timetable, info, accentColor }: RouteTimetableP
   // сьогодні насправді — не треба щоразу вручну перемикати на "Будні".
   const [dayType, setDayType] = useState<DayType>(() => todayDayType());
   const [nowSec, setNowSec] = useState(() => secOfDay(new Date()));
+  // Повний розклад (вибір зупинки, перемикач дня, сітка годин) за
+  // замовчуванням згорнутий — у розкритому вигляді картка займає весь
+  // екран модалки. Замість цього одразу показуємо компактний прев'ю з
+  // найближчим рейсом і кнопку "Розгорнути".
+  const [expanded, setExpanded] = useState(false);
 
   const todayType = todayDayType();
   const isTodayView = dayType === todayType;
@@ -110,14 +115,60 @@ export function RouteTimetable({ timetable, info, accentColor }: RouteTimetableP
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-body font-bold text-ink-text">Розклад руху</h2>
-        {info?.rollingStock && (
-          <span className="inline-flex items-center gap-1 text-caption font-semibold text-ink-muted">
-            <Bus className="h-3.5 w-3.5" />
-            <span className="truncate max-w-[9rem]">{info.rollingStock}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {info?.rollingStock && (
+            <span className="inline-flex items-center gap-1 text-caption font-semibold text-ink-muted">
+              <Bus className="h-3.5 w-3.5" />
+              <span className="truncate max-w-[9rem]">{info.rollingStock}</span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-lg py-1 pl-2 pr-1 text-caption font-semibold text-ink-muted transition-all active:scale-95 hover:text-ink-text"
+          >
+            <span>{expanded ? 'Згорнути' : 'Розгорнути'}</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+        </div>
       </div>
 
+      {!expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex w-full items-center justify-between gap-3 rounded-3xl border border-border/60 bg-surface/50 p-4 text-left backdrop-blur-xl shadow-sm transition-all active:scale-[0.99] hover:bg-surface/70"
+        >
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                isTodayView && nextDeparture ? 'bg-emerald-500/15 text-emerald-600' : 'bg-surface-soft text-ink-muted'
+              }`}
+            >
+              <Zap className="h-4 w-4" />
+            </span>
+            <div className="leading-tight">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted opacity-70">
+                {isTodayView ? 'Найближчий рейс' : `Розклад на ${dayType === 'workdays' ? 'будні' : 'вихідні'}`}
+              </div>
+              <div className="text-body-sm font-extrabold text-ink-text">
+                {isTodayView
+                  ? nextDeparture
+                    ? `${station?.station ?? ''} · ${nextDeparture.time}`
+                    : 'Рейсів більше немає сьогодні'
+                  : `${station?.station ?? ''} · ${times.length} рейсів`}
+              </div>
+            </div>
+          </div>
+          {isTodayView && nextDeparture && (
+            <span className="shrink-0 rounded-full bg-emerald-500/15 px-2.5 py-1 text-caption font-bold text-emerald-600">
+              {formatCountdown(nextDeparture.sec - nowSec)}
+            </span>
+          )}
+        </button>
+      ) : (
       <div className="rounded-3xl border border-border/60 bg-surface/50 p-4 backdrop-blur-xl shadow-sm space-y-4">
         {info?.path && (
           <div className="flex items-start gap-2 rounded-xl border border-border/40 bg-surface/80 p-3 text-body-sm text-ink-text">
@@ -278,6 +329,7 @@ export function RouteTimetable({ timetable, info, accentColor }: RouteTimetableP
           </p>
         )}
       </div>
+      )}
     </div>
   );
 }
