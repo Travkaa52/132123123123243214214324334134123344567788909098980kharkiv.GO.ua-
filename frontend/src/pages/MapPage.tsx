@@ -21,6 +21,7 @@ import { MapSearchSuggestions } from '@/components/MapSearchSuggestions';
 import { GpsButton } from '@/components/GpsButton';
 import { MapModeButton } from '@/components/MapModeButton';
 import { TransportLayersPanel } from '@/components/TransportLayersPanel';
+import { AirAlertBanner } from '@/components/AirAlertBanner';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { localRoutes, localStops, type TripPlan, type StopItem } from '@/data/localData';
 import { getRouteBounds } from '@/lib/mapLayers';
@@ -494,6 +495,10 @@ export function MapPage() {
 
       {/* 2. ВЕРХНЯ ПАНЕЛЬ: побудова маршруту "Звідки -> Куди" */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2.5 p-4 pt-[max(1rem,env(safe-area-inset-top))] will-change-transform">
+
+        <div className="pointer-events-auto">
+          <AirAlertBanner />
+        </div>
 
         <div className="pointer-events-auto relative rounded-[24px] border border-border/40 bg-surface/95 shadow-xl shadow-black/10 backdrop-blur-xl">
           <div className="flex items-stretch">

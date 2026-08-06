@@ -24,6 +24,7 @@ import { RouteDetailModal } from '@/components/RouteDetailModal';
 import { TrainWishSprite } from '@/components/TrainWishSprite';
 import { NotificationsBell, NotificationsSection } from '@/components/NotificationsSection';
 import { TransportNewsSection } from '@/components/TransportNewsSection';
+import { AirAlertBanner } from '@/components/AirAlertBanner';
 import { localRoutes, localStops } from '@/data/localData';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
@@ -256,6 +257,8 @@ export function HomePage() {
             </Link>
           </div>
         </header>
+
+        <AirAlertBanner />
 
         {/* 2. ADVANCED REAL-TIME SEARCH BAR */}
         <div className="relative z-30 animate-in fade-in slide-in-from-top-1 duration-500 delay-75 fill-mode-both">
