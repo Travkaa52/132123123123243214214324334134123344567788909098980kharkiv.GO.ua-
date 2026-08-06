@@ -16,6 +16,31 @@
       rel="stylesheet"
     />
     <title>Kharkiv GO — транспорт у реальному часі</title>
+    <script>
+      // Друга половина трюку зі spa-github-pages (див. public/404.html):
+      // якщо 404.html щойно переклав реальний шлях у query-рядок
+      // ("?/install-app"), відновлюємо його в history ДО того, як
+      // React Router встигне змонтуватися і побачити "/" замість
+      // справжнього запитаного шляху.
+      (function () {
+        var search = window.location.search;
+        if (search[1] === '/') {
+          var decoded = search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&');
+            });
+          var path = decoded.shift();
+          var rest = decoded.length ? '?' + decoded.join('&') : '';
+          window.history.replaceState(
+            null,
+            '',
+            window.location.pathname.replace(/\/$/, '') + '/' + path + rest + window.location.hash
+          );
+        }
+      })();
+    </script>
   </head>
   <body class="bg-surface-soft font-body text-graphite">
     <div id="root"></div>
