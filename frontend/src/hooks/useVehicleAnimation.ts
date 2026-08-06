@@ -25,7 +25,7 @@ function lerp(a: number, b: number, t: number) {
 }
 
 function lerpAngle(a: number, b: number, t: number) {
-  let diff = ((b - a + 540) % 360) - 180;
+  const diff = ((b - a + 540) % 360) - 180;
   return (a + diff * t + 360) % 360;
 }
 

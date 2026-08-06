@@ -294,23 +294,72 @@ for (const [a, b] of METRO_INTERCHANGES) {
   interchangeMap.set(b, [...(interchangeMap.get(b) ?? []), a]);
 }
 
+const TRANSFER_WALK_RADIUS_M = 350; // реалістична пересадка пішки — не через пів міста
+const MAX_NEARBY_TRANSFER_CANDIDATES = 6; // на кожну зупинку — не більше N найближчих сусідів
+
 /**
- * Повертає зупинку-кандидата на пересадку разом із самою зупинкою:
- * саму зупинку (пересадка без ходьби між платформами) та, якщо є,
- * пов'язані пересадочні станції поруч (підземний перехід метро) —
- * з відстанню пішки між ними.
+ * КРИТИЧНО ДЛЯ ПЕРЕСАДОК: генералізований індекс "яка зупинка поруч з якою
+ * пішки", побудований для ВСІХ зупинок ВСІХ видів транспорту одразу —
+ * автобус, тролейбус, трамвай, метро.
+ *
+ * Раніше пересадка між різними видами транспорту вважалась можливою лише
+ * у двох випадках: (1) буквально та сама зупинка (той самий stopId) або
+ * (2) один із трьох зашитих переходів метро (`METRO_INTERCHANGES`). Через
+ * це, наприклад, тролейбусна зупинка і автобусна зупинка на протилежному
+ * боці тієї самої вулиці (реальна пересадка за 20–30 секунд ходьби, але
+ * ДВА РІЗНИХ stopId у джерелі даних) не розпізнавались як пересадка
+ * взагалі — роутер не знаходив жодного варіанту з пересадкою і, розширюючи
+ * радіус пошуку "від зупинки" аж до 2.2 км, фактично будував по суті
+ * пішохідний маршрут там, де мала бути коротка пересадка з одного
+ * транспорту на інший.
+ *
+ * Тепер для кожної зупинки заздалегідь рахуємо всі інші зупинки (будь-якого
+ * виду транспорту) в межах `TRANSFER_WALK_RADIUS_M` — і саме цей список
+ * (разом із явними переходами метро) використовується як кандидати на
+ * пересадку. Пішки в межах поїздки завжди йдемо ЛИШЕ до/від зупинок —
+ * жодних "пішохідних" ділянок замість реальної пересадки на транспорт.
+ */
+const nearbyStopsMap = new Map<string, { stop: StopItem; walkM: number }[]>();
+for (const a of stopsData) {
+  const nearby: { stop: StopItem; walkM: number }[] = [];
+  for (const b of stopsData) {
+    if (a.id === b.id) continue;
+    const walkM = distanceMetersLatLng(a.position.lat, a.position.lng, b.position.lat, b.position.lng);
+    if (walkM <= TRANSFER_WALK_RADIUS_M) nearby.push({ stop: b, walkM });
+  }
+  nearby.sort((x, y) => x.walkM - y.walkM);
+  nearbyStopsMap.set(a.id, nearby.slice(0, MAX_NEARBY_TRANSFER_CANDIDATES));
+}
+
+/**
+ * Повертає всіх зупинок-кандидатів на пересадку з даної зупинки: саму
+ * зупинку (пересадка без ходьби, якщо другий маршрут теж її обслуговує),
+ * явні пересадочні вузли метро (пріоритетно — це реальні перевірені
+ * підземні переходи) та будь-які інші найближчі зупинки БУДЬ-ЯКОГО виду
+ * транспорту в межах `TRANSFER_WALK_RADIUS_M` — саме це дозволяє пересідати
+ * з тролейбуса на автобус, трамвай чи метро і навпаки, а не лише в межах
+ * одного й того самого маршруту чи однієї зупинки.
  */
 function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number }[] {
   const result: { stop: StopItem; walkM: number }[] = [{ stop, walkM: 0 }];
-  const linkedIds = interchangeMap.get(stop.id) ?? [];
-  for (const id of linkedIds) {
+  const seen = new Set<string>([stop.id]);
+
+  for (const id of interchangeMap.get(stop.id) ?? []) {
     const linked = stopsMap.get(id);
-    if (!linked) continue;
+    if (!linked || seen.has(linked.id)) continue;
+    seen.add(linked.id);
     result.push({
       stop: linked,
       walkM: distanceMetersLatLng(stop.position.lat, stop.position.lng, linked.position.lat, linked.position.lng)
     });
   }
+
+  for (const candidate of nearbyStopsMap.get(stop.id) ?? []) {
+    if (seen.has(candidate.stop.id)) continue;
+    seen.add(candidate.stop.id);
+    result.push(candidate);
+  }
+
   return result;
 }
 
