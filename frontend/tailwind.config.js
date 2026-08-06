@@ -61,8 +61,8 @@ export default {
         neon: 'rgb(var(--color-neon) / <alpha-value>)'
       },
       fontFamily: {
-        display: ['"Manrope"', 'system-ui', 'sans-serif'],
-        body: ['"Inter"', 'system-ui', 'sans-serif']
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'system-ui', 'sans-serif']
       },
       borderRadius: {
         sm: 'var(--radius-sm)',

@@ -1,4 +1,14 @@
 {
-  "updatedAt": "2026-08-06T09:40:15.887Z",
-  "items": []
+  "updatedAt": "2026-08-03T15:12:55.313Z",
+  "items": [
+    {
+      "id": 1785760899383,
+      "kind": "trolleybus",
+      "routeNumber": "3",
+      "message": "затримка дтп проспект байрона",
+      "createdAt": 1785760892.739,
+      "expiresAt": 1785768092.739,
+      "source": "manual"
+    }
+  ]
 }
