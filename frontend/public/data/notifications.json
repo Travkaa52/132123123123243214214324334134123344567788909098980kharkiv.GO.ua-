@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-07T08:47:39.462Z",
+  "updatedAt": "2026-08-07T09:44:15.163Z",
   "items": [
+    {
+      "id": "kh_metro:2837",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "Забігаєш на ескалатор і гадаєш - «встигну чи доведеться чекати?» 🏃‍♂️🚇\n\nНагадуємо, що розклад руху та зручний маршрутизатор харківського метрополітену завжди під рукою - у чат-боті «Харків - твій дім».\n\nРазом із КП «Харківський метрополітен» ми об'єднали всі графіки в одному місці, щоб ви могли точно планувати свої поїздки містом.\n\nЩо вміє цей сервіс:\n⏱️ точний розклад - обирайте лінію, потрібну станцію та день (будній чи вихідний) - бот миттєво підкаже час прибуття поїзда;\n🗺️ розумний маршрутизатор - вкажіть точки А і Б, а бот розрахує час у дорозі, підкаже пересадки та підсумує точний час прибуття.\n\nЕкономте свій час та бігайте тільки для задоволення, а не за потягом&#33; 😉\n\n📲 Перевірити розклад у чат-боті: 👉 https://t.me/tviyDimKharkivBot\n\n🔗Digital Kharkiv media and services",
+      "date": "2026-08-07T09:09:15.000Z",
+      "link": "https://t.me/kh_metro/2837",
+      "hasMedia": true,
+      "isForwarded": true,
+      "views": "1.12K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2836",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2836",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "16K",
+      "views": "16.3K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2835",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "14.6K",
+      "views": "15.1K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2826",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "9.71K",
+      "views": "10K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2825",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "15.5K",
+      "views": "15.8K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2824",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "19K",
+      "views": "19.1K",
       "kind": "info",
       "lineIds": []
     },
