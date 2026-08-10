@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-10T03:44:52.860Z",
+  "updatedAt": "2026-08-10T05:10:03.023Z",
   "items": [
+    {
+      "id": "kh_metro:2838",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Майдан Конституції» буде тимчасово зачинено пішохідний вихід №6  У період з 5:30 5 серпня до 17:00 10 серпня у зв’язку з проведенням монтажних робіт на прилеглій території пішохідний вихід №6 (у бік площі Конституції) з підземного переходу станції…",
+      "date": "2026-08-10T04:12:39.000Z",
+      "link": "https://t.me/kh_metro/2838",
+      "hasMedia": false,
+      "isForwarded": false,
+      "views": "1.19K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2837",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2837",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "4.4K",
+      "views": "4.75K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2836",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "18.5K",
+      "views": "18.9K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2835",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "17.2K",
+      "views": "17.4K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2826",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "11.3K",
+      "views": "11.4K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2825",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "16.9K",
+      "views": "17K",
       "kind": "info",
       "lineIds": []
     },
@@ -88,7 +101,7 @@
       "link": "https://t.me/kh_metro/2817",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "10.6K",
+      "views": "10.7K",
       "kind": "info",
       "lineIds": []
     }
