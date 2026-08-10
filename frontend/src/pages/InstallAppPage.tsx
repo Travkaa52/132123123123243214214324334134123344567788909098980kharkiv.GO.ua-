@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Download,
   Share,
@@ -9,9 +9,36 @@ import {
   Zap,
   Smartphone,
   Monitor,
-  ChevronRight
+  ChevronRight,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+
+/** Мінімальний прошарок над Fullscreen API — на всякий випадок з
+ *  вебкіт-префіксом для старіших Safari/iOS (частково підтримується). */
+function requestPageFullscreen() {
+  const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
+  if (el.requestFullscreen) {
+    el.requestFullscreen().catch(() => {});
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  }
+}
+
+function exitPageFullscreen() {
+  const doc = document as Document & { webkitExitFullscreen?: () => void };
+  if (document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  } else if (doc.webkitExitFullscreen) {
+    doc.webkitExitFullscreen();
+  }
+}
+
+function isPageFullscreen(): boolean {
+  const doc = document as Document & { webkitFullscreenElement?: Element | null };
+  return !!(document.fullscreenElement || doc.webkitFullscreenElement);
+}
 
 type Platform = 'ios' | 'android' | 'desktop';
 
@@ -42,6 +69,7 @@ export function InstallAppPage() {
   const [platform, setPlatform] = useState<Platform>(detectPlatform);
   const [isInstalling, setIsInstalling] = useState(false);
   const [justInstalled, setJustInstalled] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(isPageFullscreen);
 
   const handleInstall = async () => {
     if (isInstalling) return;
@@ -51,11 +79,46 @@ export function InstallAppPage() {
     if (accepted) setJustInstalled(true);
   };
 
+  const toggleFullscreen = () => {
+    if (isPageFullscreen()) {
+      exitPageFullscreen();
+    } else {
+      requestPageFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    // Ця сторінка навмисно відкривається окремою вкладкою зовнішнього
+    // браузера (див. openInExternalBrowser у ProfilePage/HomeScreenShortcutCard)
+    // саме для того, щоб можна було розгорнути її на весь екран — без
+    // адресного рядка й чужого інтерфейсу. Спроба увімкнути повноекранний
+    // режим одразу при відкритті: спрацює там, де браузер вважає перехід
+    // на сторінку користувацькою дією (типово для кліку по кнопці/посиланню
+    // з профілю); якщо ні — залишається ручна кнопка нижче.
+    requestPageFullscreen();
+
+    const onChange = () => setIsFullscreen(isPageFullscreen());
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, []);
+
   const done = isInstalled || justInstalled;
 
   return (
     <div className="min-h-screen bg-bg pb-10">
-      <header className="px-5 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))] text-center">
+      <header className="px-5 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))] text-center relative">
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          aria-label={isFullscreen ? 'Вийти з повноекранного режиму' : 'На весь екран'}
+          className="absolute right-4 top-[max(1.5rem,env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-surface/80 text-ink-text shadow-xs backdrop-blur-md transition-all hover:bg-surface active:scale-95"
+        >
+          {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </button>
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Download className="h-7 w-7" />
         </div>

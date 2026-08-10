@@ -73,30 +73,77 @@ interface StopMatch {
   totalError: number;
 }
 
-/** Прив'язує впорядкований список координат зупинок до шляху, гарантуючи
- *  НЕ спадний порядок індексів (пошук найближчої точки лише "вперед" від
- *  позиції попередньої зупинки) — саме це усуває неоднозначність на
- *  петлях, де кілька зупинок можуть бути геометрично близькі до однієї й
- *  тієї самої точки полілінії. */
+/**
+ * ГОЛОВНИЙ ФІКС #2: попередня версія (`matchStopsMonotonic`) прив'язувала
+ * зупинки ЖАДІБНО — для кожної зупинки шукала найближчу точку шляху лише
+ * "вперед" від позиції попередньої, беручи ЛОКАЛЬНО найкращий варіант.
+ * На кільцевих/петльових маршрутах (а це переважна більшість маршрутів
+ * Харкова — виїзд і повернення до тієї самої кінцевої) початок і кінець
+ * з'єднаного шляху фізично лежать в одній точці. Через це ПЕРША ж зупинка
+ * (кінцева) могла на лічені метри "виграти" прив'язку не до індексу 0
+ * (початок шляху), а до індексу в самому кінці масиву (бо там теж проходить
+ * шлях повз ту саму кінцеву) — і тоді ВСІ наступні зупинки жадібно шукались
+ * вже тільки в вузькому хвості шляху, даючи похибку в кілометри й навіть
+ * десятки кілометрів для переважної більшості маршрутів.
+ *
+ * Рішення: замінити жадібний пошук на динамічне програмування, що шукає
+ * ГЛОБАЛЬНО оптимальну (мінімальна сумарна похибка) монотонну (неспадну)
+ * послідовність індексів для ВСІХ зупинок одразу, а не крок за кроком.
+ * Складність O(n_зупинок × m_точок_шляху) — тривіальна для маршруту (≤60
+ * зупинок × ≤300 точок геометрії), рахується миттєво, і завдяки глобальній
+ * оптимізації неоднозначність на початку/кінці петлі більше не "тягне за
+ * собою" помилку по всьому маршруту.
+ */
 function matchStopsMonotonic(path: [number, number][], stopCoords: [number, number][]): StopMatch {
-  const indices: number[] = [];
-  let totalError = 0;
-  let searchStart = 0;
-  for (const coord of stopCoords) {
-    let bestIdx = searchStart;
-    let bestD = Infinity;
-    for (let i = searchStart; i < path.length; i++) {
-      const d = sqDist(path[i], coord);
-      if (d < bestD) {
-        bestD = d;
-        bestIdx = i;
+  const n = stopCoords.length;
+  const m = path.length;
+  if (m === 0 || n === 0) return { indices: stopCoords.map(() => 0), totalError: Infinity };
+
+  // dpPrev[j] — мінімальна сумарна похибка прив'язки zupynok[0..k] за умови,
+  // що zupynka[k] прив'язана саме до path[j].
+  let dpPrev = new Float64Array(m);
+  for (let j = 0; j < m; j++) dpPrev[j] = sqDist(path[j], stopCoords[0]);
+
+  // backptr[k][j] — який індекс шляху було обрано для zupynka[k-1], якщо
+  // zupynka[k] прив'язана до path[j] (для відновлення повного шляху назад).
+  const backptr: Int32Array[] = [];
+
+  for (let k = 1; k < n; k++) {
+    const dpCur = new Float64Array(m);
+    const bp = new Int32Array(m);
+    // runningMin — мінімум dpPrev[0..j] і індекс, на якому він досягнутий;
+    // рахуємо "на льоту" зліва направо, щоб уникнути O(m^2).
+    let bestVal = dpPrev[0];
+    let bestArg = 0;
+    for (let j = 0; j < m; j++) {
+      if (dpPrev[j] < bestVal) {
+        bestVal = dpPrev[j];
+        bestArg = j;
       }
+      dpCur[j] = sqDist(path[j], stopCoords[k]) + bestVal;
+      bp[j] = bestArg;
     }
-    indices.push(bestIdx);
-    totalError += bestD;
-    searchStart = bestIdx;
+    backptr.push(bp);
+    dpPrev = dpCur;
   }
-  return { indices, totalError };
+
+  let bestJ = 0;
+  let bestVal = dpPrev[0];
+  for (let j = 1; j < m; j++) {
+    if (dpPrev[j] < bestVal) {
+      bestVal = dpPrev[j];
+      bestJ = j;
+    }
+  }
+
+  const indices = new Array<number>(n);
+  let j = bestJ;
+  for (let k = n - 1; k >= 0; k--) {
+    indices[k] = j;
+    if (k > 0) j = backptr[k - 1][j];
+  }
+
+  return { indices, totalError: bestVal };
 }
 
 const routePathCache = new Map<string, [number, number][]>();

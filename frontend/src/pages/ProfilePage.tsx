@@ -18,10 +18,12 @@ import {
   LifeBuoy,
   Heart,
   MapPin,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { assetUrl } from '@/lib/assetUrl';
+import { openInExternalBrowser } from '@/lib/telegram';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
@@ -325,7 +327,7 @@ export function ProfilePage() {
           <span className="px-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted/80">
             Керування
           </span>
-          <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm">
+          <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm divide-y divide-border/40">
             <Link
               to="/settings"
               className="flex items-center justify-between p-4 transition-colors hover:bg-surface/90 active:bg-muted/50 min-h-[48px]"
@@ -341,6 +343,23 @@ export function ProfilePage() {
               </div>
               <ChevronRight className="h-4 w-4 text-ink-muted" />
             </Link>
+
+            <button
+              type="button"
+              onClick={() => openInExternalBrowser(getInstallGuideUrl())}
+              className="w-full flex items-center justify-between p-4 transition-colors hover:bg-surface/90 active:bg-muted/50 min-h-[48px] text-left"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                  <Download className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-ink-text">Встановити застосунок</h4>
+                  <p className="text-[11px] text-ink-muted">Окрема сторінка в браузері — іконка на пристрої, офлайн</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-ink-muted" />
+            </button>
           </div>
 
           <HomeScreenShortcutCard />
