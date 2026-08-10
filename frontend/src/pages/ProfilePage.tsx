@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getInstallGuideUrl } from '@/utils/install'; // Укажите ваш правильный путь
 import { useToastStore } from '@/store/useToastStore';
 import {
   User,
