@@ -3,6 +3,17 @@ import routesRealJson from './routesReal.json';
 import stopsRealJson from './stopsReal.json';
 import { metroStopsData, metroRoutesData, METRO_INTERCHANGES } from './metroStationsReal';
 
+/**
+ * Реальні дані маршрутів і зупинок Харкова, розшифровані з офіційних
+ * KML-схем (src/assets/marshryt transporty kharkiv/marshryt troleybus,
+ * marshryt tramway) та реальних розкладів руху
+ * (assets/rozklad ryhy trolley, assets/rozklad ryhy tramway).
+ *
+ * Жодних вигаданих/рівномірно розставлених зупинок — тільки точні
+ * координати та назви з першоджерела. Інтервал руху та перший/останній
+ * рейс обчислені з реальних розкладів по кожному маршруту.
+ */
+
 export interface RouteItem {
   id: string;
   kind: TransportKind;
@@ -44,63 +55,18 @@ interface RealRoute {
   stopIdsBackward: string[];
 }
 
-export interface RouteDirectionVariant {
-  headsign: string;
-  stopIds: string[];
-}
-
-export interface TripLeg {
-  route: RouteItem;
-  headsign: string;
-  directionStopIds: string[];
-  boardStop: StopItem;
-  alightStop: StopItem;
-  boardTimeMin: number;
-  alightTimeMin: number;
-  rideDurationMin: number;
-  waitTimeMin: number;
-  transferWalkFromM?: number;
-  transferWalkPath?: [number, number][];
-}
-
-export interface TripPlan {
-  legs: TripLeg[];
-  boardWalkM: number;
-  alightWalkM: number;
-  transfersCount: number;
-  estimatedMinutes: number;
-  totalWalkM: number;
-  tags?: {
-    isFastest?: boolean;
-    isFewestTransfers?: boolean;
-    isLeastWalking?: boolean;
-  };
-  boardWalkPath?: [number, number][];
-  alightWalkPath?: [number, number][];
-}
-
-// Константи фізики міського руху
-const WALK_SPEED_M_PER_MIN = 75; // 4.5 км/год (реалістична швидкість пішохода в місті)
-const TRANSFER_INITIAL_BUFFER_MIN = 2.5; // Час на орієнтування/схід з платформи
-const MAX_WALK_TO_FIRST_STOP_M = 1200; // Максимальна відстань пішки до першої зупинки
-const MAX_TRANSFER_WALK_M = 400; // Максимальний піший перехід між зупинками
-const MAX_WALK_FROM_LAST_STOP_M = 1200;
-
-const MINUTES_PER_STOP: Record<TransportKind, number> = {
-  metro: 1.8,
-  tram: 2.2,
-  trolleybus: 2.0,
-  bus: 1.9
-};
-
-// --- ІНІЦІАЛІЗАЦІЯ ДАНИХ ---
 const REAL_ROUTES = routesRealJson as unknown as RealRoute[];
 const REAL_STOPS = stopsRealJson as unknown as StopItem[];
 
 const stopsMap = new Map<string, StopItem>();
 REAL_STOPS.forEach((s) => stopsMap.set(s.id, s));
+// Станції метро (з KML, координати + українські назви) — окреме джерело,
+// без прив'язки до наземних маршрутів, але доступне для пошуку, вибору
+// на карті та як точка "Звідси"/"Куди" при побудові поїздки.
 metroStopsData.forEach((s) => stopsMap.set(s.id, s));
 
+// stopIds — зупинки в напрямку "туди" (headsignForward), як основний
+// список для карти, сторінки маршруту та підрахунку кількості зупинок.
 const routesData: RouteItem[] = REAL_ROUTES.map((r) => ({
   id: r.id,
   kind: r.kind,
@@ -116,10 +82,45 @@ const routesData: RouteItem[] = REAL_ROUTES.map((r) => ({
   intervalMinutes: r.intervalMinutes
 }));
 
-routesData.push(...(metroRoutesData as unknown as RouteItem[]));
 const stopsData: StopItem[] = Array.from(stopsMap.values());
 
+// Лінії метро як звичайні "маршрути" для роутера поїздок — жодної окремої
+// гілки логіки для метро не потрібно: buildTripOptions/buildTripPlans
+// сприймають лінію метро так само, як маршрут автобуса/трамвая/тролейбуса.
+routesData.push(...(metroRoutesData as unknown as RouteItem[]));
+
+/**
+ * КРИТИЧНО ДЛЯ ТОЧНОСТІ: реальний маршрут громадського транспорту в
+ * Харкові (і майже будь-якому місті) фізично не однакова петля в обидва
+ * боки — "туди" й "назад" часто йдуть різними вулицями/смугами (одностороній
+ * рух, розворотні кільця, різні зупинки на протилежних боках проспекту).
+ * `routesReal.json` вже містить обидва реальні напрямки
+ * (`stopIdsForward`/`stopIdsBackward`) — вони НЕ однакові навіть у
+ * зворотному порядку (перевірено: жодної пари з 84 маршрутів не збігається).
+ *
+ * Раніше роутер поїздок використовував лише `stopIds` (=stopIdsForward) і
+ * ЖОДНОГО РАЗУ не перевіряв, що зупинка посадки дійсно йде РАНІШЕ зупинки
+ * висадки в напрямку руху. Це означало дві реальні помилки:
+ *  1) для поїздок у зворотному напрямку маршруту потрібні зупинки могли
+ *     просто бути відсутні в списку (weren't in stopIdsForward) — маршрут
+ *     "губився", хоча фізично довозив саме туди;
+ *  2) навіть коли обидві зупинки випадково траплялись у forward-списку,
+ *     ніхто не перевіряв порядок — міг вийти "маршрут", що вимагав їхати
+ *     назад проти напрямку руху транспорту (фізично неможлива поїздка).
+ *
+ * Рішення: для кожного маршруту рахуємо ОБИДВА напрямки як окремі
+ * впорядковані послідовності зупинок і завжди перевіряємо
+ * `alightIdx > boardIdx` у межах ОДНОГО обраного напрямку. Метро (єдиний
+ * список станцій, потяги їдуть в обидва боки по тій самій колії) отримує
+ * другий напрямок як розворот того самого списку.
+ */
+export interface RouteDirectionVariant {
+  headsign: string;
+  stopIds: string[];
+}
+
 const routeDirectionsById = new Map<string, RouteDirectionVariant[]>();
+
 REAL_ROUTES.forEach((r) => {
   const fwd = r.stopIdsForward.length > 0 ? r.stopIdsForward : r.stopIdsBackward;
   const bwd = r.stopIdsBackward.length > 0 ? r.stopIdsBackward : r.stopIdsForward;
@@ -136,39 +137,209 @@ REAL_ROUTES.forEach((r) => {
   ]);
 });
 
+/** Усі відомі напрямки руху для маршруту (мінімум один — навіть якщо
+ *  дані з якоїсь причини не містили окремого зворотного напрямку). */
 function getRouteDirections(route: RouteItem): RouteDirectionVariant[] {
   return routeDirectionsById.get(route.id) ?? [{ headsign: route.headsignForward, stopIds: route.stopIds }];
+}
+
+export interface TripOption {
+  route: RouteItem;
+  /** Напрямок руху (кінцева зупинка/назва), у якому фактично їде пасажир
+   *  на цій ділянці — важливо, бо в один і той же боку доїхати можна лише
+   *  одним із двох напрямків маршруту. */
+  headsign: string;
+  /** Впорядкована послідовність зупинок ІМЕННО цього напрямку — на ній
+   *  побудовані boardStop/alightStop і саме вона (а не route.stopIds,
+   *  який завжди "туди") коректна для підрахунку кількості зупинок і
+   *  малювання шляху на карті. */
+  directionStopIds: string[];
+  boardStop: StopItem;
+  alightStop: StopItem;
+  boardDistanceM: number;
+  alightDistanceM: number;
 }
 
 function distanceMetersLatLng(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371000;
   const dLat = ((bLat - aLat) * Math.PI) / 180;
   const dLng = ((bLng - aLng) * Math.PI) / 180;
-  const a =
+  const x =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-// Граф піших пересадок між зупинками
+/**
+ * Шукає в межах ОДНОГО напрямку маршруту найближчу зупинку посадки (до
+ * `from`) і найближчу зупинку висадки (до `to`), і одразу відкидає
+ * результат, якщо висадка виявляється РАНІШЕ посадки в порядку руху —
+ * фізично неможлива поїздка проти напрямку транспорту.
+ */
+function bestPairForDirection(
+  direction: RouteDirectionVariant,
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number
+): { boardStop: StopItem; alightStop: StopItem; boardDist: number; alightDist: number } | null {
+  let nearestToStart: { stop: StopItem; dist: number; idx: number } | null = null;
+  let nearestToEnd: { stop: StopItem; dist: number; idx: number } | null = null;
+
+  direction.stopIds.forEach((stopId, idx) => {
+    const stop = stopsMap.get(stopId);
+    if (!stop) return;
+
+    const dStart = distanceMetersLatLng(fromLat, fromLng, stop.position.lat, stop.position.lng);
+    if (!nearestToStart || dStart < nearestToStart.dist) nearestToStart = { stop, dist: dStart, idx };
+
+    const dEnd = distanceMetersLatLng(toLat, toLng, stop.position.lat, stop.position.lng);
+    if (!nearestToEnd || dEnd < nearestToEnd.dist) nearestToEnd = { stop, dist: dEnd, idx };
+  });
+
+  if (!nearestToStart || !nearestToEnd) return null;
+  const start = nearestToStart as { stop: StopItem; dist: number; idx: number };
+  const end = nearestToEnd as { stop: StopItem; dist: number; idx: number };
+  if (start.stop.id === end.stop.id) return null;
+  // Основа виправлення точності: висадка має йти СТРОГО ПІСЛЯ посадки
+  // в порядку руху цього конкретного напрямку.
+  if (end.idx <= start.idx) return null;
+
+  return { boardStop: start.stop, alightStop: end.stop, boardDist: start.dist, alightDist: end.dist };
+}
+
+/**
+ * Підбирає маршрути громадського транспорту, які проходять і біля точки
+ * відправлення, і біля точки призначення — простий "будівник маршруту"
+ * без бекенду (жодних live-даних, тільки статична геометрія routesReal.json).
+ *
+ * Для кожного маршруту перевіряє ОБИДВА напрямки руху окремо (див.
+ * коментар вище про forward/backward) і бере найкращий валідний варіант.
+ * Радіус пошуку поступово розширюється, якщо нічого не знайдено поруч.
+ */
+export function buildTripOptions(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+  maxOptions = 5
+): TripOption[] {
+  const RADII_M = [700, 1200, 2200, 4000];
+
+  for (const radius of RADII_M) {
+    const candidates: TripOption[] = [];
+
+    for (const route of routesData) {
+      let best: (TripOption & { total: number }) | null = null;
+
+      for (const direction of getRouteDirections(route)) {
+        const pair = bestPairForDirection(direction, fromLat, fromLng, toLat, toLng);
+        if (!pair) continue;
+        if (pair.boardDist > radius || pair.alightDist > radius) continue;
+
+        const total = pair.boardDist + pair.alightDist;
+        if (!best || total < best.total) {
+          best = {
+            route,
+            headsign: direction.headsign,
+            directionStopIds: direction.stopIds,
+            boardStop: pair.boardStop,
+            alightStop: pair.alightStop,
+            boardDistanceM: pair.boardDist,
+            alightDistanceM: pair.alightDist,
+            total
+          };
+        }
+      }
+
+      if (best) candidates.push(best);
+    }
+
+    if (candidates.length > 0) {
+      return candidates
+        .sort((a, b) => a.boardDistanceM + a.alightDistanceM - (b.boardDistanceM + b.alightDistanceM))
+        .slice(0, maxOptions);
+    }
+  }
+
+  return [];
+}
+
+
+/** Знаходить найближчу до точки зупинку СЕРЕД КОНКРЕТНОГО НАПРЯМКУ
+ *  маршруту, разом з її позицією (індексом) у цьому напрямку. */
+function nearestStopInDirection(
+  direction: RouteDirectionVariant,
+  lat: number,
+  lng: number
+): { stop: StopItem; dist: number; idx: number } | null {
+  let best: { stop: StopItem; dist: number; idx: number } | null = null;
+  direction.stopIds.forEach((stopId, idx) => {
+    const stop = stopsMap.get(stopId);
+    if (!stop) return;
+    const dist = distanceMetersLatLng(lat, lng, stop.position.lat, stop.position.lng);
+    if (!best || dist < best.dist) best = { stop, dist, idx };
+  });
+  return best;
+}
+
+/**
+ * Пересадочні вузли (наразі — три реальні пересадки харківського метро,
+ * `METRO_INTERCHANGES` з metroStationsReal.ts) як карта "звідси можна
+ * пішки перейти сюди", в обидва боки.
+ */
 const interchangeMap = new Map<string, string[]>();
 for (const [a, b] of METRO_INTERCHANGES) {
   interchangeMap.set(a, [...(interchangeMap.get(a) ?? []), b]);
   interchangeMap.set(b, [...(interchangeMap.get(b) ?? []), a]);
 }
 
+const TRANSFER_WALK_RADIUS_M = 350; // реалістична пересадка пішки — не через пів міста
+const MAX_NEARBY_TRANSFER_CANDIDATES = 6; // на кожну зупинку — не більше N найближчих сусідів
+
+/**
+ * КРИТИЧНО ДЛЯ ПЕРЕСАДОК: генералізований індекс "яка зупинка поруч з якою
+ * пішки", побудований для ВСІХ зупинок ВСІХ видів транспорту одразу —
+ * автобус, тролейбус, трамвай, метро.
+ *
+ * Раніше пересадка між різними видами транспорту вважалась можливою лише
+ * у двох випадках: (1) буквально та сама зупинка (той самий stopId) або
+ * (2) один із трьох зашитих переходів метро (`METRO_INTERCHANGES`). Через
+ * це, наприклад, тролейбусна зупинка і автобусна зупинка на протилежному
+ * боці тієї самої вулиці (реальна пересадка за 20–30 секунд ходьби, але
+ * ДВА РІЗНИХ stopId у джерелі даних) не розпізнавались як пересадка
+ * взагалі — роутер не знаходив жодного варіанту з пересадкою і, розширюючи
+ * радіус пошуку "від зупинки" аж до 2.2 км, фактично будував по суті
+ * пішохідний маршрут там, де мала бути коротка пересадка з одного
+ * транспорту на інший.
+ *
+ * Тепер для кожної зупинки заздалегідь рахуємо всі інші зупинки (будь-якого
+ * виду транспорту) в межах `TRANSFER_WALK_RADIUS_M` — і саме цей список
+ * (разом із явними переходами метро) використовується як кандидати на
+ * пересадку. Пішки в межах поїздки завжди йдемо ЛИШЕ до/від зупинок —
+ * жодних "пішохідних" ділянок замість реальної пересадки на транспорт.
+ */
 const nearbyStopsMap = new Map<string, { stop: StopItem; walkM: number }[]>();
 for (const a of stopsData) {
   const nearby: { stop: StopItem; walkM: number }[] = [];
   for (const b of stopsData) {
     if (a.id === b.id) continue;
     const walkM = distanceMetersLatLng(a.position.lat, a.position.lng, b.position.lat, b.position.lng);
-    if (walkM <= MAX_TRANSFER_WALK_M) nearby.push({ stop: b, walkM });
+    if (walkM <= TRANSFER_WALK_RADIUS_M) nearby.push({ stop: b, walkM });
   }
   nearby.sort((x, y) => x.walkM - y.walkM);
-  nearbyStopsMap.set(a.id, nearby.slice(0, 8));
+  nearbyStopsMap.set(a.id, nearby.slice(0, MAX_NEARBY_TRANSFER_CANDIDATES));
 }
 
+/**
+ * Повертає всіх зупинок-кандидатів на пересадку з даної зупинки: саму
+ * зупинку (пересадка без ходьби, якщо другий маршрут теж її обслуговує),
+ * явні пересадочні вузли метро (пріоритетно — це реальні перевірені
+ * підземні переходи) та будь-які інші найближчі зупинки БУДЬ-ЯКОГО виду
+ * транспорту в межах `TRANSFER_WALK_RADIUS_M` — саме це дозволяє пересідати
+ * з тролейбуса на автобус, трамвай чи метро і навпаки, а не лише в межах
+ * одного й того самого маршруту чи однієї зупинки.
+ */
 function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number }[] {
   const result: { stop: StopItem; walkM: number }[] = [{ stop, walkM: 0 }];
   const seen = new Set<string>([stop.id]);
@@ -192,241 +363,313 @@ function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number 
   return result;
 }
 
-// --- РОЗРАХУНОК ДИНАМІЧНОГО ОЧІКУВАННЯ ТА ЧАСУ РУХУ ---
-function calculateWaitTime(route: RouteItem, arrivalTimeMinutes: number): number {
-  const interval = Math.max(route.intervalMinutes || 10, 3);
-  const phaseSeed = route.id.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const cycleTime = (arrivalTimeMinutes + phaseSeed) % interval;
-  const wait = (interval - cycleTime) % interval;
-  return Math.max(wait, 1.5); // мінімум 1.5 хв на посадку
+export interface TripLeg {
+  route: RouteItem;
+  /** Напрямок руху цієї ділянки (кінцева/назва) — див. RouteDirectionVariant. */
+  headsign: string;
+  /** Впорядкована послідовність зупинок ІМЕННО цього напрямку — коректна
+   *  основа для підрахунку кількості зупинок і малювання шляху на карті
+   *  (route.stopIds завжди відповідає лише напрямку "туди"). */
+  directionStopIds: string[];
+  boardStop: StopItem;
+  alightStop: StopItem;
+  /** Пішки від виходу з попередньої ділянки до посадки на цю (перехід між
+   *  двома різними, але пов'язаними пересадочними станціями, напр. метро). */
+  transferWalkFromM?: number;
+  /** Реальна геометрія цього пішого переходу вздовж вуличної мережі OSM
+   *  (заповнюється refineTripPlansWithOSM) — без неї карта раніше малювала
+   *  пряму лінію "навпростець" через будівлі/річку. */
+  transferWalkPath?: [number, number][];
 }
 
-function calculateRideDuration(kind: TransportKind, stopsCount: number): number {
-  return stopsCount * MINUTES_PER_STOP[kind];
+export interface TripPlan {
+  /** Одна ділянка — пряма поїздка; дві — з однією пересадкою. */
+  legs: TripLeg[];
+  /** Пішки від точки "Звідки" до першої зупинки посадки. */
+  boardWalkM: number;
+  /** Пішки від останньої зупинки виходу до точки "Куди". */
+  alightWalkM: number;
+  transfersCount: number;
+  /** Орієнтовний загальний час поїздки, хв: ходьба + очікування + сам рух + пересадка. */
+  estimatedMinutes: number;
+  /** Реальна геометрія пішого шляху "Звідки" → перша зупинка посадки,
+   *  вздовж вуличної мережі OSM (заповнюється refineTripPlansWithOSM). */
+  boardWalkPath?: [number, number][];
+  /** Те саме для ділянки "остання зупинка виходу" → "Куди". */
+  alightWalkPath?: [number, number][];
 }
 
-// --- МАТЕМАТИКА ПАРЕТО-ФІЛЬТРАЦІЇ ---
-function filterParetoOptimal(plans: TripPlan[]): TripPlan[] {
-  const isDominated = (a: TripPlan, b: TripPlan) => {
-    // B домінує A, якщо B строго кращий або рівний за всіма 3 параметрами і кращий хоча б в одному
-    const timeBetterOrEqual = b.estimatedMinutes <= a.estimatedMinutes;
-    const transfersBetterOrEqual = b.transfersCount <= a.transfersCount;
-    const walkBetterOrEqual = b.totalWalkM <= a.totalWalkM;
+const WALK_SPEED_M_PER_MIN = 80; // ≈4.8 км/год — середній пішохідний темп у місті
+const TRANSFER_PENALTY_MIN = 3; // час на орієнтування/вихід на пересадці, окрім самої ходьби
+const MIN_WAIT_MIN = 2;
+const MAX_WAIT_MIN = 12;
 
-    const strictlyBetterInOne =
-      b.estimatedMinutes < a.estimatedMinutes ||
-      b.transfersCount < a.transfersCount ||
-      b.totalWalkM < a.totalWalkM;
+/** Середній час "перегону" між сусідніми зупинками (хв), включно з зупинкою на посадку/висадку. */
+const MINUTES_PER_STOP: Record<TransportKind, number> = {
+  metro: 2.0,
+  tram: 2.3,
+  trolleybus: 2.1,
+  bus: 1.9
+};
 
-    return timeBetterOrEqual && transfersBetterOrEqual && walkBetterOrEqual && strictlyBetterInOne;
-  };
-
-  const pareto = plans.filter((planA) => !plans.some((planB) => isDominated(planA, planB)));
-
-  // Додаємо smart-теги для UI
-  if (pareto.length > 0) {
-    let minTime = Infinity;
-    let minTransfers = Infinity;
-    let minWalk = Infinity;
-
-    pareto.forEach((p) => {
-      if (p.estimatedMinutes < minTime) minTime = p.estimatedMinutes;
-      if (p.transfersCount < minTransfers) minTransfers = p.transfersCount;
-      if (p.totalWalkM < minWalk) minWalk = p.totalWalkM;
-    });
-
-    pareto.forEach((p) => {
-      p.tags = {
-        isFastest: p.estimatedMinutes === minTime,
-        isFewestTransfers: p.transfersCount === minTransfers,
-        isLeastWalking: p.totalWalkM === minWalk
-      };
-    });
-  }
-
-  return pareto;
+/** Кількість зупинок, які фактично проїде пасажир на цій ділянці (за позицією в directionStopIds — коректному напрямку). */
+function stopsRiddenOnLeg(leg: TripLeg): number {
+  const boardIdx = leg.directionStopIds.indexOf(leg.boardStop.id);
+  const alightIdx = leg.directionStopIds.indexOf(leg.alightStop.id);
+  if (boardIdx === -1 || alightIdx === -1 || boardIdx === alightIdx) return 5; // розумний дефолт, якщо індекс не знайдено
+  return Math.abs(alightIdx - boardIdx);
 }
 
-// --- ГОЛОВНИЙ АЛГОРИТМ ПОБУДОВИ МАРШРУТІВ (ULTRA ROUTER) ---
-export function buildTripPlans(
-  fromLat: number,
-  fromLng: number,
+/**
+ * Орієнтовний час усієї поїздки в хвилинах: ходьба (по прямій або, після
+ * refineTripPlansWithOSM, по вуличній мережі) + очікування транспорту
+ * (половина інтервалу руху, в розумних межах) + сам рух по маршруту
+ * (кількість зупинок × середній час перегону для цього виду транспорту) +
+ * штраф за пересадку. Це і є головна "розумна" метрика ранжування — не
+ * просто "хто ближче пішки", а хто реально довезе швидше.
+ */
+export function estimateTripMinutes(plan: TripPlan): number {
+  let minutes = (plan.boardWalkM + plan.alightWalkM) / WALK_SPEED_M_PER_MIN;
+
+  plan.legs.forEach((leg, i) => {
+    const wait = Math.min(MAX_WAIT_MIN, Math.max(MIN_WAIT_MIN, (leg.route.intervalMinutes || 10) / 2));
+    minutes += wait + stopsRiddenOnLeg(leg) * MINUTES_PER_STOP[leg.route.kind];
+    if (i > 0) {
+      minutes += TRANSFER_PENALTY_MIN + (leg.transferWalkFromM ?? 0) / WALK_SPEED_M_PER_MIN;
+    }
+  });
+
+  return Math.round(minutes);
+}
+
+/** Максимальна кількість "третіх ніг" (route3), що переглядаються на
+ *  кожну незавершену 2-леговую гілку — тримає O(routes^3) під контролем:
+ *  третій етап пошуку запускається ЛИШЕ для тих 2-легових кандидатів, чия
+ *  висадка не дотягнула до пункту призначення в межах поточного радіуса. */
+const MAX_THIRD_LEG_ATTEMPTS_PER_BRANCH = 40;
+
+/**
+ * Намагається "дотягнути" незавершену поїздку (1 або 2 ноги вже відомі,
+ * остання висадка — `fromStop`) до пункту призначення ще однією ногою.
+ * Повертає найкращий (найближчий до `toLat/toLng`) валідний варіант
+ * серед усіх маршрутів/напрямків, доступних із зупинок-кандидатів на
+ * пересадку біля `fromStop` (сама зупинка + пішохідні сусіди +
+ * пересадочні вузли метро) — окрім маршрутів, уже використаних раніше
+ * в цій поїздці (`excludeRouteIds`), щоб не "пересідати" на той самий
+ * маршрут або їхати назад тим самим шляхом.
+ */
+function bestNextLeg(
+  fromStop: StopItem,
+  excludeRouteIds: Set<string>,
   toLat: number,
-  toLng: number,
-  maxOptions = 5
-): TripPlan[] {
-  const now = new Date();
-  const startTimeMinutes = now.getHours() * 60 + now.getMinutes();
+  toLng: number
+): {
+  route: RouteItem;
+  direction: RouteDirectionVariant;
+  boardStop: StopItem;
+  boardWalkM: number;
+  alightStop: StopItem;
+  alightDist: number;
+} | null {
+  let best: {
+    route: RouteItem;
+    direction: RouteDirectionVariant;
+    boardStop: StopItem;
+    boardWalkM: number;
+    alightStop: StopItem;
+    alightDist: number;
+  } | null = null;
+  let attempts = 0;
 
-  // 1. Знаходимо початкові та кінцеві зупинки від точок користувача
-  const originStops = stopsData
-    .map((s) => ({
-      stop: s,
-      dist: distanceMetersLatLng(fromLat, fromLng, s.position.lat, s.position.lng)
-    }))
-    .filter((s) => s.dist <= MAX_WALK_TO_FIRST_STOP_M)
-    .sort((a, b) => a.dist - b.dist);
+  for (const candidate of getTransferCandidates(fromStop)) {
+    for (const routeId of candidate.stop.routeIds) {
+      if (excludeRouteIds.has(routeId)) continue;
+      const route = routesData.find((r) => r.id === routeId);
+      if (!route) continue;
 
-  const destinationStops = stopsData
-    .map((s) => ({
-      stop: s,
-      dist: distanceMetersLatLng(toLat, toLng, s.position.lat, s.position.lng)
-    }))
-    .filter((s) => s.dist <= MAX_WALK_FROM_LAST_STOP_M)
-    .sort((a, b) => a.dist - b.dist);
-
-  if (originStops.length === 0 || destinationStops.length === 0) return [];
-
-  const destinationStopsMap = new Map<string, number>();
-  destinationStops.forEach((d) => destinationStopsMap.set(d.stop.id, d.dist));
-
-  const rawPlans: TripPlan[] = [];
-  const visitedState = new Map<string, number>(); // routeId+direction+stopId -> minArrivalTime
-
-  // --- РАУНД 1: ПРЯМІ МАРШРУТИ (DIRECT LEGS) ---
-  for (const origin of originStops) {
-    const walkTimeToBoard = origin.dist / WALK_SPEED_M_PER_MIN;
-    const arrivalAtBoard = startTimeMinutes + walkTimeToBoard;
-
-    for (const route of routesData) {
       for (const direction of getRouteDirections(route)) {
-        const boardIdx = direction.stopIds.indexOf(origin.stop.id);
+        const boardIdx = direction.stopIds.indexOf(candidate.stop.id);
         if (boardIdx === -1) continue;
+        if (attempts++ > MAX_THIRD_LEG_ATTEMPTS_PER_BRANCH) return best;
 
-        const waitTime = calculateWaitTime(route, arrivalAtBoard);
-        const departTime = arrivalAtBoard + waitTime;
-
-        for (let alightIdx = boardIdx + 1; alightIdx < direction.stopIds.length; alightIdx++) {
-          const alightStopId = direction.stopIds[alightIdx];
-          const alightStop = stopsMap.get(alightStopId);
-          if (!alightStop) continue;
-
-          const stopsRidden = alightIdx - boardIdx;
-          const rideDuration = calculateRideDuration(route.kind, stopsRidden);
-          const arrivalAtAlight = departTime + rideDuration;
-
-          // Запам'ятовуємо найшвидший час прибуття для раунду 2
-          const stateKey = `${route.id}|${alightStopId}`;
-          if (!visitedState.has(stateKey) || visitedState.get(stateKey)! > arrivalAtAlight) {
-            visitedState.set(stateKey, arrivalAtAlight);
-          }
-
-          // Перевіряємо чи є ця зупинка фінішною
-          if (destinationStopsMap.has(alightStopId)) {
-            const alightWalkM = destinationStopsMap.get(alightStopId)!;
-            const walkTimeToDest = alightWalkM / WALK_SPEED_M_PER_MIN;
-            const totalTripTime = arrivalAtAlight + walkTimeToDest - startTimeMinutes;
-
-            rawPlans.push({
-              legs: [
-                {
-                  route,
-                  headsign: direction.headsign,
-                  directionStopIds: direction.stopIds,
-                  boardStop: origin.stop,
-                  alightStop,
-                  boardTimeMin: arrivalAtBoard,
-                  alightTimeMin: arrivalAtAlight,
-                  rideDurationMin: rideDuration,
-                  waitTimeMin: waitTime
-                }
-              ],
-              boardWalkM: origin.dist,
-              alightWalkM,
-              transfersCount: 0,
-              estimatedMinutes: Math.round(totalTripTime),
-              totalWalkM: Math.round(origin.dist + alightWalkM)
-            });
-          }
+        let bestAlight: { stop: StopItem; dist: number } | null = null;
+        for (let j = boardIdx + 1; j < direction.stopIds.length; j++) {
+          const s = stopsMap.get(direction.stopIds[j]);
+          if (!s) continue;
+          const dist = distanceMetersLatLng(toLat, toLng, s.position.lat, s.position.lng);
+          if (!bestAlight || dist < bestAlight.dist) bestAlight = { stop: s, dist };
+        }
+        if (!bestAlight) continue;
+        if (!best || bestAlight.dist < best.alightDist) {
+          best = {
+            route,
+            direction,
+            boardStop: candidate.stop,
+            boardWalkM: candidate.walkM,
+            alightStop: bestAlight.stop,
+            alightDist: bestAlight.dist
+          };
         }
       }
     }
   }
 
-  // --- РАУНД 2: МАРШРУТИ З ОДНІЄЮ ПЕРЕСАДКОЮ (1-TRANSFER LEGS) ---
-  // Запускаємо пошук пересадки тільки якщо потрібні ще варіанти або прямих замало
-  for (const origin of originStops) {
-    const walkTimeToBoard1 = origin.dist / WALK_SPEED_M_PER_MIN;
-    const arrivalAtBoard1 = startTimeMinutes + walkTimeToBoard1;
+  return best;
+}
+
+/**
+ * Будує варіанти поїздки громадським транспортом між двома точками:
+ * прямі маршрути, з ОДНІЄЮ пересадкою і, якщо навіть так до пункту
+ * призначення не дотягнутись у розумному радіусі (маршрут іде через
+ * увесь центр, і потрібно двічі змінити транспорт — типова ситуація у
+ * "топових" застосунках на кшталт Google Maps/2GIS/Citymapper), — з
+ * ДВОМА пересадками. Кожна наступна нога шукається жадібно (найближча
+ * до мети висадка серед доступних маршрутів на зупинках-кандидатах), що
+ * тримає час пошуку прийнятним навіть при O(маршрутів) у кубі в гіршому
+ * випадку — третя нога переглядається лише для незавершених гілок.
+ */
+export function buildTripPlans(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+  maxOptions = 6
+): TripPlan[] {
+  const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions).map((o): TripPlan => {
+    const plan: TripPlan = {
+      legs: [
+        {
+          route: o.route,
+          headsign: o.headsign,
+          directionStopIds: o.directionStopIds,
+          boardStop: o.boardStop,
+          alightStop: o.alightStop
+        }
+      ],
+      boardWalkM: o.boardDistanceM,
+      alightWalkM: o.alightDistanceM,
+      transfersCount: 0,
+      estimatedMinutes: 0
+    };
+    plan.estimatedMinutes = estimateTripMinutes(plan);
+    return plan;
+  });
+
+  // Пряму поїздку шукаємо ширшим "бюджетом" пересадкових варіантів лише
+  // тоді, коли прямих замало АБО коли найкращий прямий варіант виявляється
+  // повільнішим за типову поїздку з пересадкою — раніше пересадка взагалі
+  // не розглядалась, якщо прямих маршрутів було достатньо за кількістю,
+  // навіть якщо кожен з них об'їжджав пів міста.
+  const bestDirectMinutes = direct.length > 0 ? Math.min(...direct.map((p) => p.estimatedMinutes)) : Infinity;
+  if (direct.length >= maxOptions && bestDirectMinutes <= 25) {
+    return direct.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
+  }
+
+  const RADII_M = [700, 1200, 2200];
+  let transferPlans: TripPlan[] = [];
+
+  for (const radius of RADII_M) {
+    const candidates: TripPlan[] = [];
+    const seenPairs = new Set<string>();
 
     for (const route1 of routesData) {
       for (const direction1 of getRouteDirections(route1)) {
-        const boardIdx1 = direction1.stopIds.indexOf(origin.stop.id);
-        if (boardIdx1 === -1) continue;
+        const board = nearestStopInDirection(direction1, fromLat, fromLng);
+        if (!board || board.dist > radius) continue;
 
-        const waitTime1 = calculateWaitTime(route1, arrivalAtBoard1);
-        const departTime1 = arrivalAtBoard1 + waitTime1;
+        // Пересадкою може бути лише зупинка, що йде ПІСЛЯ посадки в
+        // порядку руху цього напрямку — інакше транспорт мав би заїхати
+        // туди до того, як забрав пасажира.
+        for (let idx = board.idx + 1; idx < direction1.stopIds.length; idx++) {
+          const transferStop = stopsMap.get(direction1.stopIds[idx]);
+          if (!transferStop) continue;
 
-        for (let alightIdx1 = boardIdx1 + 1; alightIdx1 < direction1.stopIds.length; alightIdx1++) {
-          const transferStop1 = stopsMap.get(direction1.stopIds[alightIdx1]);
-          if (!transferStop1) continue;
-
-          const rideDuration1 = calculateRideDuration(route1.kind, alightIdx1 - boardIdx1);
-          const arrivalAtTransfer1 = departTime1 + rideDuration1;
-
-          // Отримуємо всі доступні зупинки для пересадки поруч
-          for (const transferCandidate of getTransferCandidates(transferStop1)) {
-            const transferWalkTime = transferCandidate.walkM / WALK_SPEED_M_PER_MIN;
-            const arrivalAtBoard2 = arrivalAtTransfer1 + TRANSFER_INITIAL_BUFFER_MIN + transferWalkTime;
-
-            for (const routeId2 of transferCandidate.stop.routeIds) {
-              if (routeId2 === route1.id) continue; // Уникаємо пересадки на той самий маршрут
+          // Пересадка можлива або на цій самій зупинці (routeId2 в її
+          // routeIds), або на пов'язаній пересадочній станції поруч
+          // (напр. метро: Майдан Конституції ↔ Історичний музей).
+          for (const candidate of getTransferCandidates(transferStop)) {
+            for (const routeId2 of candidate.stop.routeIds) {
+              if (routeId2 === route1.id) continue;
               const route2 = routesData.find((r) => r.id === routeId2);
               if (!route2) continue;
 
               for (const direction2 of getRouteDirections(route2)) {
-                const boardIdx2 = direction2.stopIds.indexOf(transferCandidate.stop.id);
+                const boardIdx2 = direction2.stopIds.indexOf(candidate.stop.id);
                 if (boardIdx2 === -1) continue;
 
-                const waitTime2 = calculateWaitTime(route2, arrivalAtBoard2);
-                const departTime2 = arrivalAtBoard2 + waitTime2;
+                let bestAlight: { stop: StopItem; dist: number; idx: number } | null = null;
+                for (let j = boardIdx2 + 1; j < direction2.stopIds.length; j++) {
+                  const s = stopsMap.get(direction2.stopIds[j]);
+                  if (!s) continue;
+                  const dist = distanceMetersLatLng(toLat, toLng, s.position.lat, s.position.lng);
+                  if (!bestAlight || dist < bestAlight.dist) bestAlight = { stop: s, dist, idx: j };
+                }
+                if (!bestAlight) continue;
 
-                for (let alightIdx2 = boardIdx2 + 1; alightIdx2 < direction2.stopIds.length; alightIdx2++) {
-                  const alightStopId2 = direction2.stopIds[alightIdx2];
-                  if (!destinationStopsMap.has(alightStopId2)) continue;
+                const pairKey = `${route1.id}|${direction1.headsign}|${transferStop.id}|${candidate.stop.id}|${route2.id}|${direction2.headsign}`;
+                if (seenPairs.has(pairKey)) continue;
+                seenPairs.add(pairKey);
 
-                  const alightStop2 = stopsMap.get(alightStopId2);
-                  if (!alightStop2) continue;
+                const leg1: TripLeg = {
+                  route: route1,
+                  headsign: direction1.headsign,
+                  directionStopIds: direction1.stopIds,
+                  boardStop: board.stop,
+                  alightStop: transferStop
+                };
+                const leg2: TripLeg = {
+                  route: route2,
+                  headsign: direction2.headsign,
+                  directionStopIds: direction2.stopIds,
+                  boardStop: candidate.stop,
+                  alightStop: bestAlight.stop,
+                  transferWalkFromM: candidate.walkM
+                };
 
-                  const rideDuration2 = calculateRideDuration(route2.kind, alightIdx2 - boardIdx2);
-                  const arrivalAtAlight2 = departTime2 + rideDuration2;
-
-                  const alightWalkM = destinationStopsMap.get(alightStopId2)!;
-                  const walkTimeToDest = alightWalkM / WALK_SPEED_M_PER_MIN;
-                  const totalTripTime = arrivalAtAlight2 + walkTimeToDest - startTimeMinutes;
-
-                  rawPlans.push({
-                    legs: [
-                      {
-                        route: route1,
-                        headsign: direction1.headsign,
-                        directionStopIds: direction1.stopIds,
-                        boardStop: origin.stop,
-                        alightStop: transferStop1,
-                        boardTimeMin: arrivalAtBoard1,
-                        alightTimeMin: arrivalAtTransfer1,
-                        rideDurationMin: rideDuration1,
-                        waitTimeMin: waitTime1
-                      },
-                      {
-                        route: route2,
-                        headsign: direction2.headsign,
-                        directionStopIds: direction2.stopIds,
-                        boardStop: transferCandidate.stop,
-                        alightStop: alightStop2,
-                        boardTimeMin: arrivalAtBoard2,
-                        alightTimeMin: arrivalAtAlight2,
-                        rideDurationMin: rideDuration2,
-                        waitTimeMin: waitTime2,
-                        transferWalkFromM: transferCandidate.walkM
-                      }
-                    ],
-                    boardWalkM: origin.dist,
-                    alightWalkM,
+                if (bestAlight.dist <= radius) {
+                  // Двох ніг досить — висадка вже в межах пішохідної відстані від мети.
+                  const plan: TripPlan = {
+                    legs: [leg1, leg2],
+                    boardWalkM: board.dist,
+                    alightWalkM: bestAlight.dist,
                     transfersCount: 1,
-                    estimatedMinutes: Math.round(totalTripTime),
-                    totalWalkM: Math.round(origin.dist + alightWalkM + transferCandidate.walkM)
-                  });
+                    estimatedMinutes: 0
+                  };
+                  plan.estimatedMinutes = estimateTripMinutes(plan);
+                  candidates.push(plan);
+                } else if (bestAlight.dist <= radius * 3) {
+                  // Не дотягнули навіть у розширеному радіусі — пробуємо
+                  // третю ногу (друга пересадка) з поточної точки висадки.
+                  const third = bestNextLeg(
+                    bestAlight.stop,
+                    new Set([route1.id, route2.id]),
+                    toLat,
+                    toLng
+                  );
+                  if (!third || third.alightDist > radius) continue;
+
+                  const leg3: TripLeg = {
+                    route: third.route,
+                    headsign: third.direction.headsign,
+                    directionStopIds: third.direction.stopIds,
+                    boardStop: third.boardStop,
+                    alightStop: third.alightStop,
+                    transferWalkFromM: third.boardWalkM
+                  };
+
+                  const tripleKey = `${pairKey}|${third.route.id}|${third.direction.headsign}|${third.boardStop.id}`;
+                  if (seenPairs.has(tripleKey)) continue;
+                  seenPairs.add(tripleKey);
+
+                  const plan: TripPlan = {
+                    legs: [leg1, leg2, leg3],
+                    boardWalkM: board.dist,
+                    alightWalkM: third.alightDist,
+                    transfersCount: 2,
+                    estimatedMinutes: 0
+                  };
+                  plan.estimatedMinutes = estimateTripMinutes(plan);
+                  candidates.push(plan);
                 }
               }
             }
@@ -434,25 +677,64 @@ export function buildTripPlans(
         }
       }
     }
+
+    if (candidates.length > 0) {
+      transferPlans = candidates.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
+      break;
+    }
   }
 
-  // --- ФІЛЬТРАЦІЯ ТА ВІДБІР КРАЩИХ МАРШРУТІВ ---
-  const paretoOptimalPlans = filterParetoOptimal(rawPlans);
+  // Фінальне ранжування — усі варіанти (прямі й з пересадкою) разом,
+  // за реальним орієнтовним часом у дорозі. Раніше прямі маршрути завжди
+  // йшли першими незалежно від того, скільки часу вони насправді займали.
+  const allPlans = [...direct, ...transferPlans].sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
 
-  return paretoOptimalPlans
-    .sort((a, b) => a.estimatedMinutes - b.estimatedMinutes)
-    .slice(0, maxOptions);
+  // "Розумне" ранжування, як у топових застосунках: не просто N
+  // найшвидших підряд (вони можуть виявитись 6 варіантами тієї самої
+  // пересадки з мінімальними відхиленнями), а найшвидший варіант для
+  // КОЖНОЇ кількості пересадок (0, 1, 2) — навіть якщо він трохи
+  // повільніший за глобально найшвидший — плюс решта топ-варіантів за
+  // часом. Це дає пасажиру реальний вибір "швидше, але з пересадкою" чи
+  // "довше, зате без пересадок", а не ілюзію вибору з майже однакових
+  // варіантів.
+  const picked: TripPlan[] = [];
+  const pickedKeys = new Set<string>();
+  const planKey = (p: TripPlan) => p.legs.map((l) => `${l.route.id}:${l.boardStop.id}:${l.alightStop.id}`).join('>');
+
+  for (const transfers of [0, 1, 2]) {
+    const bestForTransfers = allPlans.find((p) => p.transfersCount === transfers);
+    if (bestForTransfers) {
+      const key = planKey(bestForTransfers);
+      if (!pickedKeys.has(key)) {
+        pickedKeys.add(key);
+        picked.push(bestForTransfers);
+      }
+    }
+  }
+
+  for (const plan of allPlans) {
+    if (picked.length >= maxOptions) break;
+    const key = planKey(plan);
+    if (pickedKeys.has(key)) continue;
+    pickedKeys.add(key);
+    picked.push(plan);
+  }
+
+  return picked.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
 }
 
-// Хелпери експорту
 export const localRoutes = {
   all: (): RouteItem[] => routesData,
   getById: (id: string): RouteItem | undefined => routesData.find((r) => r.id === id),
   getByKind: (kind: TransportKind): RouteItem[] => routesData.filter((r) => r.kind === kind),
   search: (query: string): RouteItem[] => {
     const q = query.toLowerCase();
-    return routesData.filter((r) => r.number.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+    return routesData.filter(
+      (r) => r.number.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    );
   },
+  buildTrip: (fromLat: number, fromLng: number, toLat: number, toLng: number): TripOption[] =>
+    buildTripOptions(fromLat, fromLng, toLat, toLng),
   buildTripPlans: (fromLat: number, fromLng: number, toLat: number, toLng: number): TripPlan[] =>
     buildTripPlans(fromLat, fromLng, toLat, toLng)
 };
@@ -463,5 +745,56 @@ export const localStops = {
   search: (query: string): StopItem[] => {
     const q = query.toLowerCase();
     return stopsData.filter((s) => s.name.toLowerCase().includes(q));
+  },
+  getNearby: (lat: number, lng: number, maxDistance = 1000): StopItem[] => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const distanceMeters = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+      const R = 6371000;
+      const dLat = toRad(bLat - aLat);
+      const dLng = toRad(bLng - aLng);
+      const la1 = toRad(aLat);
+      const la2 = toRad(bLat);
+      const x = dLng * Math.cos((la1 + la2) / 2);
+      const y = dLat;
+      return Math.sqrt(x * x + y * y) * R;
+    };
+    return stopsData
+      .filter((s) => distanceMeters(lat, lng, s.position.lat, s.position.lng) <= maxDistance)
+      .sort(
+        (a, b) =>
+          distanceMeters(lat, lng, a.position.lat, a.position.lng) -
+          distanceMeters(lat, lng, b.position.lat, b.position.lng)
+      );
+  },
+  // Симулює найближчі прибуття для кожного маршруту, що проходить через зупинку,
+  // на основі реального інтервалу руху (intervalMinutes) та поточного часу доби.
+  getArrivals: (stopId: string): { routeId: string; etaMinutes: number }[] => {
+    const stop = stopsData.find((s) => s.id === stopId);
+    if (!stop) return [];
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return stop.routeIds
+      .map((routeId) => {
+        const route = routesData.find((r) => r.id === routeId);
+        if (!route) return null;
+
+        const [fromH, fromM] = route.firstDeparture.split(':').map(Number);
+        const [toH, toM] = route.lastDeparture.split(':').map(Number);
+        const startMinutes = fromH * 60 + fromM;
+        const endMinutes = toH * 60 + toM;
+        if (nowMinutes < startMinutes || nowMinutes > endMinutes) return null;
+
+        const interval = Math.max(route.intervalMinutes || 10, 3);
+        // Детермінований, але відмінний для кожного маршруту зсув фази,
+        // щоб борти на одній зупинці не прибували всі одночасно.
+        const phaseSeed = routeId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+        const minutesIntoInterval = (nowMinutes + phaseSeed) % interval;
+        const etaMinutes = interval - minutesIntoInterval;
+
+        return { routeId, etaMinutes: etaMinutes === interval ? 0 : etaMinutes };
+      })
+      .filter((a): a is { routeId: string; etaMinutes: number } => a !== null);
   }
 };
