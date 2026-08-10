@@ -22,6 +22,117 @@ function dominantKind(kinds: TransportKind[]): TransportKind {
   return kinds[0] ?? 'bus';
 }
 
+function sqDist(a: [number, number], b: [number, number]): number {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  return dx * dx + dy * dy;
+}
+
+/**
+ * ГОЛОВНИЙ ФІКС: раніше геометрія маршруту (масив із декількох KML-ліній,
+ * зазвичай "туди" + "назад") просто "сплющувалась" в один список точок
+ * (`.flat()`), а зупинки посадки/висадки шукались як НАЙБЛИЖЧА точка в
+ * усьому цьому сплющеному масиві незалежно одна від одної. Через це на
+ * кільцевих/петльових маршрутах (а майже всі маршрути Харкова — саме
+ * такі: 2 KML-лінії, що фізично з'єднуються в одну петлю) посадка й
+ * висадка часто "прилипали" до різних, непослідовних ліній — і замість
+ * шматка реальної вулиці малювалась пряма лінія напряму через місто
+ * (найкоротший фолбек `coords.length < 2 → [board, alight]`) або
+ * "розірваний" шлях, що телепортується.
+ *
+ * Тут дві зміни:
+ *  1) `connectGeometrySegments` з'єднує KML-лінії в один суцільний шлях
+ *     у правильному порядку/орієнтації (за збігом кінцевих точок), а не
+ *     просто конкатенує їх як є.
+ *  2) `matchStopsMonotonic` прив'язує ВСІ зупинки напрямку (а не лише
+ *     дві — посадку й висадку) до цього шляху по порядку, з пошуком
+ *     "тільки вперед" від попередньої знайденої точки. Це використовує
+ *     вже відомий порядок зупинок маршруту, щоб однозначно розв'язати
+ *     неоднозначність на петлях/самоперетинах — головна причина, чому
+ *     раніше посадка й висадка могли "збитись" на різні гілки маршруту.
+ */
+function connectGeometrySegments(segments: [number, number][][]): [number, number][] {
+  if (segments.length === 0) return [];
+  let path: [number, number][] = [...segments[0]];
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg.length === 0) continue;
+    const tail = path[path.length - 1];
+    const distToStart = sqDist(tail, seg[0]);
+    const distToEnd = sqDist(tail, seg[seg.length - 1]);
+    const oriented = distToEnd < distToStart ? [...seg].reverse() : seg;
+    // Уникаємо дубльованої точки стику, якщо кінці збігаються.
+    const startFrom = sqDist(tail, oriented[0]) < 1e-12 ? 1 : 0;
+    path = path.concat(oriented.slice(startFrom));
+  }
+  return path;
+}
+
+interface StopMatch {
+  indices: number[];
+  totalError: number;
+}
+
+/** Прив'язує впорядкований список координат зупинок до шляху, гарантуючи
+ *  НЕ спадний порядок індексів (пошук найближчої точки лише "вперед" від
+ *  позиції попередньої зупинки) — саме це усуває неоднозначність на
+ *  петлях, де кілька зупинок можуть бути геометрично близькі до однієї й
+ *  тієї самої точки полілінії. */
+function matchStopsMonotonic(path: [number, number][], stopCoords: [number, number][]): StopMatch {
+  const indices: number[] = [];
+  let totalError = 0;
+  let searchStart = 0;
+  for (const coord of stopCoords) {
+    let bestIdx = searchStart;
+    let bestD = Infinity;
+    for (let i = searchStart; i < path.length; i++) {
+      const d = sqDist(path[i], coord);
+      if (d < bestD) {
+        bestD = d;
+        bestIdx = i;
+      }
+    }
+    indices.push(bestIdx);
+    totalError += bestD;
+    searchStart = bestIdx;
+  }
+  return { indices, totalError };
+}
+
+const routePathCache = new Map<string, [number, number][]>();
+
+/** Повний, з'єднаний в один шлях контур маршруту (кеш на ключ геометрії). */
+function getConnectedRoutePath(key: string): [number, number][] | null {
+  const cached = routePathCache.get(key);
+  if (cached) return cached;
+  const segments = ROUTE_GEOMETRIES[key];
+  if (!segments || segments.length === 0) return null;
+  const path = connectGeometrySegments(segments);
+  routePathCache.set(key, path);
+  return path;
+}
+
+/**
+ * Прив'язує ВЕСЬ впорядкований список зупинок одного напрямку маршруту
+ * до реального шляху (пробуючи обидві орієнтації шляху — прямий і
+ * реверсований — і обираючи ту, що дає меншу сумарну похибку прив'язки),
+ * і повертає індекс уздовж цього шляху для кожної зупинки. Це
+ * розраховується один раз на весь напрямок, а не окремо для посадки й
+ * висадки — тому індекси для будь-якої пари зупинок цього напрямку
+ * узгоджені між собою (монотонні відносно порядку руху).
+ */
+function matchDirectionToPath(
+  path: [number, number][],
+  stopCoords: [number, number][]
+): { path: [number, number][]; indices: number[] } {
+  const forward = matchStopsMonotonic(path, stopCoords);
+  const reversedPath = [...path].reverse();
+  const backward = matchStopsMonotonic(reversedPath, stopCoords);
+  return backward.totalError < forward.totalError
+    ? { path: reversedPath, indices: backward.indices }
+    : { path, indices: forward.indices };
+}
+
 /**
  * Статичні шари маршрутів і зупинок на основі KML-даних.
  */
@@ -87,8 +198,9 @@ export function buildStopsGeoJson(visibleKinds?: TransportKind[]): FeatureCollec
  *
  * Ділянка транспорту малюється вздовж РЕАЛЬНОЇ геометрії маршруту (KML),
  * обрізаної між зупинкою посадки та зупинкою виходу — а не прямою лінією
- * між ними, — якщо геометрія для маршруту є; інакше — по прямій між
- * зупинками зі списку route.stopIds.
+ * між ними, — якщо геометрія для маршруту є; інакше — по послідовності
+ * зупинок цього напрямку; і лише як останній фолбек — пряма лінія між
+ * посадкою й висадкою.
  */
 export function buildTripPathGeoJson(
   plan: TripPlan,
@@ -124,31 +236,35 @@ export function buildTripPathGeoJson(
     const forward = alightIdx >= boardIdx;
     const [startIdx, endIdx] = forward ? [boardIdx, alightIdx] : [alightIdx, boardIdx];
 
-    const realGeometry = ROUTE_GEOMETRIES[geometryKey(leg.route.kind, leg.route.number)];
+    const connectedPath = getConnectedRoutePath(geometryKey(leg.route.kind, leg.route.number));
+    const boardCoord: [number, number] = [leg.boardStop.position.lng, leg.boardStop.position.lat];
+    const alightCoord: [number, number] = [leg.alightStop.position.lng, leg.alightStop.position.lat];
     let coords: [number, number][];
 
-    if (realGeometry && realGeometry.length > 0) {
-      const flat = realGeometry.flat();
-      const boardCoord: [number, number] = [leg.boardStop.position.lng, leg.boardStop.position.lat];
-      const alightCoord: [number, number] = [leg.alightStop.position.lng, leg.alightStop.position.lat];
+    if (connectedPath && connectedPath.length > 1 && startIdx !== -1 && endIdx !== -1) {
+      // Прив'язуємо ВЕСЬ напрямок (усі зупинки по порядку) до шляху одним
+      // проходом — це узгоджує посадку й висадку між собою й не дає їм
+      // "розбігтися" по різних гілках петльового маршруту (див. коментар
+      // вище над connectGeometrySegments/matchStopsMonotonic).
+      // Довжина й порядок мають лишитись 1:1 з stopSequence (щоб
+      // boardIdx/alightIdx залишались валідними індексами в `indices`),
+      // тож для зупинки без відомих координат підставляємо координати
+      // сусідньої відомої зупинки замість того, щоб її пропускати.
+      let lastKnownCoord: [number, number] = [leg.boardStop.position.lng, leg.boardStop.position.lat];
+      const orderedStopCoords: [number, number][] = stopSequence.map((id) => {
+        const s = localStops.getById(id);
+        if (s) lastKnownCoord = [s.position.lng, s.position.lat];
+        return lastKnownCoord;
+      });
 
-      const nearestIndex = (target: [number, number]) => {
-        let bestI = 0;
-        let bestD = Infinity;
-        flat.forEach((c, i) => {
-          const d = (c[0] - target[0]) ** 2 + (c[1] - target[1]) ** 2;
-          if (d < bestD) {
-            bestD = d;
-            bestI = i;
-          }
-        });
-        return bestI;
-      };
-
-      const iBoard = nearestIndex(boardCoord);
-      const iAlight = nearestIndex(alightCoord);
+      const { path: matchedPath, indices } = matchDirectionToPath(connectedPath, orderedStopCoords);
+      // indices вирівняні з тим самим порядком, що й stopSequence, тож
+      // boardIdx/alightIdx (позиції посадки/висадки в напрямку) звідси й
+      // беремо напряму — жодних окремих "найближчих точок" одна від одної.
+      const iBoard = indices[boardIdx];
+      const iAlight = indices[alightIdx];
       const [lo, hi] = iBoard <= iAlight ? [iBoard, iAlight] : [iAlight, iBoard];
-      const sliced = flat.slice(lo, hi + 1);
+      const sliced = matchedPath.slice(lo, hi + 1);
       coords = iBoard <= iAlight ? sliced : [...sliced].reverse();
       if (coords.length < 2) coords = [boardCoord, alightCoord];
     } else if (startIdx !== -1 && endIdx !== -1) {
