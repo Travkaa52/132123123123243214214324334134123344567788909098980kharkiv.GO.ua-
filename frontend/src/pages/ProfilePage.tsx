@@ -24,6 +24,7 @@ import {
 import { PageHeader } from '@/components/PageHeader';
 import { assetUrl } from '@/lib/assetUrl';
 import { openInExternalBrowser } from '@/lib/telegram';
+import { getInstallGuideUrl } from '@/lib/installGuide';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';

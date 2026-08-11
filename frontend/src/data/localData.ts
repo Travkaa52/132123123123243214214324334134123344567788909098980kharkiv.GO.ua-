@@ -298,6 +298,72 @@ const TRANSFER_WALK_RADIUS_M = 350; // реалістична пересадка
 const MAX_NEARBY_TRANSFER_CANDIDATES = 6; // на кожну зупинку — не більше N найближчих сусідів
 
 /**
+ * ДОДАТКОВИЙ КАНАЛ ПЕРЕСАДОК — за збігом НАЗВИ зупинки.
+ * -----------------------------------------------------------------------
+ * Реальний приклад, який раніше ламав побудову маршруту: тролейбус №13
+ * приїжджає на "Станція метро Захисників України" (зупинка тролейбуса/
+ * автобуса), а трамвай №27 зупиняється на зупинці з ТІЄЮ Ж НАЗВОЮ, але
+ * фізично на іншій стороні транспортного вузла — 380–420 м пішки. Це
+ * більше за TRANSFER_WALK_RADIUS_M (350 м), тож `nearbyStopsMap` така
+ * пересадка НЕ бачила, і роутер не пропонував пересісти з 13-го на 27-й
+ * навіть на кінцевій — хоча фізично це саме та точка, куди їде пасажир.
+ *
+ * Перевірка по всій базі зупинок показала: це не поодинокий випадок, а
+ * системна закономірність — десятки пар зупинок різних видів транспорту
+ * з ІДЕНТИЧНОЮ назвою (та сама станція метро, той самий перехрестя/зупинка
+ * "вулиця N") розташовані одна від одної в діапазоні 350–850 м.
+ *
+ * Просто підняти TRANSFER_WALK_RADIUS_M для ВСІХ зупинок небезпечно: на
+ * довгій вулиці зі спільною назвою (напр. "вул. Гвардійців Широнінців")
+ * зупинки на різних перехрестях тієї самої вулиці теж матимуть однакову
+ * назву, але це РІЗНІ, не пов'язані між собою зупинки за 700–850 м одна
+ * від одної — визнати їх пересадкою означало б пропонувати пасажиру
+ * "вийти і йти 10 хвилин вздовж вулиці на іншу зупинку з такою ж назвою".
+ *
+ * Тому збіг назви враховуємо ОКРЕМИМ, вужчим каналом:
+ *  - для станцій метро ("Станція метро …") — до 600 м: це справді єдиний
+ *    великий транспортний вузол з кількома виходами/платформами;
+ *  - для решти однаково названих зупинок — до 500 м: трохи ширше за
+ *    базовий радіус (350 м), саме щоб покрити випадки на кшталт описаного
+ *    вище, але не настільки широко, щоб зловити випадкові збіги назв на
+ *    різних кінцях довгої вулиці.
+ */
+const SAME_NAME_METRO_TRANSFER_RADIUS_M = 600;
+const SAME_NAME_TRANSFER_RADIUS_M = 500;
+
+function normalizeStopName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/['’"«»]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const sameNameTransferMap = new Map<string, { stop: StopItem; walkM: number }[]>();
+{
+  const byName = new Map<string, StopItem[]>();
+  for (const s of stopsData) {
+    const key = normalizeStopName(s.name);
+    if (!byName.has(key)) byName.set(key, []);
+    byName.get(key)!.push(s);
+  }
+  for (const [name, group] of byName) {
+    if (group.length < 2) continue;
+    const radius = name.includes('станція метро') ? SAME_NAME_METRO_TRANSFER_RADIUS_M : SAME_NAME_TRANSFER_RADIUS_M;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i];
+        const b = group[j];
+        const walkM = distanceMetersLatLng(a.position.lat, a.position.lng, b.position.lat, b.position.lng);
+        if (walkM > radius) continue;
+        sameNameTransferMap.set(a.id, [...(sameNameTransferMap.get(a.id) ?? []), { stop: b, walkM }]);
+        sameNameTransferMap.set(b.id, [...(sameNameTransferMap.get(b.id) ?? []), { stop: a, walkM }]);
+      }
+    }
+  }
+}
+
+/**
  * КРИТИЧНО ДЛЯ ПЕРЕСАДОК: генералізований індекс "яка зупинка поруч з якою
  * пішки", побудований для ВСІХ зупинок ВСІХ видів транспорту одразу —
  * автобус, тролейбус, трамвай, метро.
@@ -315,9 +381,10 @@ const MAX_NEARBY_TRANSFER_CANDIDATES = 6; // на кожну зупинку — 
  *
  * Тепер для кожної зупинки заздалегідь рахуємо всі інші зупинки (будь-якого
  * виду транспорту) в межах `TRANSFER_WALK_RADIUS_M` — і саме цей список
- * (разом із явними переходами метро) використовується як кандидати на
- * пересадку. Пішки в межах поїздки завжди йдемо ЛИШЕ до/від зупинок —
- * жодних "пішохідних" ділянок замість реальної пересадки на транспорт.
+ * (разом із явними переходами метро та пересадками за збігом назви,
+ * `sameNameTransferMap`) використовується як кандидати на пересадку. Пішки
+ * в межах поїздки завжди йдемо ЛИШЕ до/від зупинок — жодних "пішохідних"
+ * ділянок замість реальної пересадки на транспорт.
  */
 const nearbyStopsMap = new Map<string, { stop: StopItem; walkM: number }[]>();
 for (const a of stopsData) {
@@ -335,10 +402,12 @@ for (const a of stopsData) {
  * Повертає всіх зупинок-кандидатів на пересадку з даної зупинки: саму
  * зупинку (пересадка без ходьби, якщо другий маршрут теж її обслуговує),
  * явні пересадочні вузли метро (пріоритетно — це реальні перевірені
- * підземні переходи) та будь-які інші найближчі зупинки БУДЬ-ЯКОГО виду
- * транспорту в межах `TRANSFER_WALK_RADIUS_M` — саме це дозволяє пересідати
- * з тролейбуса на автобус, трамвай чи метро і навпаки, а не лише в межах
- * одного й того самого маршруту чи однієї зупинки.
+ * підземні переходи), зупинки з ІДЕНТИЧНОЮ назвою поруч (`sameNameTransferMap`
+ * — див. коментар вище, найтиповіше для станцій метро з кількома
+ * платформами різних видів транспорту) та будь-які інші найближчі зупинки
+ * БУДЬ-ЯКОГО виду транспорту в межах `TRANSFER_WALK_RADIUS_M` — саме це
+ * дозволяє пересідати з тролейбуса на автобус, трамвай чи метро і навпаки,
+ * а не лише в межах одного й того самого маршруту чи однієї зупинки.
  */
 function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number }[] {
   const result: { stop: StopItem; walkM: number }[] = [{ stop, walkM: 0 }];
@@ -354,6 +423,12 @@ function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number 
     });
   }
 
+  for (const candidate of sameNameTransferMap.get(stop.id) ?? []) {
+    if (seen.has(candidate.stop.id)) continue;
+    seen.add(candidate.stop.id);
+    result.push(candidate);
+  }
+
   for (const candidate of nearbyStopsMap.get(stop.id) ?? []) {
     if (seen.has(candidate.stop.id)) continue;
     seen.add(candidate.stop.id);
@@ -362,6 +437,7 @@ function getTransferCandidates(stop: StopItem): { stop: StopItem; walkM: number 
 
   return result;
 }
+
 
 export interface TripLeg {
   route: RouteItem;
