@@ -38,6 +38,7 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
+        id: base,
         name: 'Kharkiv GO',
         short_name: 'Kharkiv GO',
         description: 'Транспорт Харкова у реальному часі: маршрути, зупинки, метро, трамваї, тролейбуси та автобуси.',
