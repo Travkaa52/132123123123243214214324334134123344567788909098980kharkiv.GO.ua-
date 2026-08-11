@@ -87,7 +87,7 @@ self.addEventListener('fetch', (event) => {
         // тупикову заглушку "ця сторінка ще не завантажувалась раніше",
         // хоча сам застосунок (JS-бандл) уже давно лежав у кеші.
         try {
-          const shell = await shellHandler.handle({ event, request: new Request(indexUrl) });
+          const shell = await shellHandler({ event, request: new Request(indexUrl) });
           if (shell) return shell;
         } catch {
           // якщо навіть прекеш недоступний (щойно встановлений SW, ще
