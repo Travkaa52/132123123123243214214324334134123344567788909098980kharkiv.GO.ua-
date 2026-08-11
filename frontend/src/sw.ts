@@ -42,13 +42,26 @@ cleanupOutdatedCaches();
 // актуальний index.html з правильними посиланнями на чанки), і лише якщо
 // мережі немає — офлайн-фолбек із precache.
 // ---------------------------------------------------------------------------
-const offlineFallbackUrl = `${self.registration.scope}offline.html`;
+const scopeUrl = self.registration.scope;
+const indexUrl = `${scopeUrl}index.html`;
+const offlineFallbackUrl = `${scopeUrl}offline.html`;
 
 const navigationHandler = new NetworkFirst({
   cacheName: 'pages-cache',
-  networkTimeoutSeconds: 4,
+  // 4с раніше було замало для "холодного" відкриття НОВОЇ вкладки в
+  // зовнішньому браузері (саме так відкривається /install-app з кнопки в
+  // профілі) — DNS + TLS-рукостискання + перший запит на мобільній мережі
+  // легко перевищують 4с навіть при робочому інтернеті, і замість реальної
+  // сторінки користувач бачив "Немає з'єднання з інтернетом".
+  networkTimeoutSeconds: 8,
   plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })]
 });
+
+// Прекешований index.html (SPA-оболонка) як SPA-фолбек — окремий handler,
+// прив'язаний ІМЕННО до precache-запису (а не до pages-cache з попередніх
+// відвідувань), тож він гарантовано доступний з першого встановлення SW,
+// а не лише для сторінок, які вже колись успішно відкривались онлайн.
+const shellHandler = createHandlerBoundToURL(indexUrl);
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -61,8 +74,28 @@ self.addEventListener('fetch', (event) => {
         if (response) return response;
         throw new Error('no-response');
       } catch {
-        const cached = await self.caches.match(offlineFallbackUrl);
-        return cached ?? Response.error();
+        // ГОЛОВНИЙ ФІКС: до того, як показати "офлайн" — пробуємо
+        // віддати кешовану SPA-оболонку (index.html + вже завантажені
+        // JS/CSS-чанки). Це САМЕ ТОЙ ФАЙЛ, з якого React Router клієнтськи
+        // рендерить БУДЬ-ЯКИЙ маршрут застосунку (/install-app, /route/42,
+        // /stop/15 тощо) — тож навіть коли мережа справді недоступна або
+        // просто забракло 8с на відповідь конкретно ЦІЄЇ адреси, сам
+        // застосунок все одно відкриється і покаже потрібну сторінку.
+        // Раніше для БУДЬ-ЯКОЇ адреси, яку не встигли/не змогли закешувати
+        // саме під її власним URL раніше (а нова сторінка типу
+        // "/install-app" ще не встигла туди потрапити), користувач бачив
+        // тупикову заглушку "ця сторінка ще не завантажувалась раніше",
+        // хоча сам застосунок (JS-бандл) уже давно лежав у кеші.
+        try {
+          const shell = await shellHandler.handle({ event, request: new Request(indexUrl) });
+          if (shell) return shell;
+        } catch {
+          // якщо навіть прекеш недоступний (щойно встановлений SW, ще
+          // не пройшов install) — падаємо далі, на офлайн-заглушку.
+        }
+
+        const cachedOffline = await self.caches.match(offlineFallbackUrl);
+        return cachedOffline ?? Response.error();
       }
     })()
   );
@@ -71,7 +104,7 @@ self.addEventListener('fetch', (event) => {
 // Реєструємо той самий handler і як NavigationRoute — для сумісності з
 // іншими місцями Workbox, що очікують navigationRoute (нешкідливо дублює
 // вище, спрацьовує лише якщо перший listener чомусь не відповів).
-registerRoute(new NavigationRoute(createHandlerBoundToURL(offlineFallbackUrl), { denylist: [/^\/api\//] }));
+registerRoute(new NavigationRoute(shellHandler, { denylist: [/^\/api\//] }));
 
 // ---------------------------------------------------------------------------
 // Хешовані JS/CSS-асети — CacheFirst. Ім'я файлу містить хеш вмісту, тож
