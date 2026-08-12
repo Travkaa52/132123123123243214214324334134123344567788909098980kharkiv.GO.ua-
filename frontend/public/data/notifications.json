@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-12T07:54:09.673Z",
+  "updatedAt": "2026-08-12T09:02:48.750Z",
   "items": [
     {
       "id": "kh_metro:2843",
@@ -10,7 +10,7 @@
       "link": "https://t.me/kh_metro/2843",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "806",
+      "views": "1.26K",
       "kind": "alert",
       "lineIds": []
     },
@@ -23,7 +23,7 @@
       "link": "https://t.me/kh_metro/2842",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "1.77K",
+      "views": "2.15K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +36,7 @@
       "link": "https://t.me/kh_metro/2841",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.76K",
+      "views": "3.87K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -51,7 +51,7 @@
       "link": "https://t.me/kh_metro/2840",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.86K",
+      "views": "3.95K",
       "kind": "info",
       "lineIds": [
         "route-metro-3"
@@ -66,7 +66,7 @@
       "link": "https://t.me/kh_metro/2839",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "4.82K",
+      "views": "4.87K",
       "kind": "info",
       "lineIds": []
     },
@@ -79,7 +79,7 @@
       "link": "https://t.me/kh_metro/2838",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "5.1K",
+      "views": "5.13K",
       "kind": "info",
       "lineIds": []
     },
@@ -92,7 +92,7 @@
       "link": "https://t.me/kh_metro/2837",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "7.7K",
+      "views": "7.72K",
       "kind": "info",
       "lineIds": []
     },
@@ -118,7 +118,7 @@
       "link": "https://t.me/kh_metro/2835",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "19.3K",
+      "views": "19.4K",
       "kind": "info",
       "lineIds": []
     },
@@ -144,7 +144,7 @@
       "link": "https://t.me/kh_metro/2825",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "17.5K",
+      "views": "17.6K",
       "kind": "info",
       "lineIds": []
     }
