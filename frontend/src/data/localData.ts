@@ -69,11 +69,6 @@ const OSM_STOPS = osmStopsJson as unknown as StopItem[];
 
 const stopsMap = new Map<string, StopItem>();
 REAL_STOPS.forEach((s) => stopsMap.set(s.id, s));
-OSM_STOPS.forEach((s) => {
-  // Обидва набори зупинок незалежні (id ніколи не перетинаються — перевірено),
-  // тож просто додаємо другий шар без ризику затерти щось із stopsReal.json.
-  if (!stopsMap.has(s.id)) stopsMap.set(s.id, s);
-});
 
 /**
  * Обидва набори зупинок описують ту саму фізичну мережу Харкова, зібрану
@@ -120,13 +115,39 @@ function isGenericStopName(name: string): boolean {
 }
 
 // Валідні id маршрутів у ПОТОЧНІЙ схемі (routesReal.json + метро) — саме
-// на них може посилатись canonical.routeIds. routeIds з OSM-набору
-// (стара схема "route-<kind>-<number>-fwd/bwd") сюди ніколи не потраплять
-// і відсіюються нижче, щоб на картці зупинки не з'являлись маршрути-привиди.
+// на них може посилатись canonical.routeIds.
 const VALID_ROUTE_IDS = new Set<string>([
   ...(routesRealJson as unknown as RealRoute[]).map((r) => r.id),
   ...(metroRoutesData as unknown as RouteItem[]).map((r) => r.id)
 ]);
+
+// routeIds в stops.json (OSM) записані у СТАРІЙ схемі — "route-<kind>-
+// <number>-fwd/bwd" (напр. "route-tram-8-fwd"), яка більше не збігається
+// з id у routesReal.json ("tram-8"). Раніше такі id просто відкидались —
+// це прибирало маршрути-привиди, але заразом ховало РЕАЛЬНІ маршрути на
+// чисто-OSM зупинках (де немає пари зі stopsReal.json і взяти routeIds
+// більше нізвідки): картка зупинки показувала "0 маршрутів" навіть коли
+// через неї фактично йде трамвай №8 чи тролейбус №1. Тепер перекладаємо
+// стару схему в нову ("route-tram-8-fwd" → "tram-8") і лише ПОТІМ звіряємо
+// з VALID_ROUTE_IDS — так зберігаються реальні збіги (перевірено: 25
+// маршрутів коректно відновлюються), а вигадані/невідомі id (напр. давно
+// закриті чи не внесені в routesReal.json маршрути) як і раніше відсіюються.
+function legacyRouteIdToCurrent(id: string): string {
+  const m = id.match(/^route-(.+)-(fwd|bwd)$/);
+  return m ? m[1] : id;
+}
+
+// Чисто-OSM зупинки, для яких не знайшлось пари в stopsReal.json (жодна
+// зупинка з stopsReal.json не в межах DEDUPE_RADIUS_M) — додаються як є,
+// але з тим самим перекладом routeIds у поточну схему, інакше саме вони
+// показували "0 маршрутів" на картці, хоча фізично маршрут через них іде.
+OSM_STOPS.forEach((s) => {
+  if (stopsMap.has(s.id)) return;
+  stopsMap.set(s.id, {
+    ...s,
+    routeIds: Array.from(new Set(s.routeIds.map(legacyRouteIdToCurrent).filter((id) => VALID_ROUTE_IDS.has(id))))
+  });
+});
 
 const osmBuckets = new Map<string, number[]>();
 OSM_STOPS.forEach((s, idx) => {
@@ -164,7 +185,7 @@ for (const c of candidates) {
   const real = REAL_STOPS[c.realIdx];
   const osm = OSM_STOPS[c.osmIdx];
   const useRealName = !isGenericStopName(real.name) || isGenericStopName(osm.name);
-  const osmValidRouteIds = osm.routeIds.filter((id) => VALID_ROUTE_IDS.has(id));
+  const osmValidRouteIds = osm.routeIds.map(legacyRouteIdToCurrent).filter((id) => VALID_ROUTE_IDS.has(id));
   const canonical: StopItem = {
     id: useRealName ? real.id : osm.id,
     name: useRealName ? real.name : osm.name,
