@@ -145,6 +145,30 @@ def _disable_invalid_subscription(token: str, uid: str) -> None:
         pass
 
 
+def _route_matches(sub_routes: list, route_number: str, kind: Optional[str]) -> bool:
+    """Порівнює обрані маршрути підписника (favorites зберігають ІД маршруту
+    у форматі "<kind>-<номер>", напр. "trolleybus-1" — саме так побудовані
+    frontend/src/data/routesReal.json) з route_number/kind, які адмін
+    вводить окремо в боті (просто "1" + вид транспорту з кнопок). Пряме
+    порівняння route_str in routes ніколи не спрацьовувало через це —
+    ось звідки бралось "Підписників не знайдено" навіть за наявності
+    підписки."""
+    route_str = str(route_number)
+    if route_str.lower() == "all":
+        return True
+
+    composite = f"{kind}-{route_str}" if kind else None
+    for r in sub_routes:
+        r = str(r)
+        if r == route_str or r == composite:
+            return True
+        if "-" in r:
+            r_kind, r_num = r.split("-", 1)
+            if r_num == route_str and (not kind or r_kind == kind):
+                return True
+    return False
+
+
 def notify_delay_subscribers(route_number: str, kind: Optional[str], alert_message: str) -> dict:
     """Надсилає push про затримку всім підписаним на цей маршрут (або на весь
     вид транспорту `kind`). Тихо повертає {"sent": 0, ...}, якщо FCM вимкнено
@@ -172,8 +196,8 @@ def notify_delay_subscribers(route_number: str, kind: Optional[str], alert_messa
     for s in subs:
         if not s.get("enabled"):
             continue
-        routes = [str(r) for r in (s.get("routes") or [])]
-        if not (route_str in routes or (kind and kind in routes)):
+        routes = s.get("routes") or []
+        if not _route_matches(routes, route_number, kind):
             continue
 
         tg_id = s.get("telegramId")
