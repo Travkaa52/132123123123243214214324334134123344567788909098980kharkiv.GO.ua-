@@ -40,7 +40,9 @@ export function RouteAlertBanner({
   const alert = findAlertForRoute(alerts, routeNumber, kind);
   if (!alert) return null;
 
-  const formattedTime = formatAlertTime(alert.createdAt || alert.updatedAt);
+  // Безопасное получение времени создания/обновления
+  const rawDate = alert.createdAt || (alert as { updatedAt?: string; date?: string }).updatedAt || (alert as { date?: string }).date;
+  const formattedTime = formatAlertTime(rawDate);
   const isLongMessage = alert.message && alert.message.length > 120;
 
   return (
