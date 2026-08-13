@@ -15,6 +15,15 @@ interface ImportMetaEnv {
   /** Перевизначення URL резервного статичного route-alerts.json, якщо потрібно. */
   readonly VITE_ROUTE_ALERTS_URL?: string;
   readonly VITE_NOTIFICATIONS_URL?: string;
+  /** Конфіг Firebase-проєкту (Project Settings → General → SDK setup and configuration). */
+  readonly VITE_FIREBASE_API_KEY?: string;
+  readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
+  readonly VITE_FIREBASE_PROJECT_ID?: string;
+  readonly VITE_FIREBASE_STORAGE_BUCKET?: string;
+  readonly VITE_FIREBASE_MESSAGING_SENDER_ID?: string;
+  readonly VITE_FIREBASE_APP_ID?: string;
+  /** Web Push сертифікат (Project Settings → Cloud Messaging → Web configuration → Key pair). */
+  readonly VITE_FIREBASE_VAPID_KEY?: string;
 }
 
 interface ImportMeta {
