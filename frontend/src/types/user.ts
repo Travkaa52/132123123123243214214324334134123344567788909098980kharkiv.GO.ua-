@@ -23,6 +23,12 @@ export interface UserProfile {
   avatarEmoji?: string;
   /** Телефон/контакт, вказаний користувачем при реєстрації (необов'язково). */
   contact?: string;
+  /** uid у Firebase Auth, якщо профіль створено/увійдено через e-mail+пароль або Google. */
+  firebaseUid?: string;
+  /** E-mail, яким користувач зареєструвався/увійшов через Firebase Auth. */
+  email?: string;
+  /** Спосіб автентифікації акаунту (Firebase) — на відміну від Telegram/локального гостя. */
+  authProvider?: 'password' | 'google';
 }
 
 export interface AppSettings {
