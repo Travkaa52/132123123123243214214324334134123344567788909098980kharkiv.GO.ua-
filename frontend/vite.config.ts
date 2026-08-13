@@ -8,18 +8,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
-  server: {
-    proxy: {
-      '/api/alerts': {
-        target: 'https://ubilling.net.ua',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/alerts/, '/aerialalerts/?source=klimenko&raw'),
-      },
-    },
-  },
-});
-
-export default defineConfig({
   base,
   resolve: {
     alias: {
@@ -78,6 +66,13 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/api/alerts': {
+        target: 'https://ubilling.net.ua',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/alerts/, '/aerialalerts/?source=klimenko&raw')
+      }
+    }
   }
 });
