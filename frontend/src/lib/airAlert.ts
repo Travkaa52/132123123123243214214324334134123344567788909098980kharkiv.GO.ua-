@@ -110,13 +110,32 @@ function parseAirAlertResponse(data: unknown): AirAlertStatus {
   }
 
   const flat = data as FlatAlertResponse;
-  const kharkiv = flat?.states?.[KHARKIV_OBLAST_NAME];
-  if (!kharkiv) return { isAlert: false, changedAt: null };
+  if (!flat?.states) return { isAlert: false, changedAt: null };
 
-  return { 
-    isAlert: kharkiv.alertnow === true, 
-    changedAt: normalizeDate(kharkiv.changed) 
-  };
+  let isAlert = false;
+  let changedAt: string | null = null;
+
+  for (const [stateName, entry] of Object.entries(flat.states)) {
+    const name = stateName.toLowerCase();
+    if (
+      name.includes('харківська область') ||
+      name.includes('харківський район') ||
+      name.includes('м. харків')
+    ) {
+      if (entry.alertnow) {
+        isAlert = true;
+        if (entry.changed) {
+          changedAt = normalizeDate(entry.changed);
+        }
+        break;
+      }
+      if (entry.changed && !changedAt) {
+        changedAt = normalizeDate(entry.changed);
+      }
+    }
+  }
+
+  return { isAlert, changedAt };
 }
 
 /**
