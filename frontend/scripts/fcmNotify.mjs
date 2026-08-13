@@ -1,9 +1,15 @@
 /**
  * scripts/fcmNotify.mjs
- * Firebase FCM + Firestore Enterprise
+ * KharkivGO
+ *
+ * GitHub Actions
+ * Firebase Admin SDK
+ * Firestore Enterprise Native
+ * Firebase Cloud Messaging
  */
 
-import crypto from 'node:crypto';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const RAW_SERVICE_ACCOUNT =
   (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
@@ -19,350 +25,354 @@ function parseServiceAccount(raw) {
     return JSON.parse(
       Buffer.from(raw, 'base64').toString('utf8')
     );
-  } catch {
-    return null;
-  }
+  } catch {}
+
+  return null;
 }
 
 const serviceAccount = parseServiceAccount(RAW_SERVICE_ACCOUNT);
 
-export const FCM_ENABLED = Boolean(
+const FCM_ENABLED = Boolean(
   serviceAccount?.project_id &&
   serviceAccount?.client_email &&
   serviceAccount?.private_key
 );
 
-if (!RAW_SERVICE_ACCOUNT) {
+let db = null;
+
+if (!FCM_ENABLED) {
   console.log(
-    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON не задано — FCM вимкнено.'
+    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON не задано — push вимкнені.'
   );
-} else if (!FCM_ENABLED) {
-  console.warn(
-    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON некоректний — FCM вимкнено.'
-  );
+} else {
+  try {
+    const app =
+      getApps().length > 0
+        ? getApps()[0]
+        : initializeApp({
+            credential: cert(serviceAccount),
+            projectId: serviceAccount.project_id
+          });
+
+    db = getFirestore(app);
+
+    console.log(
+      `[bot] FCM project: ${serviceAccount.project_id}`
+    );
+
+    console.log(
+      '[bot] Firestore database: (default)'
+    );
+  } catch (error) {
+    console.error(
+      '[bot] Firebase Admin initialization error:',
+      error?.message || error
+    );
+  }
 }
 
 const PROJECT_ID = serviceAccount?.project_id;
 
-const DATABASE_ID = '(default)';
-
-const FIRESTORE_BASE =
-  `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}` +
-  `/databases/${encodeURIComponent(DATABASE_ID)}/documents`;
-
 const FCM_SEND_URL =
   `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`;
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/datastore',
-  'https://www.googleapis.com/auth/firebase.messaging'
-];
-
-let cachedToken = null;
+let cachedAccessToken = null;
 let cachedTokenExpiresAt = 0;
 
-function base64url(input) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
 async function getAccessToken() {
-  if (!FCM_ENABLED) return null;
-
-  if (
-    cachedToken &&
-    Date.now() < cachedTokenExpiresAt - 60_000
-  ) {
-    return cachedToken;
+  if (!FCM_ENABLED || !serviceAccount) {
+    return null;
   }
 
-  const nowSec = Math.floor(Date.now() / 1000);
-
-  const header = {
-    alg: 'RS256',
-    typ: 'JWT'
-  };
-
-  const claims = {
-    iss: serviceAccount.client_email,
-    scope: SCOPES.join(' '),
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: nowSec,
-    exp: nowSec + 3600
-  };
-
-  const unsigned =
-    `${base64url(JSON.stringify(header))}.` +
-    `${base64url(JSON.stringify(claims))}`;
-
-  const signer = crypto.createSign('RSA-SHA256');
-
-  signer.update(unsigned);
-  signer.end();
-
-  const signature =
-    signer.sign(serviceAccount.private_key).toString('base64url');
-
-  const assertion = `${unsigned}.${signature}`;
+  if (
+    cachedAccessToken &&
+    Date.now() < cachedTokenExpiresAt - 60_000
+  ) {
+    return cachedAccessToken;
+  }
 
   try {
-    const res = await fetch(
-      'https://oauth2.googleapis.com/token',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':
-            'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          grant_type:
-            'urn:ietf:params:oauth:grant-type:jwt-bearer',
-          assertion
-        })
-      }
-    );
+    const app =
+      getApps().length > 0
+        ? getApps()[0]
+        : initializeApp({
+            credential: cert(serviceAccount),
+            projectId: serviceAccount.project_id
+          });
 
-    if (!res.ok) {
+    const credential =
+      app.options.credential;
+
+    const tokenResult =
+      await credential.getAccessToken();
+
+    if (!tokenResult?.access_token) {
       console.warn(
-        '[bot] Google OAuth2 token помилка:',
-        res.status,
-        (await res.text()).slice(0, 500)
+        '[bot] Firebase access token не отримано.'
       );
 
       return null;
     }
 
-    const data = await res.json();
-
-    cachedToken = data.access_token;
+    cachedAccessToken =
+      tokenResult.access_token;
 
     cachedTokenExpiresAt =
-      Date.now() +
-      (data.expires_in || 3600) * 1000;
+      Date.now() + 50 * 60 * 1000;
 
-    return cachedToken;
-
-  } catch (err) {
+    return cachedAccessToken;
+  } catch (error) {
     console.warn(
-      '[bot] Google OAuth2 мережна помилка:',
-      err?.message || err
+      '[bot] Firebase access token error:',
+      error?.message || error
     );
 
     return null;
   }
 }
 
-function fsValueToPlain(value) {
-  if (value == null) return null;
-
-  if ('stringValue' in value)
-    return value.stringValue;
-
-  if ('booleanValue' in value)
-    return value.booleanValue;
-
-  if ('integerValue' in value)
-    return Number(value.integerValue);
-
-  if ('doubleValue' in value)
-    return value.doubleValue;
-
-  if ('timestampValue' in value)
-    return value.timestampValue;
-
-  if ('arrayValue' in value)
-    return (value.arrayValue.values || [])
-      .map(fsValueToPlain);
-
-  if ('mapValue' in value)
-    return Object.fromEntries(
-      Object.entries(value.mapValue.fields || {})
-        .map(([key, val]) => [
-          key,
-          fsValueToPlain(val)
-        ])
-    );
-
-  return null;
-}
-
-function fsDocToPlain(doc) {
-  const out = {
-    id: doc.name.split('/').pop()
-  };
-
-  for (const [key, value] of Object.entries(
-    doc.fields || {}
-  )) {
-    out[key] = fsValueToPlain(value);
+function normalizeRoutes(routes) {
+  if (!Array.isArray(routes)) {
+    return [];
   }
 
-  return out;
+  return routes.map(String);
 }
 
-async function listPushSubscriptions(token) {
-  const docs = [];
-
-  let pageToken;
-
-  for (;;) {
-    const url =
-      new URL(`${FIRESTORE_BASE}/pushSubscriptions`);
-
-    url.searchParams.set('pageSize', '300');
-
-    if (pageToken) {
-      url.searchParams.set(
-        'pageToken',
-        pageToken
-      );
-    }
-
-    let res;
-
-    try {
-      res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-    } catch (err) {
-      console.warn(
-        '[bot] Firestore network error:',
-        err?.message || err
-      );
-
-      break;
-    }
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      console.warn(
-        '[bot] Firestore listDocuments помилка:',
-        res.status,
-        text.slice(0, 1000)
-      );
-
-      break;
-    }
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch {
-      console.warn(
-        '[bot] Firestore повернув некоректний JSON.'
-      );
-
-      break;
-    }
-
-    docs.push(
-      ...(data.documents || [])
-        .map(fsDocToPlain)
-    );
-
-    pageToken = data.nextPageToken;
-
-    if (!pageToken) break;
+async function listPushSubscriptions() {
+  if (!db) {
+    return [];
   }
 
-  return docs;
-}
-
-async function disableInvalidSubscription(
-  token,
-  uid
-) {
   try {
-    const url =
-      new URL(
-        `${FIRESTORE_BASE}/pushSubscriptions/${encodeURIComponent(uid)}`
-      );
+    const snapshot =
+      await db
+        .collection('pushSubscriptions')
+        .get();
 
-    url.searchParams.append(
-      'updateMask.fieldPaths',
-      'enabled'
-    );
+    const subscriptions = [];
 
-    await fetch(url, {
-      method: 'PATCH',
-
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-
-      body: JSON.stringify({
-        fields: {
-          enabled: {
-            booleanValue: false
-          }
-        }
-      })
+    snapshot.forEach((doc) => {
+      subscriptions.push({
+        id: doc.id,
+        ...doc.data()
+      });
     });
 
-  } catch {}
+    console.log(
+      `[bot] Firestore: знайдено ${subscriptions.length} підписок.`
+    );
+
+    return subscriptions;
+  } catch (error) {
+    console.error(
+      '[bot] Firestore read error:',
+      error?.message || error
+    );
+
+    return [];
+  }
 }
 
+async function disableInvalidSubscription(uid) {
+  if (!db || !uid) {
+    return;
+  }
+
+  try {
+    await db
+      .collection('pushSubscriptions')
+      .doc(uid)
+      .set(
+        {
+          enabled: false
+        },
+        {
+          merge: true
+        }
+      );
+
+    console.log(
+      `[bot] Підписку ${uid} вимкнено.`
+    );
+  } catch (error) {
+    console.warn(
+      `[bot] Не вдалося вимкнути підписку ${uid}:`,
+      error?.message || error
+    );
+  }
+}
+
+async function sendPush(
+  fcmToken,
+  routeNumber,
+  kind,
+  alertMessage
+) {
+  const accessToken =
+    await getAccessToken();
+
+  if (!accessToken) {
+    return {
+      ok: false,
+      invalid: false
+    };
+  }
+
+  const routeStr =
+    String(routeNumber);
+
+  const body =
+    alertMessage.length <= 180
+      ? alertMessage
+      : `${alertMessage.slice(0, 177)}...`;
+
+  const payload = {
+    message: {
+      token: fcmToken,
+
+      notification: {
+        title: 'Kharkiv GO — затримка руху',
+        body
+      },
+
+      data: {
+        routeNumber: routeStr,
+        kind: kind ? String(kind) : '',
+        url: '/'
+      },
+
+      webpush: {
+        fcm_options: {
+          link: '/'
+        }
+      }
+    }
+  };
+
+  try {
+    const response =
+      await fetch(
+        FCM_SEND_URL,
+        {
+          method: 'POST',
+
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+            'Content-Type':
+              'application/json'
+          },
+
+          body: JSON.stringify(payload)
+        }
+      );
+
+    if (response.ok) {
+      return {
+        ok: true,
+        invalid: false
+      };
+    }
+
+    let errorData = null;
+
+    try {
+      errorData =
+        await response.json();
+    } catch {}
+
+    const errorStatus =
+      errorData?.error?.status || '';
+
+    const errorMessage =
+      errorData?.error?.message || '';
+
+    console.warn(
+      `[bot] FCM помилка ${response.status}:`,
+      errorStatus || errorMessage || 'unknown'
+    );
+
+    const invalid =
+      errorStatus === 'NOT_FOUND' ||
+      errorStatus === 'UNREGISTERED' ||
+      errorStatus === 'INVALID_ARGUMENT';
+
+    return {
+      ok: false,
+      invalid
+    };
+  } catch (error) {
+    console.warn(
+      '[bot] FCM network error:',
+      error?.message || error
+    );
+
+    return {
+      ok: false,
+      invalid: false
+    };
+  }
+}
+
+/**
+ * Надсилає push усім користувачам,
+ * які підписані на конкретний маршрут.
+ *
+ * routeNumber — номер маршруту
+ * kind — bus / trolleybus / tram / metro
+ * alertMessage — текст повідомлення
+ */
 export async function notifyDelaySubscribers(
   routeNumber,
   kind,
   alertMessage
 ) {
-  if (!FCM_ENABLED) {
+  if (!FCM_ENABLED || !db) {
     return {
       sent: 0,
-      skipped: 'disabled'
+      total: 0,
+      skipped: 'firebase-disabled'
     };
   }
 
-  console.log(
-    `[bot] FCM project: ${PROJECT_ID}`
-  );
-
-  console.log(
-    `[bot] Firestore database: ${DATABASE_ID}`
-  );
-
-  const token = await getAccessToken();
-
-  if (!token) {
+  if (!routeNumber || !alertMessage) {
     return {
       sent: 0,
-      skipped: 'no-token'
+      total: 0,
+      skipped: 'invalid-data'
     };
   }
 
-  const subs =
-    await listPushSubscriptions(token);
+  const subscriptions =
+    await listPushSubscriptions();
 
   const routeStr =
     String(routeNumber);
 
+  const kindStr =
+    kind ? String(kind) : '';
+
   const targets =
-    subs.filter((sub) => {
+    subscriptions.filter((subscription) => {
       if (
-        !sub.enabled ||
-        !sub.fcmToken
+        subscription.enabled !== true ||
+        !subscription.fcmToken
       ) {
         return false;
       }
 
       const routes =
-        (sub.routes || [])
-          .map(String);
+        normalizeRoutes(
+          subscription.routes
+        );
 
       return (
         routes.includes(routeStr) ||
-        (kind &&
-          routes.includes(String(kind)))
+        (
+          kindStr &&
+          routes.includes(kindStr)
+        )
       );
     });
 
@@ -373,106 +383,30 @@ export async function notifyDelaySubscribers(
 
     return {
       sent: 0,
+      total: 0,
       skipped: 'no-subscribers'
     };
   }
 
-  const title =
-    'Kharkiv GO — затримка руху';
-
-  const body =
-    alertMessage.length <= 180
-      ? alertMessage
-      : `${alertMessage.slice(0, 177)}...`;
-
   let sent = 0;
 
-  for (const sub of targets) {
-    const payload = {
-      message: {
-        token: sub.fcmToken,
-
-        notification: {
-          title,
-          body
-        },
-
-        data: {
-          routeNumber: routeStr,
-          kind: kind || '',
-          url: '/'
-        },
-
-        webpush: {
-          fcm_options: {
-            link: '/'
-          }
-        }
-      }
-    };
-
-    let res;
-
-    try {
-      res = await fetch(
-        FCM_SEND_URL,
-        {
-          method: 'POST',
-
-          headers: {
-            Authorization:
-              `Bearer ${token}`,
-            'Content-Type':
-              'application/json'
-          },
-
-          body:
-            JSON.stringify(payload)
-        }
+  for (const subscription of targets) {
+    const result =
+      await sendPush(
+        subscription.fcmToken,
+        routeStr,
+        kindStr,
+        alertMessage
       );
 
-    } catch (err) {
-      console.warn(
-        `[bot] FCM network error ${sub.id}:`,
-        err?.message || err
-      );
-
+    if (result.ok) {
+      sent++;
       continue;
     }
 
-    if (res.ok) {
-      sent += 1;
-      continue;
-    }
-
-    let error;
-
-    try {
-      error = await res.json();
-    } catch {
-      error = {};
-    }
-
-    const status =
-      error?.error?.status;
-
-    const message =
-      error?.error?.message;
-
-    if (
-      status === 'NOT_FOUND' ||
-      status === 'UNREGISTERED' ||
-      status === 'INVALID_ARGUMENT'
-    ) {
+    if (result.invalid) {
       await disableInvalidSubscription(
-        token,
-        sub.id
-      );
-    } else {
-      console.warn(
-        `[bot] FCM send помилка для ${sub.id}:`,
-        status || res.status,
-        message || ''
+        subscription.id
       );
     }
   }
@@ -487,3 +421,5 @@ export async function notifyDelaySubscribers(
     total: targets.length
   };
 }
+
+export { FCM_ENABLED };
