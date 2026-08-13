@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Bell, ExternalLink, Rss, AlertCircle } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { useNotificationsStore } from '@/store/useNotificationsStore';
+
+// 36 часов в миллисекундах: 36 * 60 * 60 * 1000
+const MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -17,10 +20,18 @@ function timeAgo(iso: string): string {
 /** Дзвіночок у шапці головної сторінки: відкриває шторку зі сповіщеннями з Telegram-каналів. */
 export function NotificationsBell() {
   const { items, isLoading, error, fetchNotifications, startPolling, markAllSeen, lastSeenCount } = useNotificationsStore();
-  const unseenCount = Math.max(0, items.length - lastSeenCount);
+
+  // Залишаємо лише сповіщення за останні 36 годин
+  const freshItems = useMemo(() => {
+    const now = Date.now();
+    return items.filter((n) => now - new Date(n.date).getTime() <= MAX_AGE_MS);
+  }, [items]);
+
+  const unseenCount = Math.max(0, freshItems.length - lastSeenCount);
+  
   // items приходять від парсера відсортованими від найновіших — перші
   // unseenCount записів і є тими, що користувач ще не бачив.
-  const hasUnseenAlert = items.slice(0, unseenCount).some((n) => n.kind === 'alert');
+  const hasUnseenAlert = freshItems.slice(0, unseenCount).some((n) => n.kind === 'alert');
 
   useEffect(() => {
     fetchNotifications();
@@ -36,7 +47,7 @@ export function NotificationsBell() {
       hasUnseenAlert={hasUnseenAlert}
       isLoading={isLoading}
       error={error}
-      items={items}
+      items={freshItems}
       onOpen={markAllSeen}
     />
   );
@@ -96,6 +107,19 @@ function NotificationsList({
   isLoading: boolean;
   error: string | null;
 }) {
+  // Фільтруємо за останніми 36 годинами + сортуємо (алерти вгору, далі за датою)
+  const freshSortedItems = useMemo(() => {
+    const now = Date.now();
+    return items
+      .filter((n) => now - new Date(n.date).getTime() <= MAX_AGE_MS)
+      .sort((a, b) => {
+        const aAlert = a.kind === 'alert' ? 1 : 0;
+        const bAlert = b.kind === 'alert' ? 1 : 0;
+        if (aAlert !== bAlert) return bAlert - aAlert;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+  }, [items]);
+
   if (isLoading && items.length === 0) {
     return (
       <div className="space-y-3 py-2">
@@ -115,7 +139,7 @@ function NotificationsList({
     );
   }
 
-  if (items.length === 0) {
+  if (freshSortedItems.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-center">
         <Rss className="h-6 w-6 text-ink-muted/60" />
@@ -124,19 +148,9 @@ function NotificationsList({
     );
   }
 
-  // Термінові оголошення метрополітену (закриття/зупинка руху, повітряна
-  // тривога тощо) піднімаємо над рештою стрічки — саме заради цього парсер
-  // взагалі класифікує повідомлення @kh_metro.
-  const sorted = [...items].sort((a, b) => {
-    const aAlert = a.kind === 'alert' ? 1 : 0;
-    const bAlert = b.kind === 'alert' ? 1 : 0;
-    if (aAlert !== bAlert) return bAlert - aAlert;
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
-  });
-
   return (
     <div className="max-h-[55vh] space-y-2 overflow-y-auto -mx-1 px-1 py-1">
-      {sorted.map((n) => (
+      {freshSortedItems.map((n) => (
         <a
           key={n.id}
           href={n.link}
@@ -179,7 +193,13 @@ export function NotificationsSection() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  if (!isLoading && !error && items.length === 0) return null;
+  // Перевіряємо наявність свіжих сповіщень для відображення секції
+  const freshItems = useMemo(() => {
+    const now = Date.now();
+    return items.filter((n) => now - new Date(n.date).getTime() <= MAX_AGE_MS);
+  }, [items]);
+
+  if (!isLoading && !error && freshItems.length === 0) return null;
 
   return (
     <section className="bg-surface-raised rounded-[22px] p-4 border border-border/40 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -187,7 +207,7 @@ export function NotificationsSection() {
         <Rss className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-extrabold text-ink-text">Сповіщення з каналів</h3>
       </div>
-      <NotificationsList items={items.slice(0, 3)} isLoading={isLoading} error={error} />
+      <NotificationsList items={freshItems} isLoading={isLoading} error={error} />
     </section>
   );
 }
