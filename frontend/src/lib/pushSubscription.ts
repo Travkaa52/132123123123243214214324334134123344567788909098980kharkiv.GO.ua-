@@ -1,0 +1,120 @@
+/**
+ * Підписка на push-сповіщення про затримки маршрутів через Firebase Cloud
+ * Messaging. Токен пристрою + список обраних маршрутів користувача
+ * зберігаються в Firestore: pushSubscriptions/{uid} (uid — анонімний
+ * Firebase-користувач, див. lib/firebase.ts). За цим документом бекенд-бот
+ * (той самий, що пише route_alerts у Supabase) може розсилати push, коли
+ * зʼявляється нове оголошення про затримку по одному з обраних маршрутів.
+ *
+ * Реєстрація токена спирається на вже наявний власний Service Worker
+ * (src/sw.ts, зареєстрований через PwaUpdateBanner/virtual:pwa-register) —
+ * окремого firebase-messaging-sw.js не заводимо, обробку фонових push
+ * додано прямо в sw.ts.
+ */
+import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore';
+import { getFirebaseDb, ensureAnonymousAuth, isFirebaseConfigured } from '@/lib/firebase';
+
+export function isPushSubscriptionAvailable(): boolean {
+  return (
+    isFirebaseConfigured() &&
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'Notification' in window &&
+    Boolean(import.meta.env.VITE_FIREBASE_VAPID_KEY)
+  );
+}
+
+async function getFcmToken(): Promise<string | null> {
+  if (!isPushSubscriptionAvailable()) return null;
+  try {
+    const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
+    if (!(await isSupported())) return null;
+
+    const { getFirebaseAuth } = await import('@/lib/firebase');
+    const app = getFirebaseAuth()?.app;
+    if (!app) return null;
+
+    const registration = await navigator.serviceWorker.ready;
+    const messaging = getMessaging(app);
+    return await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: registration
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Вмикає сповіщення про затримки: анонімна автентифікація → дозвіл на
+ * сповіщення (якщо ще не наданий) → FCM-токен → запис/оновлення документа
+ * pushSubscriptions/{uid} з токеном і поточним списком обраних маршрутів.
+ * Повертає true, якщо підписку успішно збережено.
+ */
+export async function enableDelayPushSubscription(routeIds: string[]): Promise<boolean> {
+  const db = getFirebaseDb();
+  if (!db || !isPushSubscriptionAvailable()) return false;
+
+  const uid = await ensureAnonymousAuth();
+  if (!uid) return false;
+
+  if (Notification.permission !== 'granted') {
+    const result = await Notification.requestPermission();
+    if (result !== 'granted') return false;
+  }
+
+  const token = await getFcmToken();
+  if (!token) return false;
+
+  try {
+    await setDoc(
+      doc(db, 'pushSubscriptions', uid),
+      {
+        fcmToken: token,
+        routes: routeIds,
+        enabled: true,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Оновлює лише список обраних маршрутів у вже наявній підписці (без зміни токена чи прапорця enabled). */
+export async function syncSubscribedRoutes(routeIds: string[]): Promise<void> {
+  const db = getFirebaseDb();
+  const uid = await ensureAnonymousAuth();
+  if (!db || !uid) return;
+
+  try {
+    const ref = doc(db, 'pushSubscriptions', uid);
+    const snapshot = await getDoc(ref);
+    // Нічого не пишемо, якщо користувач ще жодного разу не вмикав
+    // сповіщення про затримки — не хочемо створювати "порожні" підписки.
+    if (!snapshot.exists() || !snapshot.data()?.fcmToken) return;
+
+    await setDoc(ref, { routes: routeIds, updatedAt: serverTimestamp() }, { merge: true });
+  } catch {
+    // мовчки ігноруємо — це фонова синхронізація, не критична дія користувача
+  }
+}
+
+/** Вимикає сповіщення про затримки (не видаляє документ повністю — прибирає токен і знімає прапорець). */
+export async function disableDelayPushSubscription(): Promise<void> {
+  const db = getFirebaseDb();
+  const uid = await ensureAnonymousAuth();
+  if (!db || !uid) return;
+
+  try {
+    await setDoc(
+      doc(db, 'pushSubscriptions', uid),
+      { enabled: false, fcmToken: deleteField(), updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch {
+    // ігноруємо — локальний перемикач все одно вимкнеться
+  }
+}

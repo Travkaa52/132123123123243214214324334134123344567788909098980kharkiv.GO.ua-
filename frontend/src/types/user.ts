@@ -30,6 +30,8 @@ export interface AppSettings {
   mapStyle: 'day' | 'night';
   units: 'metric' | 'imperial';
   pushNotificationsEnabled: boolean;
+  /** Push-сповіщення саме про затримки обраних маршрутів (FCM, окремо від загального pushNotificationsEnabled). */
+  delayNotificationsEnabled: boolean;
   language: 'uk' | 'en';
   /** Які види транспорту показувати на карті (лінії маршрутів + рух метро). */
   visibleTransportKinds: import('./transport').TransportKind[];

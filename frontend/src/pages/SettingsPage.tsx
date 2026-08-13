@@ -29,6 +29,8 @@ import { TransportKindIcon, KIND_LABELS_UK } from '@/components/TransportKindIco
 import { TRANSPORT_COLORS } from '@/config/map';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useToastStore } from '@/store/useToastStore';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { enableDelayPushSubscription, disableDelayPushSubscription, isPushSubscriptionAvailable } from '@/lib/pushSubscription';
 import type { AppSettings } from '@/types/user';
 import type { TransportKind } from '@/types/transport';
 
@@ -182,6 +184,8 @@ export function SettingsPage() {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTogglingDelayAlerts, setIsTogglingDelayAlerts] = useState(false);
+  const favoriteRoutes = useFavoritesStore((s) => s.routes);
   const [isResetting, setIsResetting] = useState(false);
   const [activeNav, setActiveNav] = useState(QUICK_NAV[0].id);
   const showToast = useToastStore((s) => s.show);
@@ -194,6 +198,30 @@ export function SettingsPage() {
       if (result !== 'granted') return;
     }
     settings.togglePushNotifications();
+  };
+
+  const handleToggleDelayAlerts = async () => {
+    if (isTogglingDelayAlerts) return;
+
+    if (settings.delayNotificationsEnabled) {
+      settings.setDelayNotificationsEnabled(false);
+      void disableDelayPushSubscription();
+      return;
+    }
+
+    setIsTogglingDelayAlerts(true);
+    try {
+      const routeIds = favoriteRoutes.map((r) => r.routeId);
+      const ok = await enableDelayPushSubscription(routeIds);
+      if (ok) {
+        settings.setDelayNotificationsEnabled(true);
+        showToast('Сповіщення про затримки увімкнено.', 'success');
+      } else {
+        showToast('Не вдалося увімкнути сповіщення про затримки.', 'error');
+      }
+    } finally {
+      setIsTogglingDelayAlerts(false);
+    }
   };
 
   const handleClearCache = async () => {
@@ -380,6 +408,25 @@ export function SettingsPage() {
               />
             }
           />
+          {isPushSubscriptionAvailable() && (
+            <Row
+              label="Сповіщення про затримки"
+              icon={<AlertTriangle className="h-4 w-4" />}
+              hint={
+                favoriteRoutes.length === 0
+                  ? 'Додайте маршрути в обране, щоб отримувати сповіщення саме по них'
+                  : `Стежимо за ${favoriteRoutes.length} обраним(и) маршрутом(ами)`
+              }
+              control={
+                <Switch
+                  checked={settings.delayNotificationsEnabled}
+                  onChange={handleToggleDelayAlerts}
+                  disabled={isTogglingDelayAlerts || notifStatus === 'denied'}
+                  label="Сповіщення про затримки"
+                />
+              }
+            />
+          )}
         </Section>
 
         <Section id="sec-map" title="Інтерактивна карта" icon={<MapPin className="h-4 w-4" />}>

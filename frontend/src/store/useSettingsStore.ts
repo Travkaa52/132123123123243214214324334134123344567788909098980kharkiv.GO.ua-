@@ -12,6 +12,7 @@ interface SettingsState extends AppSettings {
   setLanguage: (lang: AppSettings['language']) => void;
   setUnits: (units: AppSettings['units']) => void;
   togglePushNotifications: () => void;
+  setDelayNotificationsEnabled: (enabled: boolean) => void;
   /** Очищає всі локальні кеші застосунку (обране/історію не чіпає — тільки службові дані). */
   clearCache: () => Promise<void>;
   /** Панель керування шарами карти: увімкнути/вимкнути показ виду транспорту. */
@@ -29,6 +30,7 @@ export const useSettingsStore = create<SettingsState>()(
       mapStyle: 'night',
       units: 'metric',
       pushNotificationsEnabled: false,
+      delayNotificationsEnabled: false,
       language: 'uk',
       visibleTransportKinds: ALL_KINDS,
       showStopsOnMap: true,
@@ -51,6 +53,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
       togglePushNotifications: () => set((state) => ({ pushNotificationsEnabled: !state.pushNotificationsEnabled })),
+      setDelayNotificationsEnabled: (enabled) => set({ delayNotificationsEnabled: enabled }),
       clearCache: async () => {
         try {
           if ('caches' in window) {
