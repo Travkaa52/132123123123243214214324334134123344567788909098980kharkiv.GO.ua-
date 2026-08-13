@@ -7,7 +7,7 @@
  * FIREBASE_SERVICE_ACCOUNT_JSON
  *
  * Firestore:
- * databaseId = (default)
+ * databaseId = default
  * collection = pushSubscriptions
  */
 
@@ -101,17 +101,14 @@ if (FCM_ENABLED) {
      * ВАЖНО:
      *
      * У тебе Firestore Enterprise Native.
-     *
-     * databaseId "(default)" — это именно имя базы.
-     *
-     * firebase-admin поддерживает работу с конкретным databaseId.
+     * Имя базы данных в GCP — именно "default" (без скобок).
      */
-    db = getFirestore(app, '(default)');
+    db = getFirestore(app, 'default');
 
     messaging = getMessaging(app);
 
     console.log(`[bot] FCM project: ${serviceAccount.project_id}`);
-    console.log('[bot] Firestore database: (default)');
+    console.log('[bot] Firestore database: default');
     console.log('[bot] Firestore Enterprise Native: Admin SDK');
   } catch (error) {
     console.error(
@@ -158,11 +155,17 @@ async function listPushSubscriptions() {
 
     return snapshot.docs.map(documentToPlain);
   } catch (error) {
-    console.error(
-      '[bot] Firestore read error:',
-      error?.code || '',
-      error?.message || error
-    );
+    if (error?.code === 5 || error?.code === 'NOT_FOUND') {
+      console.warn(
+        '[bot] Firestore: Коллекция "pushSubscriptions" не найдена.'
+      );
+    } else {
+      console.error(
+        '[bot] Firestore read error:',
+        error?.code || '',
+        error?.message || error
+      );
+    }
 
     return [];
   }
