@@ -809,7 +809,28 @@ export function buildTripPlans(
 export const localRoutes = {
   all: (): RouteItem[] => routesData,
   getById: (id: string): RouteItem | undefined => routesData.find((r) => r.id === id),
-  getByKind: (kind: TransportKind): RouteItem[] => routesData.filter((r) => r.kind === kind),
+  /**
+   * `routesReal.json` містить кілька історичних варіантів запису одного й
+   * того самого реального маршруту (наприклад одразу "trolleybus-1",
+   * "route-trolleybus-1-fwd" і "route-trolleybus-1-bwd", подекуди навіть
+   * буквально продубльовані) — вони лишаються в даних, бо на них посилаються
+   * `stopIds` зупинок (щоб на картці зупинки коректно показати "які
+   * маршрути тут ходять"). Але у списку маршрутів за видом транспорту це
+   * виглядає як 3-5 однакових карток підряд. Тому саме тут — і тільки тут —
+   * схлопуємо їх до однієї картки на номер маршруту, вибираючи
+   * найповніший запис (найбільше зупинок разом в обидва боки).
+   */
+  getByKind: (kind: TransportKind): RouteItem[] => {
+    const byNumber = new Map<string, RouteItem>();
+    for (const r of routesData) {
+      if (r.kind !== kind) continue;
+      const existing = byNumber.get(r.number);
+      if (!existing || r.stopIds.length > existing.stopIds.length) {
+        byNumber.set(r.number, r);
+      }
+    }
+    return Array.from(byNumber.values());
+  },
   search: (query: string): RouteItem[] => {
     const q = query.toLowerCase();
     return routesData.filter(
