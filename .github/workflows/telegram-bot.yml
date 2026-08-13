@@ -1,52 +1,25 @@
-name: Telegram Bot (support + затримки)
+name: Telegram Bot (24/7 Shift Work)
 
-# Немає постійного сервера, тому цей workflow не просто "пінгує" API раз на
-# кілька хвилин, а раз на RUN_INTERVAL піднімає завдання, яке саме тримає
-# активне long-polling з'єднання до Telegram (getUpdates) протягом
-# RUN_DURATION_MINUTES (~25 хв). Раніше інтервал був 3 години (бот "спав"
-# майже 2 години з кожних трьох, і оголошення про затримку могли чекати
-# публікації до ~2 годин) — тепер бот прокидається щопівгодини, тож
-# найгірший випадок очікування — трохи більше 30 хв, а типовий — кілька
-# хвилин. Якщо потрібна справжня "наживо" робота без вікон очікування
-# взагалі — дивіться нижче про bot/telegram_bot.py на своєму сервері.
-# Комітить оновлений route-alerts.json/data-runtime назад у репозиторій
-# одразу після кожного циклу, у якому щось реально прийшло — банер про
-# затримку в застосунку зʼявляється протягом чергової "зміни", а не чекає
-# завершення всього запуску.
-#
-# Хочете справжній 24/7 без вікон чергування — використайте bot/telegram_bot.py
-# на своєму VPS/сервері (той самий формат даних, docs у bot/README.md).
-#
-# ВАЖЛИВО: коміти цього workflow НЕ позначені [skip ci] навмисно — Pages
-# живить лише статичні файли з останнього білда, тому кожен коміт з новими
-# даними (route-alerts.json) має тригернути звичайний push-workflow
-# `deploy.yml`, який пересобере й передеплоїть сайт. Якщо повернути
-# [skip ci] у повідомлення коміту — GitHub взагалі не запустить жодного
-# push-workflow для цього коміту (це його вбудована поведінка, не залежить
-# від назви конкретного workflow), і оголошення про затримку ніколи не
-# зʼявиться на задеплоєному сайті, хоч у самому репозиторії дані вже оновлені.
-#
-# Змінити розклад чергування: відредагуйте `cron` нижче і, за бажання,
-# RUN_DURATION_MINUTES у Variables (Settings → Secrets and variables →
-# Actions → Variables).
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # Запуск каждые 6 часов и 30 минут (интервал смены)
+    - cron: '0 */6 * * *'
   workflow_dispatch: {}
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: telegram-bot
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   process:
     runs-on: ubuntu-latest
-    # Трохи менше за інтервал розкладу (30 хв), щоб завдання завжди встигало
-    # завершитись і закомітити до того, як GitHub спробує запустити наступне.
-    timeout-minutes: 27
+    # Лимит работы воркер-машины — 6 часов + запас на финализацию/комит
+    timeout-minutes: 375
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,7 +38,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run Telegram bot (long-polling чергування ~1 год)
+      - name: Run Telegram bot (6 hours shift)
         working-directory: frontend
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -76,15 +49,14 @@ jobs:
           DELAY_REPORT_THRESHOLD: ${{ vars.DELAY_REPORT_THRESHOLD || '5' }}
           DELAY_REPORT_WINDOW_MINUTES: ${{ vars.DELAY_REPORT_WINDOW_MINUTES || '60' }}
           DELAY_ALERT_DURATION_HOURS: ${{ vars.DELAY_ALERT_DURATION_HOURS || '2' }}
-          RUN_DURATION_MINUTES: ${{ vars.RUN_DURATION_MINUTES || '25' }}
+          # 360 минут = 6 часов непрерывной работы (long-polling)
+          RUN_DURATION_MINUTES: '360'
           POLL_TIMEOUT_SECONDS: ${{ vars.POLL_TIMEOUT_SECONDS || '25' }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: node scripts/process-telegram-bot.mjs
 
-      - name: Final safety-net commit
-        # Скрипт вище вже комітить після кожного циклу зі змінами — цей крок
-        # лише підстраховує, якщо щось лишилось незакомічене (наприклад,
-        # git push у скрипті не вдався через тимчасову мережеву помилку).
+      - name: Final commit & push updates
+        if: always()
         run: |
           git add frontend/data-runtime frontend/public/data/route-alerts.json
           git diff --cached --quiet || git commit -m "chore: process telegram bot updates"
