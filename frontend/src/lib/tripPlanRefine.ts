@@ -1,6 +1,7 @@
 import type { TripPlan } from '@/data/localData';
 import { estimateTripMinutes } from '@/data/localData';
-import { getWalkingRoutesBatch } from '@/lib/osrmRouting';
+import { getWalkingRoutesBatch, getTransitStreetPathsBatch } from '@/lib/osrmRouting';
+import { hasKmlGeometry } from '@/lib/mapLayers';
 
 /**
  * Другий, уточнюючий прохід по вже підібраних варіантах поїздки:
@@ -56,10 +57,33 @@ export async function refineTripPlansWithOSM(
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  const [boardResults, alightResults, transferResults] = await Promise.all([
+  // Для ділянок транспорту, для яких немає точної KML-геометрії маршруту
+  // (routeGeometries.json), окремо уточнюємо реальну вуличну трасу через
+  // OSRM (профіль driving) — інакше на карті лишається ламана лінія по
+  // рідких координатах самих зупинок. Індекси зберігаємо як (planIndex,
+  // legIndex), бо таких ділянок у різних планах — довільна, розріджена
+  // кількість (0, 1 або 2 на план).
+  const transitLegRefs: Array<{ planIndex: number; legIndex: number }> = [];
+  const transitPairs = plans.flatMap((plan, planIndex) =>
+    plan.legs
+      .map((leg, legIndex) => ({ leg, legIndex }))
+      .filter(({ leg }) => !hasKmlGeometry(leg.route.kind, leg.route.number))
+      .map(({ leg, legIndex }) => {
+        transitLegRefs.push({ planIndex, legIndex });
+        return {
+          aLat: leg.boardStop.position.lat,
+          aLng: leg.boardStop.position.lng,
+          bLat: leg.alightStop.position.lat,
+          bLng: leg.alightStop.position.lng
+        };
+      })
+  );
+
+  const [boardResults, alightResults, transferResults, transitResults] = await Promise.all([
     getWalkingRoutesBatch(boardPairs),
     getWalkingRoutesBatch(alightPairs),
-    getWalkingRoutesBatch(transferPairs)
+    getWalkingRoutesBatch(transferPairs),
+    getTransitStreetPathsBatch(transitPairs)
   ]);
 
   const refined: TripPlan[] = plans.map((plan, i) => {
@@ -72,6 +96,13 @@ export async function refineTripPlansWithOSM(
         transferWalkPath: transferResults[transferPos].coordinates
       };
     }
+    transitLegRefs.forEach((ref, idx) => {
+      if (ref.planIndex !== i) return;
+      const path = transitResults[idx];
+      if (path && path.length >= 2) {
+        legs[ref.legIndex] = { ...legs[ref.legIndex], transitPath: path };
+      }
+    });
     const updated: TripPlan = {
       ...plan,
       legs,

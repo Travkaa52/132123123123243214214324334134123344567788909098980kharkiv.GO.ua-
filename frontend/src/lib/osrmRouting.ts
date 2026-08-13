@@ -27,6 +27,7 @@ export interface OsrmWalkResult {
 }
 
 const OSRM_FOOT_BASE = 'https://router.project-osrm.org/route/v1/foot';
+const OSRM_DRIVING_BASE = 'https://router.project-osrm.org/route/v1/driving';
 const REQUEST_TIMEOUT_MS = 3000;
 
 /** Проста оцінка "запасним ходом", якщо OSRM недоступний: пряма відстань,
@@ -118,4 +119,61 @@ export async function getWalkingRoutesBatch(
   pairs: Array<{ aLat: number; aLng: number; bLat: number; bLng: number }>
 ): Promise<OsrmWalkResult[]> {
   return Promise.all(pairs.map((p) => getWalkingRoute(p.aLat, p.aLng, p.bLat, p.bLng)));
+}
+
+// Окремий кеш для наземного транспорту (профіль driving) — координати ті
+// самі, що й для пішоходів, могли б збігатись, тож ключі кешу розділяємо,
+// щоб пішохідний і транспортний профіль не переписували один одного.
+const drivingCache = new Map<string, [number, number][]>();
+
+/**
+ * Реальна вулична траса для ДІЛЯНКИ ТРАНСПОРТУ (не пішохода) між зупинкою
+ * посадки і зупинкою висадки — профіль OSRM "driving" (найближчий по духу
+ * до руху автобуса/тролейбуса/трамвая по вулицях, коли точної KML-схеми
+ * маршруту немає в routeGeometries.json).
+ *
+ * Це саме фолбек для ~половини маршрутів без офіційної KML-геометрії:
+ * без нього карта малювала ламану лінію по самих зупинках (`stopSequence`),
+ * що на рідких зупинках виглядає як прямі відрізки "навпростець" через
+ * квартали. Ніколи не кидає виняток — при помилці/таймауті повертає `null`,
+ * і виклик коду сам вирішує, чим замінити (проміжні зупинки або пряма).
+ */
+export async function getTransitStreetPath(
+  aLat: number,
+  aLng: number,
+  bLat: number,
+  bLng: number
+): Promise<[number, number][] | null> {
+  const key = cacheKey(aLat, aLng, bLat, bLng);
+  const cached = drivingCache.get(key);
+  if (cached) return cached;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const url = `${OSRM_DRIVING_BASE}/${aLng},${aLat};${bLng},${bLat}?overview=full&geometries=geojson`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const route = data?.routes?.[0];
+    const coords = route?.geometry?.coordinates as [number, number][] | undefined;
+    if (!coords || coords.length < 2) return null;
+
+    drivingCache.set(key, coords);
+    return coords;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Паралельно уточнює вуличну траєкторію для декількох ділянок транспорту
+ *  одразу (одна на кожен `leg`, для якого немає точної KML-геометрії). */
+export async function getTransitStreetPathsBatch(
+  pairs: Array<{ aLat: number; aLng: number; bLat: number; bLng: number }>
+): Promise<Array<[number, number][] | null>> {
+  return Promise.all(pairs.map((p) => getTransitStreetPath(p.aLat, p.aLng, p.bLat, p.bLng)));
 }

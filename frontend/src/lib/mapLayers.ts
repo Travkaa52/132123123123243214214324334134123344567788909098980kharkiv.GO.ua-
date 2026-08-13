@@ -15,6 +15,15 @@ function geometryKey(kind: TransportKind, number: string): string {
   return `${kind}-${number}`;
 }
 
+/** Чи є для цього маршруту точна геометрія з офіційної KML-схеми
+ *  (routeGeometries.json). Використовується як тригер для OSRM-фолбека
+ *  ділянки транспорту (getTransitStreetPath) — щоб не ганяти мережевий
+ *  запит там, де й так є найточніше можливе джерело. */
+export function hasKmlGeometry(kind: TransportKind, number: string): boolean {
+  const g = ROUTE_GEOMETRIES[geometryKey(kind, number)];
+  return !!g && g.length > 0;
+}
+
 function dominantKind(kinds: TransportKind[]): TransportKind {
   for (const k of KIND_PRIORITY) {
     if (kinds.includes(k as TransportKind)) return k as TransportKind;
@@ -314,6 +323,11 @@ export function buildTripPathGeoJson(
       const sliced = matchedPath.slice(lo, hi + 1);
       coords = iBoard <= iAlight ? sliced : [...sliced].reverse();
       if (coords.length < 2) coords = [boardCoord, alightCoord];
+    } else if (leg.transitPath && leg.transitPath.length >= 2) {
+      // Немає KML для цього маршруту, зате refineTripPlansWithOSM уже
+      // уточнив вуличну трасу через OSRM (профіль driving) — малюємо її
+      // замість ламаної по рідких координатах самих зупинок.
+      coords = leg.transitPath;
     } else if (startIdx !== -1 && endIdx !== -1) {
       coords = stopSequence
         .slice(startIdx, endIdx + 1)
