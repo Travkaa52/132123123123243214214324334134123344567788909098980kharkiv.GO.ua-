@@ -21,6 +21,7 @@
  */
 
 const AIR_ALERT_API_URL = 'https://ubilling.net.ua/aerialalerts/?source=klimenko&raw';
+const REQUEST_TIMEOUT_MS = 6000; // Таймаут мережевого запиту (6 сек)
 
 /** Точна назва області в офіційних довідниках тривог. */
 const KHARKIV_OBLAST_NAME = 'Харківська область';
@@ -61,8 +62,14 @@ interface HierarchicalAlertResponse {
 export interface AirAlertStatus {
   /** Чи оголошена тривога, яка стосується Харкова (уся область АБО Харківський район). */
   isAlert: boolean;
-  /** Час останньої зміни статусу, якщо джерело його надало. */
+  /** Час останньої зміни статусу у форматі ISO, якщо джерело його надало. */
   changedAt: string | null;
+}
+
+/** Нормалізує рядок дати YYYY-MM-DD HH:mm:ss до ISO для коректної роботи на iOS/WebKit */
+function normalizeDate(dateStr?: string | null): string | null {
+  if (!dateStr) return null;
+  return dateStr.includes(' ') ? dateStr.replace(' ', 'T') : dateStr;
 }
 
 function isHierarchical(data: unknown): data is HierarchicalAlertResponse {
@@ -87,18 +94,27 @@ function parseAirAlertResponse(data: unknown): AirAlertStatus {
     const districtAlert = kharkivDistrict?.enabled === true;
 
     const isAlert = wholeOblastAlert || districtAlert;
-    const changedAt = wholeOblastAlert
-      ? (kharkivOblast.enabled_at ?? null)
-      : (kharkivDistrict?.enabled_at ?? null);
+    
+    let rawChangedAt: string | null = null;
+    if (wholeOblastAlert) {
+      rawChangedAt = kharkivOblast.enabled_at ?? null;
+    } else if (districtAlert) {
+      rawChangedAt = kharkivDistrict?.enabled_at ?? null;
+    } else {
+      rawChangedAt = kharkivOblast.disabled_at ?? kharkivDistrict?.disabled_at ?? null;
+    }
 
-    return { isAlert, changedAt };
+    return { isAlert, changedAt: normalizeDate(rawChangedAt) };
   }
 
   const flat = data as FlatAlertResponse;
   const kharkiv = flat?.states?.[KHARKIV_OBLAST_NAME];
   if (!kharkiv) return { isAlert: false, changedAt: null };
 
-  return { isAlert: kharkiv.alertnow === true, changedAt: kharkiv.changed ?? null };
+  return { 
+    isAlert: kharkiv.alertnow === true, 
+    changedAt: normalizeDate(kharkiv.changed) 
+  };
 }
 
 /**
@@ -108,7 +124,11 @@ function parseAirAlertResponse(data: unknown): AirAlertStatus {
  */
 export async function fetchAirAlertStatus(): Promise<AirAlertStatus | null> {
   try {
-    const res = await fetch(AIR_ALERT_API_URL, { cache: 'no-store' });
+    const res = await fetch(AIR_ALERT_API_URL, { 
+      cache: 'no-store',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+    
     if (!res.ok) return null;
     const data = await res.json();
     return parseAirAlertResponse(data);
