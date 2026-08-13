@@ -89,7 +89,7 @@ OSM_STOPS.forEach((s) => {
  * ~15м кожен може зрештою злити чотири РІЗНІ реальні зупинки за 40+ метрів
  * одна від одної. Жорстка пара 1↔1 такого зробити не може за визначенням.
  */
-const DEDUPE_RADIUS_M = 15;
+const DEDUPE_RADIUS_M = 30;
 const GRID_SIZE_DEG = 0.0002;
 
 function gridKey(lat: number, lng: number): string {
