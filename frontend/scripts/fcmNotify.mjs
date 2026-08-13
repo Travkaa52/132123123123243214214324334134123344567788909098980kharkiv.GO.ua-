@@ -199,26 +199,36 @@ async function disableInvalidSubscription(id) {
 /**
  * Проверка соответствия подписки маршруту.
  */
+/**
+ * Порівнює обрані маршрути підписника (favorites зберігають ІД маршруту у
+ * форматі "<kind>-<номер>", напр. "trolleybus-1" — саме так побудовані
+ * frontend/src/data/routesReal.json) з routeNumber/kind, які адмін вводить
+ * окремо в боті (просто "1" + вид транспорту з кнопок). Пряме порівняння
+ * "routeStr in routes" ніколи не спрацьовувало через це.
+ */
+function routeMatches(subscriptionRoutes, routeNumber, kind) {
+  const routeStr = String(routeNumber ?? '');
+  if (routeStr.toLowerCase() === 'all') return true;
+
+  const composite = kind ? `${kind}-${routeStr}` : null;
+  const routes = Array.isArray(subscriptionRoutes) ? subscriptionRoutes.map(String) : [];
+
+  for (const r of routes) {
+    if (r === routeStr || r === composite) return true;
+    const dashIndex = r.indexOf('-');
+    if (dashIndex !== -1) {
+      const rKind = r.slice(0, dashIndex);
+      const rNum = r.slice(dashIndex + 1);
+      if (rNum === routeStr && (!kind || rKind === kind)) return true;
+    }
+  }
+  return false;
+}
+
 function subscriptionMatchesRoute(subscription, routeNumber, kind) {
   if (!subscription?.enabled) return false;
 
-  if (!subscription?.fcmToken) return false;
-
-  const routes = Array.isArray(subscription.routes)
-    ? subscription.routes.map(String)
-    : [];
-
-  const route = String(routeNumber ?? '');
-
-  if (route && routes.includes(route)) {
-    return true;
-  }
-
-  if (kind && routes.includes(String(kind))) {
-    return true;
-  }
-
-  return false;
+  return routeMatches(subscription.routes, routeNumber, kind);
 }
 
 /**
@@ -319,47 +329,43 @@ export async function notifyDelaySubscribers(
   kind,
   alertMessage
 ) {
-  if (!FCM_ENABLED || !db || !messaging) {
-    return {
-      sent: 0,
-      total: 0,
-      skipped: 'disabled',
-    };
-  }
-
   const subscriptions = await listPushSubscriptions();
+
+  const matched = subscriptions.filter((subscription) =>
+    subscriptionMatchesRoute(subscription, routeNumber, kind)
+  );
+
+  // telegramId (chat_id) записується фронтендом (frontend/src/lib/pushSubscription.ts)
+  // лише коли Mini App відкрито з Telegram — доступний незалежно від того,
+  // чи вдалось видати робочий FCM-токен на цьому пристрої/браузері.
+  // Викликач (process-telegram-bot.mjs) сам розсилає цим id особисті
+  // повідомлення від бота, дублюючи push.
+  const telegramIds = [
+    ...new Set(
+      matched
+        .map((s) => Number(s.telegramId))
+        .filter((id) => Number.isFinite(id))
+    ),
+  ];
+
+  if (!FCM_ENABLED || !db || !messaging) {
+    return { sent: 0, total: 0, skipped: 'disabled', telegramIds };
+  }
 
   if (!subscriptions.length) {
     console.log(
       `[bot] Firestore: pushSubscriptions пуст — подписчиков для маршруту ${routeNumber} не найдено.`
     );
-
-    return {
-      sent: 0,
-      total: 0,
-      skipped: 'no-subscribers',
-    };
+    return { sent: 0, total: 0, skipped: 'no-subscribers', telegramIds };
   }
 
-  const targets = subscriptions.filter(
-    (subscription) =>
-      subscriptionMatchesRoute(
-        subscription,
-        routeNumber,
-        kind
-      )
-  );
+  const targets = matched.filter((subscription) => subscription.fcmToken);
 
   if (!targets.length) {
     console.log(
-      `[bot] Підписників для маршруту ${String(routeNumber)} не знайдено.`
+      `[bot] Підписників з push-токеном для маршруту ${String(routeNumber)} не знайдено.`
     );
-
-    return {
-      sent: 0,
-      total: 0,
-      skipped: 'no-matching-subscribers',
-    };
+    return { sent: 0, total: 0, skipped: 'no-matching-subscribers', telegramIds };
   }
 
   let sent = 0;
@@ -384,6 +390,7 @@ export async function notifyDelaySubscribers(
   return {
     sent,
     total: targets.length,
+    telegramIds,
   };
 }
 
