@@ -56,6 +56,10 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
       - name: Configure git identity
         run: |
           git config --global user.name "github-actions[bot]"
