@@ -769,6 +769,35 @@ def send_preset_prompt(chat_id: int, route_number: str, kind: Optional[str]) -> 
     )
 
 
+def notify_delay_subscribers_in_dm(route_number: str, kind: Optional[str], alert_text: str, telegram_ids: list) -> int:
+    """Розсилає особисте повідомлення від бота кожному підписнику з
+    telegram_ids (їх видає notify_delay_subscribers() — це ті, хто увімкнув
+    сповіщення про затримки в Mini App і в кого зчитано Telegram id, див.
+    frontend/src/lib/pushSubscription.ts). Дублює push у Mini App: не всі
+    підписники тримають застосунок відкритим / мають робочий FCM-токен
+    (Safari, приватний режим тощо), а особисте повідомлення в Telegram
+    доходить надійніше. Помилка по одному підписнику (заблокував бота,
+    видалив чат) не зупиняє розсилку іншим."""
+    if not telegram_ids:
+        return 0
+    route_label = "усі маршрути" if str(route_number).lower() == "all" else f"маршрут {escape_html(str(route_number))}"
+    text = f"🚦 Затримка: <b>{route_label}</b> ({kind_badge(kind)})\n\n{escape_html(alert_text)}"
+    sent = 0
+    for uid in telegram_ids:
+        try:
+            resp = send_message(uid, text)
+        except Exception:  # noqa: BLE001
+            log.exception("Не вдалось надіслати ЛС про затримку підписнику %s", uid)
+            continue
+        if resp.get("ok"):
+            sent += 1
+        else:
+            # Найчастіша причина: користувач заблокував бота або чат
+            # видалено — це не помилка сценарію, просто логуємо і йдемо далі.
+            log.info("ЛС про затримку не доставлено %s: %s", uid, resp.get("description"))
+    return sent
+
+
 def create_alert_and_notify(chat_id: int, route_number: str, kind: Optional[str], alert_text: str, alerts: list, now: float) -> None:
     if not alert_text:
         send_message(chat_id, "Порожній текст оголошення — спробуйте ще раз.", reply_markup=main_menu_keyboard(True))
@@ -785,17 +814,20 @@ def create_alert_and_notify(chat_id: int, route_number: str, kind: Optional[str]
             "source": "manual",
         }
     )
+    dm_sent = 0
     try:
-        notify_delay_subscribers(route_number, kind, alert_text)
+        result = notify_delay_subscribers(route_number, kind, alert_text)
+        dm_sent = notify_delay_subscribers_in_dm(route_number, kind, alert_text, result.get("telegram_ids") or [])
     except Exception:  # noqa: BLE001
         log.exception("notify_delay_subscribers впав — оголошення все одно опубліковано в застосунку.")
     send_message(
         chat_id,
-        f"✅ Оголошення створено для маршруту <b>{escape_html(route_number)}</b> на {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год.",
+        f"✅ Оголошення створено для маршруту <b>{escape_html(route_number)}</b> на {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год.\n"
+        f"📨 Особисто в Telegram сповіщено: {dm_sent}.",
         reply_markup={"inline_keyboard": [[{"text": "🗑 Скасувати достроково", "callback_data": f"cancel_alert:{alert_id}"}]]},
     )
     send_message(chat_id, "Оберіть наступну дію 👇", reply_markup=main_menu_keyboard(True))
-    log.info("Оголошення створено (кнопки): id=%s маршрут=%s kind=%s", alert_id, route_number, kind)
+    log.info("Оголошення створено (кнопки): id=%s маршрут=%s kind=%s, ЛС надіслано=%s", alert_id, route_number, kind, dm_sent)
 
 
 # --- обробники повідомлень ----------------------------------------------------

@@ -148,26 +148,49 @@ def _disable_invalid_subscription(token: str, uid: str) -> None:
 def notify_delay_subscribers(route_number: str, kind: Optional[str], alert_message: str) -> dict:
     """Надсилає push про затримку всім підписаним на цей маршрут (або на весь
     вид транспорту `kind`). Тихо повертає {"sent": 0, ...}, якщо FCM вимкнено
-    чи підписників немає — виклик завжди безпечний, навіть без налаштувань."""
+    чи підписників немає — виклик завжди безпечний, навіть без налаштувань.
+
+    Крім переліку FCM push, у відповіді повертається "telegram_ids" —
+    унікальний список Telegram chat_id підписників на цей маршрут, у яких
+    у документі pushSubscriptions/{uid} збережено поле telegramId (записується
+    фронтендом при увімкненні сповіщень, якщо Mini App відкрито з Telegram —
+    див. frontend/src/lib/pushSubscription.ts). Викликач (telegram_bot.py)
+    сам розсилає цим id особисті повідомлення від бота — тут ми лише
+    визначаємо, кому саме."""
     if not FCM_ENABLED:
-        return {"sent": 0, "skipped": "disabled"}
+        return {"sent": 0, "skipped": "disabled", "telegram_ids": []}
 
     token = _get_access_token()
     if not token:
-        return {"sent": 0, "skipped": "no-token"}
+        return {"sent": 0, "skipped": "no-token", "telegram_ids": []}
 
     subs = _list_push_subscriptions(token)
     route_str = str(route_number)
     targets = []
+    telegram_ids: list[int] = []
+    seen_telegram_ids: set[int] = set()
     for s in subs:
-        if not s.get("enabled") or not s.get("fcmToken"):
+        if not s.get("enabled"):
             continue
         routes = [str(r) for r in (s.get("routes") or [])]
-        if route_str in routes or (kind and kind in routes):
+        if not (route_str in routes or (kind and kind in routes)):
+            continue
+
+        tg_id = s.get("telegramId")
+        if tg_id is not None:
+            try:
+                tg_id = int(tg_id)
+            except (TypeError, ValueError):
+                tg_id = None
+        if tg_id is not None and tg_id not in seen_telegram_ids:
+            seen_telegram_ids.add(tg_id)
+            telegram_ids.append(tg_id)
+
+        if s.get("fcmToken"):
             targets.append(s)
 
     if not targets:
-        return {"sent": 0, "skipped": "no-subscribers"}
+        return {"sent": 0, "skipped": "no-subscribers", "telegram_ids": telegram_ids}
 
     title = "Kharkiv GO — затримка руху"
     body = alert_message if len(alert_message) <= 180 else alert_message[:177] + "..."
@@ -202,4 +225,4 @@ def notify_delay_subscribers(route_number: str, kind: Optional[str], alert_messa
             log.warning("FCM send помилка для %s: %s", sub["id"], status or resp.status_code)
 
     log.info("Push про затримку маршруту %s: надіслано %s/%s.", route_str, sent, len(targets))
-    return {"sent": sent, "total": len(targets)}
+    return {"sent": sent, "total": len(targets), "telegram_ids": telegram_ids}
