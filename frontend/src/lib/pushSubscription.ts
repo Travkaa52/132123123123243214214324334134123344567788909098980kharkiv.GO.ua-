@@ -13,6 +13,7 @@
  */
 import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb, ensureAnonymousAuth, isFirebaseConfigured } from '@/lib/firebase';
+import { getTelegramUser } from '@/lib/telegram';
 
 export function isPushSubscriptionAvailable(): boolean {
   return (
@@ -83,6 +84,14 @@ export async function enableDelayPushSubscription(routeIds: string[]): Promise<b
   const token = await getFcmToken();
   if (!token) return false;
 
+  // Якщо Mini App відкрито з Telegram — зберігаємо ще й chat_id користувача,
+  // щоб бекенд-бот міг, крім push у застосунок, надіслати особисте
+  // повідомлення напряму в Telegram (надійніше за push: не залежить від
+  // FCM/Safari/увімкненого застосунку). Поза Telegram (звичайний браузер)
+  // getTelegramUser() поверне null — поле просто не пишеться, нічого не
+  // ламається, працює як і раніше лише через push.
+  const telegramUser = getTelegramUser();
+
   try {
     await setDoc(
       doc(db, 'pushSubscriptions', uid),
@@ -90,7 +99,8 @@ export async function enableDelayPushSubscription(routeIds: string[]): Promise<b
         fcmToken: token,
         routes: routeIds,
         enabled: true,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        ...(telegramUser ? { telegramId: telegramUser.id } : {})
       },
       { merge: true }
     );
@@ -100,6 +110,32 @@ export async function enableDelayPushSubscription(routeIds: string[]): Promise<b
     // uid у pushSubscriptions/{uid} (перевірте, що правило дозволяє
     // request.auth.uid == uid для create/update).
     console.error('[push] setDoc(pushSubscriptions) впав:', e);
+    return false;
+  }
+}
+
+/**
+ * Перевіряє, чи існує в Firestore РЕАЛЬНА (з fcmToken і enabled: true)
+ * підписка для поточного пристрою. Саме відсутність такого документа при
+ * увімкненому локальному перемикачі — головна причина "підписка є, а в
+ * Firebase її нема": перемикач delayNotificationsEnabled — це звичайне
+ * поле налаштувань, тож він міг стати true без реального виклику
+ * enableDelayPushSubscription() (наприклад, підтягнувся з хмарного
+ * знімка налаштувань іншого пристрою через useAccountCloudSync — а
+ * FCM-токен по своїй суті прив'язаний до конкретного браузера/пристрою
+ * і синхронізуватись між пристроями не може).
+ */
+export async function hasActivePushSubscription(): Promise<boolean> {
+  const db = getFirebaseDb();
+  if (!db) return false;
+
+  const uid = await ensureAnonymousAuth();
+  if (!uid) return false;
+
+  try {
+    const snapshot = await getDoc(doc(db, 'pushSubscriptions', uid));
+    return Boolean(snapshot.exists() && snapshot.data()?.enabled && snapshot.data()?.fcmToken);
+  } catch {
     return false;
   }
 }
