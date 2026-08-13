@@ -19,7 +19,10 @@ import {
   Heart,
   MapPin,
   Clock,
-  Download
+  Download,
+  CloudUpload,
+  Cloud,
+  LogOut
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { assetUrl } from '@/lib/assetUrl';
@@ -28,6 +31,8 @@ import { getInstallGuideUrl } from '@/lib/installGuide';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
+import { RegistrationModal } from '@/components/RegistrationModal';
+import { isFirebaseConfigured } from '@/lib/firebase';
 import {
   AboutAppModal,
   RateAppModal,
@@ -56,6 +61,9 @@ const SOCIAL_LINKS = [
 export function ProfilePage() {
   const profile = useAuthStore((s) => s.profile);
   const isTelegramEnv = useAuthStore((s) => s.isTelegramEnv);
+  const signOut = useAuthStore((s) => s.signOut);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const firebaseAvailable = isFirebaseConfigured();
 
   const favoriteStops = useFavoritesStore((s) => s.stops);
   const favoriteRoutes = useFavoritesStore((s) => s.routes);
@@ -241,6 +249,49 @@ export function ProfilePage() {
                 <span>Продовжити гостем</span>
               </a>
             </div>
+          </div>
+        )}
+
+        {profile && firebaseAvailable && (
+          <div className="overflow-hidden rounded-[22px] border border-border/60 bg-surface/80 backdrop-blur-2xl shadow-sm p-4">
+            {profile.firebaseUid ? (
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Cloud className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-bold text-ink-text">Хмарний акаунт підключено</h4>
+                  <p className="text-[11px] text-ink-muted truncate">
+                    {profile.email ?? 'Синхронізовано через Google'} — дані переносяться між Telegram і PWA
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  aria-label="Вийти з акаунту"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-soft text-ink-muted transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsLinkModalOpen(true)}
+                className="flex w-full items-center gap-3.5 text-left"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <CloudUpload className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-bold text-ink-text">Прив'язати email або Google</h4>
+                  <p className="text-[11px] text-ink-muted">
+                    Щоб обране й налаштування перенеслись у встановлений застосунок (PWA)
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-ink-muted shrink-0" />
+              </button>
+            )}
           </div>
         )}
 
@@ -494,6 +545,8 @@ export function ProfilePage() {
       <PrivacyPolicyModal open={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
       <SupportModal open={isSupportOpen} onClose={() => setIsSupportOpen(false)} />
       <SupportProjectModal open={isSupportProjectOpen} onClose={() => setIsSupportProjectOpen(false)} />
+
+      {isLinkModalOpen && <RegistrationModal variant="link" onClose={() => setIsLinkModalOpen(false)} />}
     </div>
   );
 }
