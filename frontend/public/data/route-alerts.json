@@ -1,4 +1,14 @@
 {
-  "updatedAt": "2026-08-13T12:16:41.687Z",
-  "items": []
+  "updatedAt": "2026-08-13T12:16:53.723Z",
+  "items": [
+    {
+      "id": 1786623413228,
+      "kind": "trolleybus",
+      "routeNumber": "1",
+      "message": "Затримка 20 хв через ДТП на Салтівці",
+      "createdAt": 1786623402.964,
+      "expiresAt": 1786630602.964,
+      "source": "manual"
+    }
+  ]
 }
