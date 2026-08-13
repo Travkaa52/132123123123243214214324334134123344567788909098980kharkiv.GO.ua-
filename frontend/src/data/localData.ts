@@ -1,7 +1,6 @@
 import { TransportKind } from '@/types/transport';
 import routesRealJson from './routesReal.json';
 import stopsRealJson from './stopsReal.json';
-import osmStopsJson from './stops.json';
 import { metroStopsData, metroRoutesData, METRO_INTERCHANGES } from './metroStationsReal';
 
 /**
@@ -58,113 +57,9 @@ interface RealRoute {
 
 const REAL_ROUTES = routesRealJson as unknown as RealRoute[];
 const REAL_STOPS = stopsRealJson as unknown as StopItem[];
-// Другий, незалежний набір зупинок — id тут це номери вузлів OpenStreetMap
-// (напр. "stop-2578454062"), а не послідовні "stop-1", "stop-2"...
-// Саме на ЦІ id посилаються stopIdsForward/Backward у ~79% маршрутів
-// routesReal.json (усі "route-<kind>-<number>-fwd/bwd" записи). Без цього
-// імпорту ті маршрути лишались би зі "зниклими" зупинками — валідний id
-// є, а відповідної зупинки в мапі немає.
-const OSM_STOPS = osmStopsJson as unknown as StopItem[];
 
 const stopsMap = new Map<string, StopItem>();
 REAL_STOPS.forEach((s) => stopsMap.set(s.id, s));
-OSM_STOPS.forEach((s) => {
-  // Обидва набори зупинок незалежні (id ніколи не перетинаються — перевірено),
-  // тож просто додаємо другий шар без ризику затерти щось із stopsReal.json.
-  if (!stopsMap.has(s.id)) stopsMap.set(s.id, s);
-});
-
-/**
- * Обидва набори зупинок описують ту саму фізичну мережу Харкова, зібрану
- * НЕЗАЛЕЖНО з двох джерел — тому та сама реальна зупинка часто має по
- * запису в кожному наборі, за кілька метрів одна від одної (напр.
- * "Інфекційна лікарня" з stopsReal.json і безіменна "Зупинка міського
- * транспорту" з stops.json). Без дедуплікації це два окремих кружечки на
- * карті майже впритул один до одного.
- *
- * Зіставляємо СУВОРО пара-до-пари (1:1, найближчий кандидат із ІНШОГО
- * набору) методом "жадібний найближчий сусід за зростанням відстані" —
- * НЕ транзитивною кластеризацією через грід-сусідів. Транзитивне
- * об'єднання тут перевірено небезпечне: ланцюжок A↔B↔C↔D із кроками по
- * ~15м кожен може зрештою злити чотири РІЗНІ реальні зупинки за 40+ метрів
- * одна від одної. Жорстка пара 1↔1 такого зробити не може за визначенням.
- */
-const DEDUPE_RADIUS_M = 30;
-const GRID_SIZE_DEG = 0.0002;
-
-function gridKey(lat: number, lng: number): string {
-  return `${Math.round(lat / GRID_SIZE_DEG)}:${Math.round(lng / GRID_SIZE_DEG)}`;
-}
-
-function haversineM(a: StopItem, b: StopItem): number {
-  const R = 6371000;
-  const lat1 = (a.position.lat * Math.PI) / 180;
-  const lat2 = (b.position.lat * Math.PI) / 180;
-  const dLat = ((b.position.lat - a.position.lat) * Math.PI) / 180;
-  const dLng = ((b.position.lng - a.position.lng) * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-// Родові, "не людські" назви (трапляються в ОБОХ наборах) — при виборі
-// канонічної назви пари програють будь-якій конкретній (напр. "Інфекційна
-// лікарня" переможе "Зупинка міського транспорту").
-function isGenericStopName(name: string): boolean {
-  return /^Зупинка(\s|$)/i.test(name.trim());
-}
-
-const osmBuckets = new Map<string, number[]>();
-OSM_STOPS.forEach((s, idx) => {
-  const k = gridKey(s.position.lat, s.position.lng);
-  if (!osmBuckets.has(k)) osmBuckets.set(k, []);
-  osmBuckets.get(k)!.push(idx);
-});
-
-interface Candidate {
-  d: number;
-  realIdx: number;
-  osmIdx: number;
-}
-const candidates: Candidate[] = [];
-REAL_STOPS.forEach((real, realIdx) => {
-  const [gx, gy] = gridKey(real.position.lat, real.position.lng).split(':').map(Number);
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      for (const osmIdx of osmBuckets.get(`${gx + dx}:${gy + dy}`) ?? []) {
-        const d = haversineM(real, OSM_STOPS[osmIdx]);
-        if (d <= DEDUPE_RADIUS_M) candidates.push({ d, realIdx, osmIdx });
-      }
-    }
-  }
-});
-candidates.sort((a, b) => a.d - b.d);
-
-const usedReal = new Set<number>();
-const usedOsm = new Set<number>();
-for (const c of candidates) {
-  if (usedReal.has(c.realIdx) || usedOsm.has(c.osmIdx)) continue;
-  usedReal.add(c.realIdx);
-  usedOsm.add(c.osmIdx);
-
-  const real = REAL_STOPS[c.realIdx];
-  const osm = OSM_STOPS[c.osmIdx];
-  const useRealName = !isGenericStopName(real.name) || isGenericStopName(osm.name);
-  const canonical: StopItem = {
-    id: useRealName ? real.id : osm.id,
-    name: useRealName ? real.name : osm.name,
-    kinds: Array.from(new Set([...real.kinds, ...osm.kinds])) as TransportKind[],
-    position: real.position,
-    routeIds: Array.from(new Set([...real.routeIds, ...osm.routeIds]))
-  };
-
-  // Обидва id (і з stopsReal.json, і з stops.json) тепер резолвляться в
-  // ОДИН об'єкт — на карті лишається один маркер, а StopDetailModal бачить
-  // повний список маршрутів незалежно від того, який саме id прийшов
-  // (наприклад, зі stopIdsForward/Backward якогось маршруту).
-  stopsMap.set(real.id, canonical);
-  stopsMap.set(osm.id, canonical);
-}
-
 // Станції метро (з KML, координати + українські назви) — окреме джерело,
 // без прив'язки до наземних маршрутів, але доступне для пошуку, вибору
 // на карті та як точка "Звідси"/"Куди" при побудові поїздки.
@@ -187,11 +82,7 @@ const routesData: RouteItem[] = REAL_ROUTES.map((r) => ({
   intervalMinutes: r.intervalMinutes
 }));
 
-// Дедуплікація по об'єкту (не по id!) — після кластеризації вище кілька
-// різних id можуть вказувати на ОДИН і той самий канонічний об'єкт
-// зупинки; без цього кроку він потрапив би у список стільки разів,
-// скільки id на нього посилається.
-const stopsData: StopItem[] = Array.from(new Set(stopsMap.values()));
+const stopsData: StopItem[] = Array.from(stopsMap.values());
 
 // Лінії метро як звичайні "маршрути" для роутера поїздок — жодної окремої
 // гілки логіки для метро не потрібно: buildTripOptions/buildTripPlans
