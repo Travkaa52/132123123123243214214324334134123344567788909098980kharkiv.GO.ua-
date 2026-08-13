@@ -25,22 +25,39 @@ export function isPushSubscriptionAvailable(): boolean {
 }
 
 async function getFcmToken(): Promise<string | null> {
-  if (!isPushSubscriptionAvailable()) return null;
+  if (!isPushSubscriptionAvailable()) {
+    console.warn(
+      '[push] isPushSubscriptionAvailable() = false — перевірте: VITE_FIREBASE_* + VITE_FIREBASE_VAPID_KEY задані на білді, серфейс підтримує Notification/serviceWorker.'
+    );
+    return null;
+  }
   try {
     const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
-    if (!(await isSupported())) return null;
+    if (!(await isSupported())) {
+      console.warn('[push] firebase/messaging isSupported() = false у цьому браузері (типово: Safari/приватний режим/старий браузер).');
+      return null;
+    }
 
     const { getFirebaseAuth } = await import('@/lib/firebase');
     const app = getFirebaseAuth()?.app;
-    if (!app) return null;
+    if (!app) {
+      console.warn('[push] getFirebaseAuth() не повернув app — Firebase не проініціалізовано.');
+      return null;
+    }
 
     const registration = await navigator.serviceWorker.ready;
     const messaging = getMessaging(app);
-    return await getToken(messaging, {
+    const token = await getToken(messaging, {
       vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
       serviceWorkerRegistration: registration
     });
-  } catch {
+    if (!token) console.warn('[push] getToken() повернув порожній токен.');
+    return token;
+  } catch (e) {
+    // Найчастіші причини: невалідний/відсутній VAPID-ключ, project ID не
+    // збігається з тим, під яким видано VAPID-ключ, або messagingSenderId
+    // не збігається з sender ID токена (напр. проєкт поміняли, а .env — ні).
+    console.error('[push] getFcmToken() впав:', e);
     return null;
   }
 }
@@ -78,7 +95,11 @@ export async function enableDelayPushSubscription(routeIds: string[]): Promise<b
       { merge: true }
     );
     return true;
-  } catch {
+  } catch (e) {
+    // Найчастіша причина: firestore.rules не дозволяють запис анонімному
+    // uid у pushSubscriptions/{uid} (перевірте, що правило дозволяє
+    // request.auth.uid == uid для create/update).
+    console.error('[push] setDoc(pushSubscriptions) впав:', e);
     return false;
   }
 }
