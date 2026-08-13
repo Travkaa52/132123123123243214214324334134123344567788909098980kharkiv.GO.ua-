@@ -74,6 +74,7 @@ import requests
 from dotenv import load_dotenv
 
 import supabase_sync
+from fcm_notify import notify_delay_subscribers
 
 load_dotenv()
 
@@ -784,6 +785,10 @@ def create_alert_and_notify(chat_id: int, route_number: str, kind: Optional[str]
             "source": "manual",
         }
     )
+    try:
+        notify_delay_subscribers(route_number, kind, alert_text)
+    except Exception:  # noqa: BLE001
+        log.exception("notify_delay_subscribers впав — оголошення все одно опубліковано в застосунку.")
     send_message(
         chat_id,
         f"✅ Оголошення створено для маршруту <b>{escape_html(route_number)}</b> на {fmt_hours(DELAY_ALERT_DURATION_HOURS)} год.",
@@ -1066,6 +1071,10 @@ def handle_callback_query(cq: dict, alerts: list, pending_prompts: list, delay_r
         }
     )
     pending_prompts[:] = [p for p in pending_prompts if not (p["routeNumber"] == route_number and p["kind"] == kind)]
+    try:
+        notify_delay_subscribers(route_number, kind, text)
+    except Exception:  # noqa: BLE001
+        log.exception("notify_delay_subscribers впав — оголошення все одно опубліковано в застосунку.")
 
     tg(
         "editMessageText",

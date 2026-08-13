@@ -62,7 +62,37 @@ App (карта, маршрути, профіль) дійсно повністю
 `/setdescription` і `/setabouttext` — просто текст, який бот показує до
 першого повідомлення.
 
-## 5. Перевірка
+## 5. Push-сповіщення про затримку (Firebase)
+
+Коли адмін оголошує затримку (кнопкою "📢 Оголосити затримку" або
+командою `/alert`), бот тепер додатково розсилає push-сповіщення всім,
+хто додав відповідний маршрут (або весь вид транспорту) в "Обране" й
+увімкнув сповіщення в застосунку — і на розблокований, і на заблокований
+екран (звичайний системний push через Firebase Cloud Messaging).
+
+Щоб увімкнути:
+
+1. У [Firebase Console](https://console.firebase.google.com/) → тому ж
+   проєкті, що вказаний у `VITE_FIREBASE_*` (`deploy.yml`) → **Project
+   settings → Service accounts → Generate new private key**. Завантажиться
+   `.json`-файл — це службовий обліковий запис із правами на Firestore і
+   Firebase Cloud Messaging.
+2. Скопіюйте весь вміст файлу (або закодуйте в base64 — підтримується
+   обидва варіанти) і збережіть як секрет репозиторію
+   **`FIREBASE_SERVICE_ACCOUNT_JSON`** (Settings → Secrets and variables →
+   Actions → Secrets) — для `.github/workflows/telegram-bot.yml`. Для
+   `bot/telegram_bot.py` (VPS-варіант) — те саме значення в `.env`
+   (`FIREBASE_SERVICE_ACCOUNT_JSON=...`) і `pip install -r requirements.txt`
+   (додано залежність `google-auth`).
+3. Нічого більше налаштовувати не треба: якщо секрет не задано, бот просто
+   мовчки не шле push (усе інше — оголошення в застосунку, Telegram-меню —
+   продовжує працювати як і раніше).
+
+⚠️ Тримайте цей ключ у секреті — він дає повний доступ на читання/запис до
+Firestore проєкту (обходить `firestore.rules`, які діють лише на клієнтські
+SDK-запити).
+
+## 6. Перевірка
 
 
 Відкрийте `t.me/<ваш_бот>/app` у мобільному Telegram (Mini App у десктоп-
