@@ -21,3 +21,10 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+# TypeScript incremental build cache — стає непослідовним при ручному
+# редагуванні файлів поза tsc (мтайм не оновлюється), через що `tsc -b`
+# інколи пропускає перевірку змінених файлів і падає з застарілими
+# помилками типів. Кеш регенерується сам при наступному білді.
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
