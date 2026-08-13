@@ -28,7 +28,7 @@ import { BOT_USERNAME } from '@/lib/botConfig';
  * - DONATION_CARD_NUMBER / DONATION_JAR_URL — реквізити для донатів.
  */
 const TELEGRAM_BOT_URL = `https://t.me/${BOT_USERNAME}`;
-const DONATION_CARD_NUMBER = '0000 0000 0000 0000';
+const DONATION_CARD_NUMBER = '5355 5732 5047 6310';
 const DONATION_JAR_URL = 'https://send.monobank.ua/jar/6S34HzcLMS';
 // Google-форма зворотного зв'язку — запасний канал поруч із чатом у боті.
 // Стилізувати вміст самої форми неможливо (кросдоменний iframe), тож
