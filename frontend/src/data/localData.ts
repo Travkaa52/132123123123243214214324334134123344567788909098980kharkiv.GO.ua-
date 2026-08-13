@@ -175,15 +175,60 @@ REAL_STOPS.forEach((real, realIdx) => {
 });
 candidates.sort((a, b) => a.d - b.d);
 
+/**
+ * ФІКС "КУПИ ЗУПИНОК": раніше тут була СУВОРА пара 1↔1 — кожна реальна
+ * зупинка забирала СОБІ ЛИШЕ НАЙБЛИЖЧУ OSM-точку, решта кандидатів у
+ * радіусі (навіть 5-15м) лишались "непрочитаними" і потрапляли на карту
+ * як власні окремі кружечки. А насправді для однієї фізичної зупинки
+ * (особливо великого вузла на кілька видів транспорту) джерело stops.json
+ * (OSM) часто містить ПО ДЕКІЛЬКА точок — окремо для тролейбусної/
+ * автобусної платформи, окремо безіменний вузол "Зупинка міського
+ * транспорту" тощо. Приклад з бага: біля stop-105 (вул. М. Кравченка,
+ * bus+trolleybus) в радіусі 30м лежало ОДРАЗУ 2 OSM-точки (4.9м і 12.5м),
+ * а біля stop-303 (той самий перетин, tram+trolleybus+bus) — ще 3 (21.7м,
+ * 24.7м, 26.5м). Стара логіка забирала по ОДНІЙ найближчій на кожну
+ * реальну зупинку — 3 OSM-точки лишались "зайвими" й малювались окремими
+ * кружечками поруч.
+ *
+ * Рішення: реальна зупинка тепер поглинає ВСІ ще не зайняті OSM-точки в
+ * радіусі (не лише найближчу) — це "багато-до-одного", а не "одна-до-
+ * одної". Проходимо кандидатів за зростанням відстані, тож ближчі OSM-
+ * точки для кожної реальної зупинки все одно розбираються першими; але
+ * жодна OSM-точка в радіусі вже не лишається невикористаною, якщо її
+ * реальна зупинка ще не "зайнята" кимось іншим.
+ *
+ * НЕ para 1↔1: реальна зупинка (usedReal) все ще використовується один
+ * раз — це узгоджено з коментарем вище про небезпеку транзитивного
+ * злиття (A↔B↔C↔D): тут зливаємо лише "зірку" навколо ОДНІЄЇ реальної
+ * точки, а не ланцюжок між сусідніми OSM-точками одна через одну.
+ * Завдяки цьому фізично інша зупинка на тому ж перехресті (напр.
+ * трамвайна платформа за 36м — за межею DEDUPE_RADIUS_M) і далі
+ * лишається окремим кружечком, як і має бути.
+ */
 const usedReal = new Set<number>();
 const usedOsm = new Set<number>();
 for (const c of candidates) {
-  if (usedReal.has(c.realIdx) || usedOsm.has(c.osmIdx)) continue;
-  usedReal.add(c.realIdx);
-  usedOsm.add(c.osmIdx);
+  if (usedOsm.has(c.osmIdx)) continue;
 
   const real = REAL_STOPS[c.realIdx];
   const osm = OSM_STOPS[c.osmIdx];
+
+  if (usedReal.has(c.realIdx)) {
+    // Цю реальну зупинку вже ініціалізовано canonical-об'єктом раніше
+    // (ближчим кандидатом) — доклеюємо цю OSM-точку до НЬОГО, а не
+    // створюємо новий об'єкт.
+    const canonical = stopsMap.get(real.id)!;
+    usedOsm.add(c.osmIdx);
+    const osmValidRouteIds = osm.routeIds.map(legacyRouteIdToCurrent).filter((id) => VALID_ROUTE_IDS.has(id));
+    canonical.kinds = Array.from(new Set([...canonical.kinds, ...osm.kinds])) as TransportKind[];
+    canonical.routeIds = Array.from(new Set([...canonical.routeIds, ...osmValidRouteIds]));
+    stopsMap.set(osm.id, canonical);
+    continue;
+  }
+
+  usedReal.add(c.realIdx);
+  usedOsm.add(c.osmIdx);
+
   const useRealName = !isGenericStopName(real.name) || isGenericStopName(osm.name);
   const osmValidRouteIds = osm.routeIds.map(legacyRouteIdToCurrent).filter((id) => VALID_ROUTE_IDS.has(id));
   const canonical: StopItem = {
