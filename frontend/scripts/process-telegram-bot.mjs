@@ -12,6 +12,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { replaceRouteAlerts, insertDelayReports } from './supabaseSync.mjs';
+import { notifyDelaySubscribers } from './fcmNotify.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -370,6 +371,12 @@ async function processCycle() {
 
           pendingPrompts = pendingPrompts.filter((p) => !(p.routeNumber === routeNumber && p.kind === kind));
 
+          try {
+            await notifyDelaySubscribers(routeNumber, kind, text);
+          } catch (err) {
+            console.error('[bot] notifyDelaySubscribers впав — оголошення все одно опубліковано в застосунку.', err);
+          }
+
           await editMessageText(
             chatId,
             cq.message.message_id,
@@ -452,6 +459,12 @@ async function processCycle() {
         expiresAt: now + DELAY_ALERT_DURATION_HOURS * 3600,
         source: 'manual'
       });
+
+      try {
+        await notifyDelaySubscribers(routeNumber, kind, alertText);
+      } catch (err) {
+        console.error('[bot] notifyDelaySubscribers впав — оголошення все одно опубліковано в застосунку.', err);
+      }
 
       await sendMessage(
         chatId,
