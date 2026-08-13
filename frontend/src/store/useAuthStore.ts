@@ -96,38 +96,39 @@ export const useAuthStore = create<AuthState>()(
       },
       applyFirebaseUser: (user, provider) => {
         const existing = get().profile;
-        const profile: UserProfile = {
-          telegramId: existing?.telegramId ?? generateLocalId(),
-          displayName: user.displayName?.trim() || existing?.displayName || user.email?.split('@')[0] || 'Користувач',
-          avatarUrl: user.photoURL ?? existing?.avatarUrl,
-          avatarEmoji: existing?.avatarEmoji,
-          languageCode: existing?.languageCode ?? 'uk',
-          createdAt: existing?.createdAt ?? new Date().toISOString(),
-          isLocal: false,
-          firebaseUid: user.uid,
-          email: user.email ?? undefined,
-          authProvider: provider
-        };
+        // Профіль з Telegram (реальний, позитивний telegramId, не локальний
+        // гість) — це "справжня" ідентичність людини. Прив'язка email/Google
+        // акаунту в такому разі не підміняє ім'я/аватар з Telegram, а лише
+        // додає firebaseUid — саме цей uid потім використовується як ключ
+        // хмарної синхронізації, завдяки якій дані переносяться в PWA поза
+        // Telegram. Для локального гостя або першого входу через email/Google
+        // — профіль формується з даних Firebase-акаунту.
+        const isTelegramProfile = Boolean(existing && existing.telegramId > 0 && !existing.isLocal);
+
+        const profile: UserProfile = isTelegramProfile
+          ? { ...(existing as UserProfile), firebaseUid: user.uid, email: user.email ?? existing?.email, authProvider: provider }
+          : {
+              telegramId: existing?.telegramId ?? generateLocalId(),
+              displayName:
+                user.displayName?.trim() || existing?.displayName || user.email?.split('@')[0] || 'Користувач',
+              avatarUrl: user.photoURL ?? existing?.avatarUrl,
+              avatarEmoji: existing?.avatarEmoji,
+              languageCode: existing?.languageCode ?? 'uk',
+              createdAt: existing?.createdAt ?? new Date().toISOString(),
+              isLocal: false,
+              firebaseUid: user.uid,
+              email: user.email ?? undefined,
+              authProvider: provider
+            };
         set({ profile, hasCompletedOnboarding: true });
       },
       registerWithEmailAccount: async ({ displayName, email, password }) => {
         set({ isAuthLoading: true });
         const result = await registerWithEmail(email, password, displayName.trim());
         if (result.ok && result.user) {
-          const profile: UserProfile = {
-            telegramId: get().profile?.telegramId ?? generateLocalId(),
-            displayName: displayName.trim(),
-            languageCode: 'uk',
-            createdAt: new Date().toISOString(),
-            isLocal: false,
-            firebaseUid: result.user.uid,
-            email: result.user.email ?? email,
-            authProvider: 'password'
-          };
-          set({ profile, hasCompletedOnboarding: true, isAuthLoading: false });
-        } else {
-          set({ isAuthLoading: false });
+          get().applyFirebaseUser(result.user, 'password');
         }
+        set({ isAuthLoading: false });
         return result;
       },
       loginWithEmailAccount: async ({ email, password }) => {
