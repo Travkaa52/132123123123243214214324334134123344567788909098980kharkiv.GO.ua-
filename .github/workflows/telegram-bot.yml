@@ -58,7 +58,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: install
+        run: npm install
 
       - name: Configure git identity
         run: |
