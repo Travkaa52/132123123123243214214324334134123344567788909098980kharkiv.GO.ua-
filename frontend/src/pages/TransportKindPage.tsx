@@ -22,6 +22,7 @@ import { AirAlertBanner } from '@/components/AirAlertBanner';
 import { MetroLinesExplorer } from '@/components/MetroLinesExplorer';
 import { routesApi } from '@/api/routes';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { localStops } from '@/data/localData';
 import type { TransportKind, TransportRoute } from '@/types/transport';
 
 interface TransportMeta {
@@ -120,12 +121,28 @@ export function TransportKindPage({ kind }: { kind: TransportKind }) {
   const filteredRoutes = useMemo(() => {
     let result = routes;
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) {
+      const query = trimmedQuery.toLowerCase();
+
+      // Пошук за назвою зупинки: окремо шукаємо всі зупинки, що відповідають
+      // запиту, і будуємо з їхніх id множину — щоб не ганяти localStops.search
+      // всередині .filter() по кожному маршруту (O(routes × stops) замість
+      // одного проходу по зупинках + O(1) перевірки на маршрут).
+      const matchingStopIds = new Set(localStops.search(query).map((s) => s.id));
+
       result = result.filter((r) => {
         const numMatch = r.number != null && String(r.number).toLowerCase().includes(query);
         const nameMatch = r.name != null && r.name.toLowerCase().includes(query);
-        return numMatch || nameMatch;
+        // Пошук за напрямком: "туди"/"назад" кінцева зупинка маршруту
+        // (headsignForward/headsignBackward), напр. "Салтівка" чи "Одеська".
+        const directionMatch =
+          (r.headsignForward != null && r.headsignForward.toLowerCase().includes(query)) ||
+          (r.headsignBackward != null && r.headsignBackward.toLowerCase().includes(query));
+        // Пошук за назвою зупинки: маршрут підходить, якщо серед його
+        // зупинок є хоч одна, що відповідає запиту.
+        const stopMatch = matchingStopIds.size > 0 && r.stopIds.some((id) => matchingStopIds.has(id));
+        return numMatch || nameMatch || directionMatch || stopMatch;
       });
     }
 
@@ -256,7 +273,7 @@ export function TransportKindPage({ kind }: { kind: TransportKind }) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Пошук маршруту..."
+              placeholder="Номер, зупинка або напрямок..."
               className="w-full rounded-[20px] border border-border/40 bg-surface-raised py-3 pl-10 pr-10 text-xs font-semibold text-ink-text placeholder:text-ink-muted shadow-sm focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
             />
             {searchQuery && (

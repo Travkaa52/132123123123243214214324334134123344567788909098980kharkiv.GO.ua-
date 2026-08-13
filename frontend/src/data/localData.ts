@@ -330,8 +330,33 @@ REAL_ROUTES.forEach((r) => {
 
 /** Усі відомі напрямки руху для маршруту (мінімум один — навіть якщо
  *  дані з якоїсь причини не містили окремого зворотного напрямку). */
-function getRouteDirections(route: RouteItem): RouteDirectionVariant[] {
+export function getRouteDirections(route: RouteItem): RouteDirectionVariant[] {
   return routeDirectionsById.get(route.id) ?? [{ headsign: route.headsignForward, stopIds: route.stopIds }];
+}
+
+/**
+ * ФІКС НАПРЯМКУ НА ЗУПИНЦІ: StopDetailModal раніше завжди показував
+ * route.headsignForward для кожного маршруту на зупинці — незалежно від
+ * того, яким напрямком цей маршрут ФАКТИЧНО проходить саме тут. Але
+ * зупинка (особливо після дедуплікації real+OSM, див. коментар вище над
+ * DEDUPE_RADIUS_M) часто обслуговує маршрут лише в ОДНОМУ з двох
+ * напрямків — напр. stop-105 на вул. М. Кравченка стоїть лише на
+ * "зворотному" напрямку тролейбуса №3, і показ headsignForward ("Університетська")
+ * замість справжнього headsignBackward тут вводив в оману: пасажир бачив
+ * не ту кінцеву, куди насправді повезе рейс із цієї зупинки.
+ *
+ * Повертає лише ті напрямки маршруту, у яких stopId дійсно є в
+ * stopIds цього напрямку (може бути один, чи навіть обидва — якщо
+ * зупинка стоїть на прямій вулиці й обслуговує рух в обидва боки з
+ * одного й того самого фізичного місця).
+ */
+export function getStopDirectionsForRoute(route: RouteItem, stopId: string): RouteDirectionVariant[] {
+  const directions = getRouteDirections(route);
+  const matching = directions.filter((d) => d.stopIds.includes(stopId));
+  // Якщо з якоїсь причини жоден напрямок формально не містить цей stopId
+  // (напр. дані розійшлись після дедуплікації зупинок) — краще показати
+  // хоч щось (усі відомі напрямки), ніж лишити порожній список.
+  return matching.length > 0 ? matching : directions;
 }
 
 export interface TripOption {
