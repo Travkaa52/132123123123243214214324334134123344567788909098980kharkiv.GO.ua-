@@ -11,7 +11,9 @@ import { useTelegramEnvironment } from '@/hooks/useTelegramEnvironment';
 import { useThemeSync } from '@/hooks/useThemeSync';
 import { useAppReady } from '@/hooks/useAppReady';
 import { useDepartureReminder } from '@/hooks/useDepartureReminder';
+import { useAccountCloudSync } from '@/hooks/useAccountCloudSync';
 import { useAuthStore } from '@/store/useAuthStore';
+import { consumeGoogleRedirectResult } from '@/lib/firebase';
 import { HomePage } from '@/pages/HomePage';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -87,6 +89,25 @@ export default function App() {
   const telegramStatus = useTelegramEnvironment();
   useThemeSync();
   useDepartureReminder();
+  useAccountCloudSync();
+
+  // Забираємо результат Google-входу через signInWithRedirect: у деяких
+  // мобільних WebView (зокрема всередині Telegram Mini App) popup-вікна
+  // блокуються, тож loginWithGoogle() падає назад на redirect-флоу — після
+  // повернення на сторінку результат треба явно "забрати" один раз при
+  // старті застосунку і застосувати як звичайний вхід через Google.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await consumeGoogleRedirectResult();
+      if (!cancelled && result?.ok && result.user) {
+        useAuthStore.getState().applyFirebaseUser(result.user, 'google');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const appReady = useAppReady();
   const [splashMounted, setSplashMounted] = useState<boolean>(true);
@@ -106,6 +127,23 @@ export default function App() {
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
   const showRegistration =
     telegramStatus === 'outside' && !hasCompletedOnboarding && !splashMounted && !isInstallAppRoute;
+
+  // У Telegram профіль підтягується автоматично (hydrateFromTelegram), тож
+  // повноекранна форма реєстрації там не потрібна. Але щоб перші
+  // користувачі одразу могли прив'язати email/Google (і в майбутньому не
+  // втратити обране/історію при переході в PWA — див. useAccountCloudSync),
+  // одразу після спліш-екрана один раз показуємо їм ненав'язливе (з
+  // хрестиком) запрошення прив'язати акаунт. Далі — лише вручну з профілю.
+  const profile = useAuthStore((s) => s.profile);
+  const hasSeenAccountPrompt = useAuthStore((s) => s.hasSeenAccountPrompt);
+  const markAccountPromptSeen = useAuthStore((s) => s.markAccountPromptSeen);
+  const showAccountPrompt =
+    telegramStatus === 'inside' &&
+    Boolean(profile) &&
+    !profile?.firebaseUid &&
+    !hasSeenAccountPrompt &&
+    !splashMounted &&
+    !isInstallAppRoute;
 
   // Карта — важкий компонент (ініціалізація MapLibre, завантаження стилю,
   // тайлів, шрифтів). Щоб вона відкривалась миттєво щоразу після першого
@@ -174,6 +212,8 @@ export default function App() {
       <DevToolsGuardOverlay />
 
       {showRegistration && <RegistrationModal />}
+
+      {showAccountPrompt && <RegistrationModal variant="link" onClose={markAccountPromptSeen} />}
 
       {splashMounted && (
         <SplashScreen
