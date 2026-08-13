@@ -1,4 +1,14 @@
 {
-  "updatedAt": "2026-08-13T20:36:00.588Z",
-  "items": []
+  "updatedAt": "2026-08-13T20:36:08.688Z",
+  "items": [
+    {
+      "id": 1786653367625,
+      "kind": "trolleybus",
+      "routeNumber": "1",
+      "message": "ТЕСТ",
+      "createdAt": 1786653361.795,
+      "expiresAt": 1786660561.795,
+      "source": "manual"
+    }
+  ]
 }
