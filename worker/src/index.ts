@@ -37,6 +37,14 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_KEY: string;
 
+  /**
+   * JSON (або base64 від JSON) сервісного акаунта Firebase — той самий, що
+   * використовує frontend/scripts/fcmNotify.mjs у старому cron-боті. Потрібен,
+   * щоб Worker міг сам розіслати push одразу після створення route_alerts,
+   * не чекаючи наступного запуску GitHub Actions (до 30 хв).
+   */
+  FIREBASE_SERVICE_ACCOUNT_JSON?: string;
+
   DELAY_REPORT_THRESHOLD?: string;
   DELAY_REPORT_WINDOW_MINUTES?: string;
   DELAY_ALERT_DURATION_HOURS?: string;
@@ -284,6 +292,227 @@ async function maybeRaiseAlert(kind: string, routeNumber: string, env: Env): Pro
   };
 
   await supabaseInsert(env, 'route_alerts', [alert], 'resolution=merge-duplicates,return=minimal');
+
+  // Push підписникам маршруту — у фоні, той самий HTTP-запит webhook-у на це
+  // не чекає (виклик іде з ctx.waitUntil ще на рівні handleTelegramWebhook).
+  // Якщо FIREBASE_SERVICE_ACCOUNT_JSON не задано — просто нічого не шлемо
+  // (push і далі розішле старий cron-бот раз на 30 хв, як резерв).
+  await notifyDelaySubscribers(env, kind, routeNumber, alert.message);
+}
+
+// --- FCM push (той самий підхід, що в frontend/scripts/fcmNotify.mjs, але
+// на Web Crypto замість Node-only firebase-admin, бо Worker це не Node) -----
+
+interface ServiceAccount {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+function parseServiceAccount(raw: string | undefined): ServiceAccount | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ServiceAccount;
+  } catch {
+    // fallthrough
+  }
+  try {
+    return JSON.parse(atob(raw)) as ServiceAccount;
+  } catch {
+    return null;
+  }
+}
+
+function base64url(bytes: ArrayBuffer | Uint8Array): string {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let str = '';
+  for (const b of arr) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  const body = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s+/g, '');
+  const raw = atob(body);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return crypto.subtle.importKey(
+    'pkcs8',
+    bytes.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+}
+
+let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+
+async function getGoogleAccessToken(sa: ServiceAccount): Promise<string | null> {
+  if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt - 60_000) {
+    return cachedAccessToken.token;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claims = {
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: nowSeconds,
+    exp: nowSeconds + 3600
+  };
+
+  const encoder = new TextEncoder();
+  const unsigned = `${base64url(encoder.encode(JSON.stringify(header)))}.${base64url(
+    encoder.encode(JSON.stringify(claims))
+  )}`;
+
+  try {
+    const key = await importPrivateKey(sa.private_key);
+    const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, encoder.encode(unsigned));
+    const jwt = `${unsigned}.${base64url(signature)}`;
+
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt
+      })
+    });
+    if (!res.ok) {
+      console.error(`google token exchange -> ${res.status}: ${await res.text()}`);
+      return null;
+    }
+    const data = (await res.json()) as { access_token: string; expires_in: number };
+    cachedAccessToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+    return data.access_token;
+  } catch (err) {
+    console.error('google token exchange error', err);
+    return null;
+  }
+}
+
+interface FirestoreSubscription {
+  uid: string;
+  fcmToken: string;
+  routes: string[];
+}
+
+/** Firestore REST API замість Admin SDK (Admin SDK не працює у Workers runtime). */
+async function listPushSubscriptions(sa: ServiceAccount, accessToken: string): Promise<FirestoreSubscription[]> {
+  const out: FirestoreSubscription[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL(
+      `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/pushSubscriptions`
+    );
+    url.searchParams.set('pageSize', '300');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) {
+      console.error(`firestore list -> ${res.status}: ${await res.text()}`);
+      break;
+    }
+    const data = (await res.json()) as {
+      documents?: Array<{ name: string; fields?: Record<string, any> }>;
+      nextPageToken?: string;
+    };
+
+    for (const doc of data.documents ?? []) {
+      const fields = doc.fields ?? {};
+      const enabled = fields.enabled?.booleanValue;
+      const fcmToken = fields.fcmToken?.stringValue;
+      if (enabled !== true || !fcmToken) continue;
+      const routes = (fields.routes?.arrayValue?.values ?? [])
+        .map((v: any) => v.stringValue)
+        .filter(Boolean);
+      out.push({ uid: doc.name.split('/').pop() ?? '', fcmToken, routes });
+    }
+
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return out;
+}
+
+async function sendFcmPush(
+  sa: ServiceAccount,
+  accessToken: string,
+  fcmToken: string,
+  title: string,
+  body: string,
+  data: Record<string, string>
+): Promise<{ ok: boolean; invalid: boolean }> {
+  try {
+    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          token: fcmToken,
+          notification: { title, body },
+          data,
+          webpush: { fcm_options: { link: '/' } }
+        }
+      })
+    });
+    if (res.ok) return { ok: true, invalid: false };
+    const errData = (await res.json().catch(() => null)) as { error?: { status?: string } } | null;
+    const status = errData?.error?.status ?? '';
+    console.warn(`fcm send -> ${res.status}: ${status}`);
+    return { ok: false, invalid: status === 'NOT_FOUND' || status === 'UNREGISTERED' || status === 'INVALID_ARGUMENT' };
+  } catch (err) {
+    console.warn('fcm send network error', err);
+    return { ok: false, invalid: false };
+  }
+}
+
+async function disableInvalidSubscription(sa: ServiceAccount, accessToken: string, uid: string): Promise<void> {
+  try {
+    await fetch(
+      `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents/pushSubscriptions/${uid}?updateMask.fieldPaths=enabled`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { enabled: { booleanValue: false } } })
+      }
+    );
+  } catch {
+    // не критично — старий cron-бот теж прибирає невалідні токени
+  }
+}
+
+async function notifyDelaySubscribers(
+  env: Env,
+  kind: string,
+  routeNumber: string,
+  alertMessage: string
+): Promise<void> {
+  const sa = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!sa) return; // push вимкнені — резервний cron-бот все одно розішле пізніше
+
+  const accessToken = await getGoogleAccessToken(sa);
+  if (!accessToken) return;
+
+  const subs = await listPushSubscriptions(sa, accessToken);
+  const targets = subs.filter((s) => s.routes.includes(routeNumber) || s.routes.includes(kind));
+  if (!targets.length) return;
+
+  const body = alertMessage.length <= 180 ? alertMessage : `${alertMessage.slice(0, 177)}...`;
+
+  for (const sub of targets) {
+    const result = await sendFcmPush(sa, accessToken, sub.fcmToken, 'Kharkiv GO — затримка руху', body, {
+      routeNumber,
+      kind,
+      url: '/'
+    });
+    if (result.invalid) await disableInvalidSubscription(sa, accessToken, sub.uid);
+  }
 }
 
 // --- Chat state у KV (заміна файлового data-runtime/chat-states.json) ------

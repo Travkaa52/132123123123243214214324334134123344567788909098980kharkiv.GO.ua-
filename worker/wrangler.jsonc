@@ -29,6 +29,10 @@
   //   TELEGRAM_WEBHOOK_SECRET
   //   SUPABASE_URL
   //   SUPABASE_SERVICE_KEY
+  //   FIREBASE_SERVICE_ACCOUNT_JSON   (той самий JSON, що й у секреті
+  //                                    GitHub Actions — потрібен, щоб Worker
+  //                                    сам розсилав push одразу, без 30-хв
+  //                                    очікування cron-бота)
   "vars": {
     "DELAY_REPORT_THRESHOLD": "5",
     "DELAY_REPORT_WINDOW_MINUTES": "60",
