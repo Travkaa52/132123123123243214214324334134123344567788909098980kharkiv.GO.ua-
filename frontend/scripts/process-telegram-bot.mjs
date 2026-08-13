@@ -122,6 +122,39 @@ function sendMessage(chatId, text, extra = {}) {
   return tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', ...extra });
 }
 
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Розсилає особисте повідомлення від бота підписникам, чиї Telegram id
+ * (chat_id) відомі — див. notifyDelaySubscribers() у fcmNotify.mjs та
+ * frontend/src/lib/pushSubscription.ts (поле telegramId пишеться там,
+ * коли Mini App відкрито з Telegram). Дублює push у Mini App і доходить
+ * навіть тим, у кого не спрацював FCM-токен. Помилка з одним chat_id
+ * (заблокував бота тощо) не перериває розсилку іншим.
+ */
+async function notifyDelaySubscribersInDm(routeNumber, kind, alertText, telegramIds) {
+  if (!telegramIds || !telegramIds.length) return 0;
+  const routeLabel =
+    String(routeNumber).toLowerCase() === 'all' ? 'усі маршрути' : `маршрут ${escapeHtml(routeNumber)}`;
+  const text = `🚦 Затримка: <b>${routeLabel}</b>${kind ? ` (${escapeHtml(kind)})` : ''}\n\n${escapeHtml(alertText)}`;
+
+  let sent = 0;
+  for (const id of telegramIds) {
+    try {
+      const result = await sendMessage(id, text);
+      if (result?.ok) sent += 1;
+    } catch (err) {
+      console.warn(`[bot] Не вдалось надіслати ЛС про затримку підписнику ${id}:`, err?.message || err);
+    }
+  }
+  return sent;
+}
+
 function editMessageText(chatId, messageId, text, extra = {}) {
   return tg('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'HTML', ...extra });
 }
@@ -372,7 +405,8 @@ async function processCycle() {
           pendingPrompts = pendingPrompts.filter((p) => !(p.routeNumber === routeNumber && p.kind === kind));
 
           try {
-            await notifyDelaySubscribers(routeNumber, kind, text);
+            const result = await notifyDelaySubscribers(routeNumber, kind, text);
+            await notifyDelaySubscribersInDm(routeNumber, kind, text, result?.telegramIds);
           } catch (err) {
             console.error('[bot] notifyDelaySubscribers впав — оголошення все одно опубліковано в застосунку.', err);
           }
@@ -460,15 +494,17 @@ async function processCycle() {
         source: 'manual'
       });
 
+      let dmSent = 0;
       try {
-        await notifyDelaySubscribers(routeNumber, kind, alertText);
+        const result = await notifyDelaySubscribers(routeNumber, kind, alertText);
+        dmSent = await notifyDelaySubscribersInDm(routeNumber, kind, alertText, result?.telegramIds);
       } catch (err) {
         console.error('[bot] notifyDelaySubscribers впав — оголошення все одно опубліковано в застосунку.', err);
       }
 
       await sendMessage(
         chatId,
-        `✅ <b>Оголошення опубліковано!</b>\n\n<b>Маршрут:</b> ${routeNumber}\n<b>Текст:</b> ${alertText}`,
+        `✅ <b>Оголошення опубліковано!</b>\n\n<b>Маршрут:</b> ${routeNumber}\n<b>Текст:</b> ${alertText}\n📨 Особисто в Telegram сповіщено: ${dmSent}.`,
         {
           reply_markup: {
             inline_keyboard: [
