@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Phone, Mail, Lock, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { User, Phone, Mail, Lock, ArrowRight, Sparkles, Loader2, X, CloudUpload } from 'lucide-react';
 import { Emblem } from '@/components/ui/Emblem';
 import { useAuthStore } from '@/store/useAuthStore';
 import { isFirebaseConfigured } from '@/lib/firebase';
@@ -41,7 +41,21 @@ function GoogleIcon({ className }: { className?: string }) {
  * користувач має свій окремий, повністю локальний профіль — без бекенду
  * і без відправки даних кудись назовні.
  */
-export function RegistrationModal() {
+export interface RegistrationModalProps {
+  /**
+   * 'onboarding' — повноекранне "знайомство" при першому запуску поза
+   * Telegram (з гостьовою вкладкою). 'link' — виклик поверх уже наявного
+   * профілю (у тому числі з Telegram) для прив'язки email/Google акаунту,
+   * щоб потім увійти в той самий акаунт із встановленої PWA і отримати ті
+   * самі обране/історію/налаштування (хмарна синхронізація в
+   * hooks/useAccountCloudSync.ts). У режимі 'link' гостьової вкладки немає
+   * і вікно можна закрити хрестиком.
+   */
+  variant?: 'onboarding' | 'link';
+  onClose?: () => void;
+}
+
+export function RegistrationModal({ variant = 'onboarding', onClose }: RegistrationModalProps) {
   const registerLocalProfile = useAuthStore((s) => s.registerLocalProfile);
   const registerWithEmailAccount = useAuthStore((s) => s.registerWithEmailAccount);
   const loginWithEmailAccount = useAuthStore((s) => s.loginWithEmailAccount);
@@ -49,11 +63,12 @@ export function RegistrationModal() {
   const isAuthLoading = useAuthStore((s) => s.isAuthLoading);
 
   const firebaseAvailable = isFirebaseConfigured();
+  const isLinkMode = variant === 'link';
 
-  // Гостьовий (локальний, без бекенду) режим лишається доступним завжди —
-  // email/Google додаються як альтернатива для тих, хто хоче "справжній"
-  // акаунт, що не втратиться при очищенні даних браузера.
-  const [mode, setMode] = useState<AuthMode>('guest');
+  // Гостьовий (локальний, без бекенду) режим доступний лише при онбордингу —
+  // у режимі прив'язки профіль уже є (в т.ч. з Telegram), тож гостьова
+  // вкладка не потрібна: одразу пропонуємо реєстрацію/вхід email чи Google.
+  const [mode, setMode] = useState<AuthMode>(isLinkMode ? 'email' : 'guest');
 
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
@@ -112,7 +127,9 @@ export function RegistrationModal() {
 
     if (!result.ok) {
       setError(result.error ?? 'Не вдалося виконати вхід. Спробуйте ще раз.');
+      return;
     }
+    onClose?.();
   };
 
   const handleGoogleClick = async () => {
@@ -122,7 +139,11 @@ export function RegistrationModal() {
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error ?? 'Не вдалося увійти через Google.');
+      return;
     }
+    // На мобільних (redirect-флоу) result.ok=true, але без user — сторінка
+    // зараз піде на перезавантаження через Google, закривати нічого не треба.
+    if (result.user) onClose?.();
   };
 
   const switchMode = (next: AuthMode) => {
@@ -135,27 +156,75 @@ export function RegistrationModal() {
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-y-auto bg-bg px-5 py-8"
       role="dialog"
       aria-modal="true"
-      aria-label="Реєстрація в Kharkiv GO"
+      aria-label={isLinkMode ? 'Прив\u2019язати акаунт' : 'Реєстрація в Kharkiv GO'}
     >
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-primary/10 via-bg to-bg" />
 
+      {isLinkMode && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Закрити"
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-muted/60 text-ink-muted ring-1 ring-border/40 transition-all hover:bg-surface-muted active:scale-95"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      )}
+
       <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <div className="mb-6 flex flex-col items-center text-center">
-          <Emblem size={68} glow className="mb-4" />
+          {isLinkMode ? (
+            <div className="mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-[22px] bg-primary/10 text-primary ring-1 ring-primary/20">
+              <CloudUpload className="h-8 w-8" />
+            </div>
+          ) : (
+            <Emblem size={68} glow className="mb-4" />
+          )}
           <h1 className="font-display text-2xl font-black tracking-tight text-ink-text">
-            Ласкаво просимо!
+            {isLinkMode ? 'Прив\u2019язати акаунт' : 'Ласкаво просимо!'}
           </h1>
           <p className="mt-2 text-[13px] leading-relaxed text-ink-muted max-w-[280px]">
-            Kharkiv GO — транспортний застосунок Харкова. Створіть локальний профіль, щоб зберігати
-            обране, історію та налаштування на цьому пристрої.
+            {isLinkMode
+              ? 'Створіть e-mail або увійдіть через Google, щоб обране, історія та налаштування переносились між Telegram і встановленим застосунком (PWA) автоматично.'
+              : 'Kharkiv GO — транспортний застосунок Харкова. Створіть локальний профіль, щоб зберігати обране, історію та налаштування на цьому пристрої.'}
           </p>
         </div>
 
-        {firebaseAvailable && (
+        {firebaseAvailable && !isLinkMode && (
           <div className="mb-4 flex gap-1 rounded-2xl bg-surface-muted/50 p-1 ring-1 ring-border/40">
             {(
               [
                 { key: 'guest', label: 'Гість' },
+                { key: 'email', label: 'Реєстрація' },
+                { key: 'login', label: 'Вхід' }
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => switchMode(tab.key)}
+                className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all ${
+                  mode === tab.key
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-ink-muted hover:text-ink-text'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isLinkMode && !firebaseAvailable && (
+          <p className="glass-surface rounded-[28px] p-5 text-center text-xs font-medium text-ink-muted shadow-glass-lg">
+            Хмарні акаунти зараз не налаштовано для цього застосунку.
+          </p>
+        )}
+
+        {isLinkMode && firebaseAvailable && (
+          <div className="mb-4 flex gap-1 rounded-2xl bg-surface-muted/50 p-1 ring-1 ring-border/40">
+            {(
+              [
                 { key: 'email', label: 'Реєстрація' },
                 { key: 'login', label: 'Вхід' }
               ] as const
