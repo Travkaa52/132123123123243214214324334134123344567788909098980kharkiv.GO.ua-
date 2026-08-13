@@ -5,12 +5,14 @@ import { findAlertForRoute } from '@/lib/routeAlerts';
 import type { TransportKind } from '@/types/transport';
 
 /**
- * Вспомогательная функция для форматирования времени алерта
+ * Допоміжна функція для форматування часу алерту.
+ * Приймає як ISO-рядок, так і timestamp у вигляді числа.
  */
-function formatAlertTime(dateString?: string) {
-  if (!dateString) return null;
+function formatAlertTime(dateVal?: string | number) {
+  if (!dateVal) return null;
   try {
-    const date = new Date(dateString);
+    const date = new Date(dateVal);
+    if (isNaN(date.getTime())) return null;
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   } catch {
     return null;
@@ -40,18 +42,22 @@ export function RouteAlertBanner({
   const alert = findAlertForRoute(alerts, routeNumber, kind);
   if (!alert) return null;
 
-  // Безопасное получение времени создания/обновления
-  const rawDate = alert.createdAt || (alert as { updatedAt?: string; date?: string }).updatedAt || (alert as { date?: string }).date;
+  // Витягуємо дату з урахуванням можливих назв полів і типів (string | number)
+  const rawDate =
+    alert.createdAt ??
+    (alert as { updatedAt?: string | number }).updatedAt ??
+    (alert as { date?: string | number }).date;
+
   const formattedTime = formatAlertTime(rawDate);
   const isLongMessage = alert.message && alert.message.length > 120;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3.5 shadow-glass backdrop-blur-md transition-all animate-slide-up">
-      {/* Легкий красный фоновый градиент для глубины */}
+      {/* Легкий червоний фоновий градієнт для глибини */}
       <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-rose-500/15 blur-xl" />
 
       <div className="flex items-start gap-3">
-        {/* Анимированный плашка-иконка с пульсирующим индикатором */}
+        {/* Анімована плашка-іконка з пульсуючим індикатором */}
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/20 text-rose-500 shadow-xs">
           <AlertTriangle size={18} />
           <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
@@ -60,13 +66,13 @@ export function RouteAlertBanner({
           </span>
         </div>
 
-        {/* Контентная часть */}
+        {/* Контентна частина */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-xs font-bold tracking-wide text-rose-500 uppercase">
               Можлива затримка руху
             </h4>
-            
+
             {formattedTime && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-rose-500/70">
                 <Clock size={12} />
@@ -83,7 +89,7 @@ export function RouteAlertBanner({
             {alert.message}
           </p>
 
-          {/* Кнопка раскрытия, если текст объявления длинный */}
+          {/* Кнопка розгортання, якщо текст оголошення довгий */}
           {isLongMessage && (
             <button
               type="button"
