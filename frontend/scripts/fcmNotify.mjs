@@ -1,172 +1,166 @@
 /**
- * scripts/fcmNotify.mjs
- * KharkivGO
+ * frontend/scripts/fcmNotify.mjs
  *
- * GitHub Actions
- * Firebase Admin SDK
- * Firestore Enterprise Native
- * Firebase Cloud Messaging
+ * Firebase Cloud Messaging + Firestore Enterprise Native
+ *
+ * GitHub Actions:
+ * FIREBASE_SERVICE_ACCOUNT_JSON
+ *
+ * Firestore:
+ * databaseId = (default)
+ * collection = pushSubscriptions
  */
 
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
-const RAW_SERVICE_ACCOUNT =
-  (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+const RAW_SERVICE_ACCOUNT = (
+  process.env.FIREBASE_SERVICE_ACCOUNT_JSON || ''
+).trim();
 
 function parseServiceAccount(raw) {
   if (!raw) return null;
 
+  // Обычный JSON
   try {
-    return JSON.parse(raw);
-  } catch {}
+    const parsed = JSON.parse(raw);
 
+    if (
+      parsed &&
+      parsed.project_id &&
+      parsed.client_email &&
+      parsed.private_key
+    ) {
+      return parsed;
+    }
+  } catch {
+    // continue
+  }
+
+  // Base64 JSON
   try {
-    return JSON.parse(
-      Buffer.from(raw, 'base64').toString('utf8')
-    );
-  } catch {}
+    const decoded = Buffer.from(raw, 'base64').toString('utf8');
+    const parsed = JSON.parse(decoded);
+
+    if (
+      parsed &&
+      parsed.project_id &&
+      parsed.client_email &&
+      parsed.private_key
+    ) {
+      return parsed;
+    }
+  } catch {
+    // continue
+  }
 
   return null;
 }
 
 const serviceAccount = parseServiceAccount(RAW_SERVICE_ACCOUNT);
 
-const FCM_ENABLED = Boolean(
+export const FCM_ENABLED = Boolean(
   serviceAccount?.project_id &&
   serviceAccount?.client_email &&
   serviceAccount?.private_key
 );
 
-let db = null;
+if (!RAW_SERVICE_ACCOUNT) {
+  console.log(
+    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON не задано — push-сповіщення вимкнені.'
+  );
+}
+
+if (RAW_SERVICE_ACCOUNT && !FCM_ENABLED) {
+  console.warn(
+    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON задано, але service account некоректний.'
+  );
+}
 
 if (!FCM_ENABLED) {
-  console.log(
-    '[bot] FIREBASE_SERVICE_ACCOUNT_JSON не задано — push вимкнені.'
-  );
-} else {
-  try {
-    const app =
-      getApps().length > 0
-        ? getApps()[0]
-        : initializeApp({
-            credential: cert(serviceAccount),
-            projectId: serviceAccount.project_id
-          });
-
-    db = getFirestore(app);
-
-    console.log(
-      `[bot] FCM project: ${serviceAccount.project_id}`
-    );
-
-    console.log(
-      '[bot] Firestore database: (default)'
-    );
-  } catch (error) {
-    console.error(
-      '[bot] Firebase Admin initialization error:',
-      error?.message || error
-    );
-  }
+  // Не падаємо — Telegram/Supabase бот продовжує працювати.
+  // Усі notify-функції просто повернуть skipped.
 }
 
-const PROJECT_ID = serviceAccount?.project_id;
+let app = null;
+let db = null;
+let messaging = null;
 
-const FCM_SEND_URL =
-  `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`;
-
-let cachedAccessToken = null;
-let cachedTokenExpiresAt = 0;
-
-async function getAccessToken() {
-  if (!FCM_ENABLED || !serviceAccount) {
-    return null;
-  }
-
-  if (
-    cachedAccessToken &&
-    Date.now() < cachedTokenExpiresAt - 60_000
-  ) {
-    return cachedAccessToken;
-  }
-
+if (FCM_ENABLED) {
   try {
-    const app =
-      getApps().length > 0
-        ? getApps()[0]
-        : initializeApp({
-            credential: cert(serviceAccount),
-            projectId: serviceAccount.project_id
-          });
-
-    const credential =
-      app.options.credential;
-
-    const tokenResult =
-      await credential.getAccessToken();
-
-    if (!tokenResult?.access_token) {
-      console.warn(
-        '[bot] Firebase access token не отримано.'
-      );
-
-      return null;
-    }
-
-    cachedAccessToken =
-      tokenResult.access_token;
-
-    cachedTokenExpiresAt =
-      Date.now() + 50 * 60 * 1000;
-
-    return cachedAccessToken;
-  } catch (error) {
-    console.warn(
-      '[bot] Firebase access token error:',
-      error?.message || error
-    );
-
-    return null;
-  }
-}
-
-function normalizeRoutes(routes) {
-  if (!Array.isArray(routes)) {
-    return [];
-  }
-
-  return routes.map(String);
-}
-
-async function listPushSubscriptions() {
-  if (!db) {
-    return [];
-  }
-
-  try {
-    const snapshot =
-      await db
-        .collection('pushSubscriptions')
-        .get();
-
-    const subscriptions = [];
-
-    snapshot.forEach((doc) => {
-      subscriptions.push({
-        id: doc.id,
-        ...doc.data()
-      });
+    app = initializeApp({
+      credential: cert({
+        projectId: serviceAccount.project_id,
+        clientEmail: serviceAccount.client_email,
+        privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      }),
     });
 
-    console.log(
-      `[bot] Firestore: знайдено ${subscriptions.length} підписок.`
+    /*
+     * ВАЖНО:
+     *
+     * У тебе Firestore Enterprise Native.
+     *
+     * databaseId "(default)" — это именно имя базы.
+     *
+     * firebase-admin поддерживает работу с конкретным databaseId.
+     */
+    db = getFirestore(app, '(default)');
+
+    messaging = getMessaging(app);
+
+    console.log(`[bot] FCM project: ${serviceAccount.project_id}`);
+    console.log('[bot] Firestore database: (default)');
+    console.log('[bot] Firestore Enterprise Native: Admin SDK');
+  } catch (error) {
+    console.error(
+      '[bot] Firebase initialization error:',
+      error?.message || error
     );
 
-    return subscriptions;
+    app = null;
+    db = null;
+    messaging = null;
+  }
+}
+
+/**
+ * Преобразует Firestore document в обычный JS-объект.
+ */
+function documentToPlain(snapshot) {
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
+  };
+}
+
+/**
+ * Получить все pushSubscriptions.
+ *
+ * Структура ожидается примерно такая:
+ *
+ * pushSubscriptions/{uid}
+ *
+ * {
+ *   enabled: true,
+ *   fcmToken: "...",
+ *   routes: ["1", "20", "Трамвай"]
+ * }
+ */
+async function listPushSubscriptions() {
+  if (!db) return [];
+
+  try {
+    const snapshot = await db
+      .collection('pushSubscriptions')
+      .get();
+
+    return snapshot.docs.map(documentToPlain);
   } catch (error) {
     console.error(
       '[bot] Firestore read error:',
+      error?.code || '',
       error?.message || error
     );
 
@@ -174,252 +168,223 @@ async function listPushSubscriptions() {
   }
 }
 
-async function disableInvalidSubscription(uid) {
-  if (!db || !uid) {
-    return;
-  }
+/**
+ * Отключить недействительный FCM token.
+ */
+async function disableInvalidSubscription(id) {
+  if (!db || !id) return;
 
   try {
     await db
       .collection('pushSubscriptions')
-      .doc(uid)
-      .set(
-        {
-          enabled: false
-        },
-        {
-          merge: true
-        }
-      );
+      .doc(id)
+      .update({
+        enabled: false,
+      });
 
     console.log(
-      `[bot] Підписку ${uid} вимкнено.`
+      `[bot] FCM subscription ${id} отключена.`
     );
   } catch (error) {
     console.warn(
-      `[bot] Не вдалося вимкнути підписку ${uid}:`,
+      `[bot] Не удалось отключить subscription ${id}:`,
       error?.message || error
     );
   }
 }
 
-async function sendPush(
-  fcmToken,
-  routeNumber,
-  kind,
-  alertMessage
-) {
-  const accessToken =
-    await getAccessToken();
+/**
+ * Проверка соответствия подписки маршруту.
+ */
+function subscriptionMatchesRoute(subscription, routeNumber, kind) {
+  if (!subscription?.enabled) return false;
 
-  if (!accessToken) {
+  if (!subscription?.fcmToken) return false;
+
+  const routes = Array.isArray(subscription.routes)
+    ? subscription.routes.map(String)
+    : [];
+
+  const route = String(routeNumber ?? '');
+
+  if (route && routes.includes(route)) {
+    return true;
+  }
+
+  if (kind && routes.includes(String(kind))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Отправка одного FCM сообщения.
+ */
+async function sendPush(subscription, routeNumber, kind, alertMessage) {
+  if (!messaging) {
     return {
       ok: false,
-      invalid: false
+      reason: 'messaging-disabled',
     };
   }
 
-  const routeStr =
-    String(routeNumber);
+  const route = String(routeNumber ?? '');
+
+  const title = 'Kharkiv GO — затримка руху';
+
+  const rawBody = String(
+    alertMessage || 'Зафіксовано затримку руху.'
+  );
 
   const body =
-    alertMessage.length <= 180
-      ? alertMessage
-      : `${alertMessage.slice(0, 177)}...`;
+    rawBody.length <= 180
+      ? rawBody
+      : `${rawBody.slice(0, 177)}...`;
 
-  const payload = {
-    message: {
-      token: fcmToken,
+  try {
+    await messaging.send({
+      token: subscription.fcmToken,
 
       notification: {
-        title: 'Kharkiv GO — затримка руху',
-        body
+        title,
+        body,
       },
 
       data: {
-        routeNumber: routeStr,
-        kind: kind ? String(kind) : '',
-        url: '/'
+        routeNumber: route,
+        kind: String(kind || ''),
+        url: '/',
       },
 
       webpush: {
-        fcm_options: {
-          link: '/'
-        }
-      }
-    }
-  };
+        fcmOptions: {
+          link: '/',
+        },
+      },
+    });
 
-  try {
-    const response =
-      await fetch(
-        FCM_SEND_URL,
-        {
-          method: 'POST',
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    const code = error?.code || '';
 
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-            'Content-Type':
-              'application/json'
-          },
+    /*
+     * Эти ошибки означают, что token больше нельзя использовать.
+     */
+    const invalidToken =
+      code === 'messaging/registration-token-not-registered' ||
+      code === 'messaging/invalid-registration-token';
 
-          body: JSON.stringify(payload)
-        }
-      );
+    if (invalidToken) {
+      await disableInvalidSubscription(subscription.id);
 
-    if (response.ok) {
       return {
-        ok: true,
-        invalid: false
+        ok: false,
+        invalidToken: true,
+        code,
       };
     }
 
-    let errorData = null;
-
-    try {
-      errorData =
-        await response.json();
-    } catch {}
-
-    const errorStatus =
-      errorData?.error?.status || '';
-
-    const errorMessage =
-      errorData?.error?.message || '';
-
     console.warn(
-      `[bot] FCM помилка ${response.status}:`,
-      errorStatus || errorMessage || 'unknown'
-    );
-
-    const invalid =
-      errorStatus === 'NOT_FOUND' ||
-      errorStatus === 'UNREGISTERED' ||
-      errorStatus === 'INVALID_ARGUMENT';
-
-    return {
-      ok: false,
-      invalid
-    };
-  } catch (error) {
-    console.warn(
-      '[bot] FCM network error:',
+      `[bot] FCM send error для ${subscription.id}:`,
+      code,
       error?.message || error
     );
 
     return {
       ok: false,
-      invalid: false
+      code,
     };
   }
 }
 
 /**
- * Надсилає push усім користувачам,
- * які підписані на конкретний маршрут.
+ * Главная функция.
  *
- * routeNumber — номер маршруту
- * kind — bus / trolleybus / tram / metro
- * alertMessage — текст повідомлення
+ * Вызывается из process-telegram-bot.mjs:
+ *
+ * notifyDelaySubscribers(
+ *   routeNumber,
+ *   kind,
+ *   alertMessage
+ * );
  */
 export async function notifyDelaySubscribers(
   routeNumber,
   kind,
   alertMessage
 ) {
-  if (!FCM_ENABLED || !db) {
+  if (!FCM_ENABLED || !db || !messaging) {
     return {
       sent: 0,
       total: 0,
-      skipped: 'firebase-disabled'
+      skipped: 'disabled',
     };
   }
 
-  if (!routeNumber || !alertMessage) {
-    return {
-      sent: 0,
-      total: 0,
-      skipped: 'invalid-data'
-    };
-  }
+  const subscriptions = await listPushSubscriptions();
 
-  const subscriptions =
-    await listPushSubscriptions();
-
-  const routeStr =
-    String(routeNumber);
-
-  const kindStr =
-    kind ? String(kind) : '';
-
-  const targets =
-    subscriptions.filter((subscription) => {
-      if (
-        subscription.enabled !== true ||
-        !subscription.fcmToken
-      ) {
-        return false;
-      }
-
-      const routes =
-        normalizeRoutes(
-          subscription.routes
-        );
-
-      return (
-        routes.includes(routeStr) ||
-        (
-          kindStr &&
-          routes.includes(kindStr)
-        )
-      );
-    });
-
-  if (!targets.length) {
+  if (!subscriptions.length) {
     console.log(
-      `[bot] Підписників для маршруту ${routeStr} не знайдено.`
+      `[bot] Firestore: pushSubscriptions пуст — подписчиков для маршруту ${routeNumber} не найдено.`
     );
 
     return {
       sent: 0,
       total: 0,
-      skipped: 'no-subscribers'
+      skipped: 'no-subscribers',
+    };
+  }
+
+  const targets = subscriptions.filter(
+    (subscription) =>
+      subscriptionMatchesRoute(
+        subscription,
+        routeNumber,
+        kind
+      )
+  );
+
+  if (!targets.length) {
+    console.log(
+      `[bot] Підписників для маршруту ${String(routeNumber)} не знайдено.`
+    );
+
+    return {
+      sent: 0,
+      total: 0,
+      skipped: 'no-matching-subscribers',
     };
   }
 
   let sent = 0;
 
   for (const subscription of targets) {
-    const result =
-      await sendPush(
-        subscription.fcmToken,
-        routeStr,
-        kindStr,
-        alertMessage
-      );
+    const result = await sendPush(
+      subscription,
+      routeNumber,
+      kind,
+      alertMessage
+    );
 
     if (result.ok) {
-      sent++;
-      continue;
-    }
-
-    if (result.invalid) {
-      await disableInvalidSubscription(
-        subscription.id
-      );
+      sent += 1;
     }
   }
 
   console.log(
-    `[bot] Push про затримку маршруту ${routeStr}: ` +
-    `надіслано ${sent}/${targets.length}.`
+    `[bot] Push про затримку маршруту ${String(routeNumber)}: надіслано ${sent}/${targets.length}.`
   );
 
   return {
     sent,
-    total: targets.length
+    total: targets.length,
   };
 }
 
-export { FCM_ENABLED };
+export default {
+  FCM_ENABLED,
+  notifyDelaySubscribers,
+};
