@@ -20,7 +20,9 @@
  * такий формат, парсер підтримує ОБИДВІ форми відповіді (див. нижче).
  */
 
-const AIR_ALERT_API_URL = 'https://ubilling.net.ua/aerialalerts/?source=klimenko&raw';
+const AIR_ALERT_API_URL = import.meta.env.DEV
+  ? '/api/alerts'
+  : 'https://ubilling.net.ua/aerialalerts/?source=klimenko&raw';
 const REQUEST_TIMEOUT_MS = 6000; // Таймаут мережевого запиту (6 сек)
 
 /** Точна назва області в офіційних довідниках тривог. */
