@@ -136,6 +136,70 @@ registerRoute(
 // а не сама собою — щоб не перезавантажувати застосунок непомітно під час
 // активної роботи користувача (планування маршруту, відкрита картка станції).
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Push-сповіщення про затримки (FCM webpush). Firebase JS SDK НЕ ставить свій
+// обробник автоматично, якщо ми не використовуємо firebase-messaging-sw.js —
+// тож без цього listener'а браузер отримує push, але ніхто не викликає
+// showNotification(), і сповіщення просто зникає в нікуди.
+// ---------------------------------------------------------------------------
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload: any;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+
+  // FCM кладе показувані поля або в payload.notification (webpush notification),
+  // або (для суто data-повідомлень) лише в payload.data — підстраховуємось під обидва.
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+
+  const title = notification.title || data.title || 'Kharkiv GO — затримка руху';
+  const body = notification.body || data.body || '';
+  const url = data.url || notification.click_action || '/';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: data.routeNumber ? `delay-${data.routeNumber}` : 'delay-alert',
+      renotify: true,
+      data: { url }
+    })
+  );
+});
+
+// Клік по сповіщенню — фокусуємо вже відкриту вкладку застосунку, якщо є,
+// інакше відкриваємо нову на потрібному маршруті.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of allClients) {
+        if ('focus' in client) {
+          await client.focus();
+          if ('navigate' in client) {
+            try {
+              await (client as WindowClient).navigate(url);
+            } catch {
+              // ігноруємо — фокус вже спрацював
+            }
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(url);
+    })()
+  );
+});
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
