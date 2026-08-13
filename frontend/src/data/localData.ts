@@ -1,6 +1,7 @@
 import { TransportKind } from '@/types/transport';
 import routesRealJson from './routesReal.json';
 import stopsRealJson from './stopsReal.json';
+import osmStopsJson from './stops.json';
 import { metroStopsData, metroRoutesData, METRO_INTERCHANGES } from './metroStationsReal';
 
 /**
@@ -57,9 +58,21 @@ interface RealRoute {
 
 const REAL_ROUTES = routesRealJson as unknown as RealRoute[];
 const REAL_STOPS = stopsRealJson as unknown as StopItem[];
+// Другий, незалежний набір зупинок — id тут це номери вузлів OpenStreetMap
+// (напр. "stop-2578454062"), а не послідовні "stop-1", "stop-2"...
+// Саме на ЦІ id посилаються stopIdsForward/Backward у ~79% маршрутів
+// routesReal.json (усі "route-<kind>-<number>-fwd/bwd" записи). Без цього
+// імпорту ті маршрути лишались би зі "зниклими" зупинками — валідний id
+// є, а відповідної зупинки в мапі немає.
+const OSM_STOPS = osmStopsJson as unknown as StopItem[];
 
 const stopsMap = new Map<string, StopItem>();
 REAL_STOPS.forEach((s) => stopsMap.set(s.id, s));
+OSM_STOPS.forEach((s) => {
+  // Обидва набори зупинок незалежні (id ніколи не перетинаються — перевірено),
+  // тож просто додаємо другий шар без ризику затерти щось із stopsReal.json.
+  if (!stopsMap.has(s.id)) stopsMap.set(s.id, s);
+});
 // Станції метро (з KML, координати + українські назви) — окреме джерело,
 // без прив'язки до наземних маршрутів, але доступне для пошуку, вибору
 // на карті та як точка "Звідси"/"Куди" при побудові поїздки.
