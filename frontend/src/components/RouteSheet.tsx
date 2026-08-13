@@ -28,7 +28,7 @@ export function RouteSheet({ route, onClose, onStopSelect }: RouteSheetProps) {
 
   return (
     <div className="-mx-5 -mt-2 flex max-h-[70vh] flex-col overflow-hidden">
-      <div className="flex items-start gap-3 border-b border-graphite/10 px-5 py-3">
+      <div className="flex items-start gap-3 border-b border-ink-border px-5 py-3">
         <div
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold text-white"
           style={{ backgroundColor: route.color }}
@@ -38,14 +38,14 @@ export function RouteSheet({ route, onClose, onStopSelect }: RouteSheetProps) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <TransportKindIcon kind={route.kind} size={14} />
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-graphite/50">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
               {KIND_LABELS_UK[route.kind]} №{route.number}
             </p>
           </div>
-          <p className="truncate font-body text-sm font-semibold text-graphite">
+          <p className="truncate font-body text-sm font-semibold text-ink-text">
             {route.headsignForward} ↔ {route.headsignBackward}
           </p>
-          <p className="text-xs text-graphite/50">
+          <p className="text-xs text-ink-muted">
             {route.firstDeparture}–{route.lastDeparture} · інтервал ≈{route.intervalMinutes} хв · {stops.length} зупинок
           </p>
         </div>
@@ -58,7 +58,7 @@ export function RouteSheet({ route, onClose, onStopSelect }: RouteSheetProps) {
           type="button"
           onClick={onClose}
           aria-label="Закрити"
-          className="shrink-0 rounded-full p-1.5 text-graphite/40 transition hover:bg-graphite/5 hover:text-graphite"
+          className="shrink-0 rounded-full p-1.5 text-ink-muted transition hover:bg-ink-border hover:text-ink-text"
         >
           ✕
         </button>
@@ -79,7 +79,7 @@ export function RouteSheet({ route, onClose, onStopSelect }: RouteSheetProps) {
                 />
                 {i < stops.length - 1 && <span className="mt-0.5 w-px flex-1" style={{ backgroundColor: route.color, opacity: 0.35 }} />}
               </span>
-              <span className="truncate py-1 font-body text-sm text-graphite">{stop.name}</span>
+              <span className="truncate py-1 font-body text-sm text-ink-text">{stop.name}</span>
             </button>
           </li>
         ))}
