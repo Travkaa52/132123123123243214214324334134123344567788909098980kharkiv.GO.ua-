@@ -438,14 +438,16 @@ export function buildTripOptions(
   fromLng: number,
   toLat: number,
   toLng: number,
-  maxOptions = 5
+  maxOptions = 5,
+  allowedKinds?: TransportKind[]
 ): TripOption[] {
   const RADII_M = [700, 1200, 2200, 4000];
+  const pool = allowedKinds ? routesData.filter((r) => allowedKinds.includes(r.kind)) : routesData;
 
   for (const radius of RADII_M) {
     const candidates: TripOption[] = [];
 
-    for (const route of routesData) {
+    for (const route of pool) {
       let best: (TripOption & { total: number }) | null = null;
 
       for (const direction of getRouteDirections(route)) {
@@ -761,7 +763,8 @@ function bestNextLeg(
   fromStop: StopItem,
   excludeRouteIds: Set<string>,
   toLat: number,
-  toLng: number
+  toLng: number,
+  allowedKinds?: TransportKind[]
 ): {
   route: RouteItem;
   direction: RouteDirectionVariant;
@@ -785,6 +788,7 @@ function bestNextLeg(
       if (excludeRouteIds.has(routeId)) continue;
       const route = routesData.find((r) => r.id === routeId);
       if (!route) continue;
+      if (allowedKinds && !allowedKinds.includes(route.kind)) continue;
 
       for (const direction of getRouteDirections(route)) {
         const boardIdx = direction.stopIds.indexOf(candidate.stop.id);
@@ -832,9 +836,11 @@ export function buildTripPlans(
   fromLng: number,
   toLat: number,
   toLng: number,
-  maxOptions = 6
+  maxOptions = 6,
+  allowedKinds?: TransportKind[]
 ): TripPlan[] {
-  const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions).map((o): TripPlan => {
+  const pool = allowedKinds ? routesData.filter((r) => allowedKinds.includes(r.kind)) : routesData;
+  const direct = buildTripOptions(fromLat, fromLng, toLat, toLng, maxOptions, allowedKinds).map((o): TripPlan => {
     const plan: TripPlan = {
       legs: [
         {
@@ -871,7 +877,7 @@ export function buildTripPlans(
     const candidates: TripPlan[] = [];
     const seenPairs = new Set<string>();
 
-    for (const route1 of routesData) {
+    for (const route1 of pool) {
       for (const direction1 of getRouteDirections(route1)) {
         const board = nearestStopInDirection(direction1, fromLat, fromLng);
         if (!board || board.dist > radius) continue;
@@ -889,7 +895,7 @@ export function buildTripPlans(
           for (const candidate of getTransferCandidates(transferStop)) {
             for (const routeId2 of candidate.stop.routeIds) {
               if (routeId2 === route1.id) continue;
-              const route2 = routesData.find((r) => r.id === routeId2);
+              const route2 = pool.find((r) => r.id === routeId2);
               if (!route2) continue;
 
               for (const direction2 of getRouteDirections(route2)) {
@@ -943,7 +949,8 @@ export function buildTripPlans(
                     bestAlight.stop,
                     new Set([route1.id, route2.id]),
                     toLat,
-                    toLng
+                    toLng,
+                    allowedKinds
                   );
                   if (!third || third.alightDist > radius) continue;
 
@@ -1022,6 +1029,74 @@ export function buildTripPlans(
   return picked.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes).slice(0, maxOptions);
 }
 
+/**
+ * "Розумні маршрути" — режими побудови поїздки, які пасажир обирає в UI:
+ *  - smart: типова поведінка buildTripPlans (найшвидший на кожну кількість
+ *    пересадок + решта топ-варіантів за часом) — баланс швидкості й вибору;
+ *  - fastest: суворо за орієнтовним часом у дорозі, без урахування пересадок;
+ *  - fewestTransfers: мінімізує кількість пересадок (0 краще за 1 краще за 2),
+ *    за рівності — швидший з них;
+ *  - metroOnly: поїздка ЛИШЕ метро (перша й остання нога теж метро) — окремий
+ *    пошук з обмеженим пулом маршрутів (allowedKinds), бо жадібний пошук
+ *    "усіма видами" не гарантує знайти суто метро-варіант, навіть коли
+ *    такий існує;
+ *  - noLongWalks: відкидає варіанти з довгим пішим переходом (посадка,
+ *    висадка чи пересадка) — довше по часу, зате без тривалих піших ділянок.
+ */
+export type TripPlanMode = 'smart' | 'fastest' | 'fewestTransfers' | 'metroOnly' | 'noLongWalks';
+
+/** Поріг "довгого" пішого переходу для режиму noLongWalks, метри. */
+export const LONG_WALK_THRESHOLD_M = 600;
+
+export function planHasLongWalk(plan: TripPlan): boolean {
+  if (plan.boardWalkM > LONG_WALK_THRESHOLD_M || plan.alightWalkM > LONG_WALK_THRESHOLD_M) return true;
+  return plan.legs.some((leg) => (leg.transferWalkFromM ?? 0) > LONG_WALK_THRESHOLD_M);
+}
+
+/** Єдина логіка сортування/фільтрації під режим — використовується і тут
+ *  (перший, приблизний прохід), і в refineTripPlansWithOSM (другий,
+ *  уточнюючий прохід через реальну вуличну мережу), щоб порядок і склад
+ *  варіантів під час уточнення не "стрибав" назад до просто "найшвидший". */
+export function applyTripPlanMode(plans: TripPlan[], mode: TripPlanMode): TripPlan[] {
+  switch (mode) {
+    case 'fewestTransfers':
+      return [...plans].sort(
+        (a, b) => a.transfersCount - b.transfersCount || a.estimatedMinutes - b.estimatedMinutes
+      );
+    case 'noLongWalks': {
+      const filtered = plans.filter((p) => !planHasLongWalk(p));
+      return (filtered.length > 0 ? filtered : plans).sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+    }
+    case 'metroOnly':
+      return [...plans]
+        .filter((p) => p.legs.every((l) => l.route.kind === 'metro'))
+        .sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+    case 'fastest':
+    case 'smart':
+    default:
+      return [...plans].sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+  }
+}
+
+export function buildTripPlansForMode(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+  mode: TripPlanMode = 'smart',
+  maxOptions = 6
+): TripPlan[] {
+  if (mode === 'metroOnly') {
+    // Жадібний пошук "усіма видами транспорту" не гарантує знайти суто
+    // метро-варіант навіть коли такий існує (метро-ноги можуть програвати
+    // за часом наземним і не потрапити у фінальний зріз) — тому для цього
+    // режиму одразу обмежуємо пул маршрутів лише метро.
+    return applyTripPlanMode(buildTripPlans(fromLat, fromLng, toLat, toLng, maxOptions, ['metro']), mode);
+  }
+
+  return applyTripPlanMode(buildTripPlans(fromLat, fromLng, toLat, toLng, maxOptions), mode);
+}
+
 export const localRoutes = {
   all: (): RouteItem[] => routesData,
   getById: (id: string): RouteItem | undefined => routesData.find((r) => r.id === id),
@@ -1056,7 +1131,14 @@ export const localRoutes = {
   buildTrip: (fromLat: number, fromLng: number, toLat: number, toLng: number): TripOption[] =>
     buildTripOptions(fromLat, fromLng, toLat, toLng),
   buildTripPlans: (fromLat: number, fromLng: number, toLat: number, toLng: number): TripPlan[] =>
-    buildTripPlans(fromLat, fromLng, toLat, toLng)
+    buildTripPlans(fromLat, fromLng, toLat, toLng),
+  buildTripPlansForMode: (
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number,
+    mode: TripPlanMode = 'smart'
+  ): TripPlan[] => buildTripPlansForMode(fromLat, fromLng, toLat, toLng, mode)
 };
 
 export const localStops = {

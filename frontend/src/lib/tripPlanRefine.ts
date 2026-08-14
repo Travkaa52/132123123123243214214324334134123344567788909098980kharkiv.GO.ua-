@@ -1,5 +1,5 @@
-import type { TripPlan } from '@/data/localData';
-import { estimateTripMinutes } from '@/data/localData';
+import type { TripPlan, TripPlanMode } from '@/data/localData';
+import { estimateTripMinutes, applyTripPlanMode } from '@/data/localData';
 import { getWalkingRoutesBatch, getTransitStreetPathsBatch } from '@/lib/osrmRouting';
 import { hasKmlGeometry } from '@/lib/mapLayers';
 
@@ -17,7 +17,8 @@ import { hasKmlGeometry } from '@/lib/mapLayers';
 export async function refineTripPlansWithOSM(
   plans: TripPlan[],
   fromPoint: { lat: number; lng: number },
-  toPoint: { lat: number; lng: number }
+  toPoint: { lat: number; lng: number },
+  mode: TripPlanMode = 'smart'
 ): Promise<TripPlan[]> {
   if (plans.length === 0) return plans;
 
@@ -116,10 +117,10 @@ export async function refineTripPlansWithOSM(
     return updated;
   });
 
-  // Переупорядковуємо за реальним орієнтовним часом у дорозі (ходьба по
-  // вуличній мережі + очікування + сам рух + пересадка), а не лише за
-  // сумарною ходьбою — раніше маршрут з довшою поїздкою в салоні міг
-  // випереджати значно швидший варіант тільки тому, що до зупинки було
-  // на 20 метрів ближче пішки.
-  return refined.sort((a, b) => a.estimatedMinutes - b.estimatedMinutes);
+  // Переупорядковуємо/фільтруємо за тим самим режимом ("розумний"/
+  // найшвидший/найменше пересадок/лише метро/без довгих переходів), яким
+  // варіанти вже були відфільтровані на першому проході — інакше уточнення
+  // реальною вуличною мережею тихо "забувало" обраний користувачем режим і
+  // відкочувало список назад до сортування просто за часом.
+  return applyTripPlanMode(refined, mode);
 }
