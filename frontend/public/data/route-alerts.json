@@ -1,4 +1,14 @@
 {
-  "updatedAt": "2026-08-14T08:10:46.141Z",
-  "items": []
+  "updatedAt": "2026-08-14T08:10:50.068Z",
+  "items": [
+    {
+      "id": 1786695048453,
+      "kind": "tram",
+      "routeNumber": "1",
+      "message": "тест",
+      "createdAt": 1786695047.519,
+      "expiresAt": 1786702247.519,
+      "source": "manual"
+    }
+  ]
 }
