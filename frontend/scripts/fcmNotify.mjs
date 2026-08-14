@@ -335,6 +335,12 @@ export async function notifyDelaySubscribers(
     subscriptionMatchesRoute(subscription, routeNumber, kind)
   );
 
+  console.log(
+    `[bot] notifyDelaySubscribers: усього документів у pushSubscriptions=${subscriptions.length}, ` +
+      `enabled+збігається за маршрутом "${routeNumber}"${kind ? ` (kind=${kind})` : ''}=${matched.length} ` +
+      `(routes у документах: ${JSON.stringify(subscriptions.map((s) => ({ id: s.id, enabled: s.enabled, routes: s.routes, hasToken: Boolean(s.fcmToken), hasTelegramId: s.telegramId != null })))})`
+  );
+
   // telegramId (chat_id) записується фронтендом (frontend/src/lib/pushSubscription.ts)
   // лише коли Mini App відкрито з Telegram — доступний незалежно від того,
   // чи вдалось видати робочий FCM-токен на цьому пристрої/браузері.
@@ -347,6 +353,10 @@ export async function notifyDelaySubscribers(
         .filter((id) => Number.isFinite(id))
     ),
   ];
+
+  console.log(
+    `[bot] notifyDelaySubscribers: telegramIds для ЛС-розсилки (${telegramIds.length}): ${JSON.stringify(telegramIds)}`
+  );
 
   if (!FCM_ENABLED || !db || !messaging) {
     return { sent: 0, total: 0, skipped: 'disabled', telegramIds };
