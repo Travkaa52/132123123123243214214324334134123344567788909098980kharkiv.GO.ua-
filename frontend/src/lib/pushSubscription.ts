@@ -140,7 +140,11 @@ export async function hasActivePushSubscription(): Promise<boolean> {
   }
 }
 
-/** Оновлює лише список обраних маршрутів у вже наявній підписці (без зміни токена чи прапорця enabled). */
+/** Оновлює список обраних маршрутів у вже наявній підписці (без зміни токена чи прапорця enabled).
+ * Заодно дописує telegramId, якщо його там ще нема, а Mini App зараз відкрито
+ * з Telegram — це "лікує" підписки, створені ДО того, як з'явився запис
+ * telegramId (enableDelayPushSubscription раніше його не писав), інакше
+ * такий підписник назавжди лишився б без ЛС-дублювання оголошень. */
 export async function syncSubscribedRoutes(routeIds: string[]): Promise<void> {
   const db = getFirebaseDb();
   const uid = await ensureAnonymousAuth();
@@ -153,7 +157,18 @@ export async function syncSubscribedRoutes(routeIds: string[]): Promise<void> {
     // сповіщення про затримки — не хочемо створювати "порожні" підписки.
     if (!snapshot.exists() || !snapshot.data()?.fcmToken) return;
 
-    await setDoc(ref, { routes: routeIds, updatedAt: serverTimestamp() }, { merge: true });
+    const telegramUser = getTelegramUser();
+    const missingTelegramId = telegramUser && snapshot.data()?.telegramId == null;
+
+    await setDoc(
+      ref,
+      {
+        routes: routeIds,
+        updatedAt: serverTimestamp(),
+        ...(missingTelegramId ? { telegramId: telegramUser.id } : {})
+      },
+      { merge: true }
+    );
   } catch {
     // мовчки ігноруємо — це фонова синхронізація, не критична дія користувача
   }
