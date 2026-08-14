@@ -138,7 +138,10 @@ function escapeHtml(text) {
  * (заблокував бота тощо) не перериває розсилку іншим.
  */
 async function notifyDelaySubscribersInDm(routeNumber, kind, alertText, telegramIds) {
-  if (!telegramIds || !telegramIds.length) return 0;
+  if (!telegramIds || !telegramIds.length) {
+    console.log('[bot] notifyDelaySubscribersInDm: telegramIds порожній — нікому надсилати ЛС.');
+    return 0;
+  }
   const routeLabel =
     String(routeNumber).toLowerCase() === 'all' ? 'усі маршрути' : `маршрут ${escapeHtml(routeNumber)}`;
   const text = `🚦 Затримка: <b>${routeLabel}</b>${kind ? ` (${escapeHtml(kind)})` : ''}\n\n${escapeHtml(alertText)}`;
@@ -147,11 +150,16 @@ async function notifyDelaySubscribersInDm(routeNumber, kind, alertText, telegram
   for (const id of telegramIds) {
     try {
       const result = await sendMessage(id, text);
-      if (result?.ok) sent += 1;
+      if (result?.ok) {
+        sent += 1;
+      } else {
+        console.warn(`[bot] sendMessage(${id}) повернув не-ok:`, JSON.stringify(result));
+      }
     } catch (err) {
       console.warn(`[bot] Не вдалось надіслати ЛС про затримку підписнику ${id}:`, err?.message || err);
     }
   }
+  console.log(`[bot] notifyDelaySubscribersInDm: надіслано ${sent}/${telegramIds.length} ЛС.`);
   return sent;
 }
 
