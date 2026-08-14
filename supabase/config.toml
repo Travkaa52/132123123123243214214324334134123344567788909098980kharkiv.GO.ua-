@@ -1,0 +1,19 @@
+# Мінімальний конфіг для `supabase functions deploy`.
+# verify_jwt = false для всіх функцій нижче: авторизація в цьому бекенді —
+# це перевірка Telegram initData всередині кожної функції
+# (_shared/telegramAuth.ts), а не стандартний Supabase Auth JWT. Це
+# навмисний вибір, узгоджений із рештою проєкту (Telegram Mini App, немає
+# окремого логіну/пароля) — не Supabase Auth "не налаштований", а свідомо
+# не використовується.
+
+[functions.profile]
+verify_jwt = false
+
+[functions.favorites]
+verify_jwt = false
+
+[functions.history]
+verify_jwt = false
+
+[functions.notifications]
+verify_jwt = false
