@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   /** Публічний anon-ключ Supabase (Project Settings → API Keys) — НЕ service_role. */
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Базовий URL Edge Functions, напр. https://xxxx.supabase.co/functions/v1 (див. frontend/src/api/client.ts). */
+  readonly VITE_API_BASE_URL?: string;
   /** Перевизначення URL резервного статичного route-alerts.json, якщо потрібно. */
   readonly VITE_ROUTE_ALERTS_URL?: string;
   readonly VITE_NOTIFICATIONS_URL?: string;

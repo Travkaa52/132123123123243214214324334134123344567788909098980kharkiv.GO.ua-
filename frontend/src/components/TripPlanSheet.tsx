@@ -1,6 +1,6 @@
 import { ArrowRight, ChevronRight, Navigation2, Repeat, Route as RouteIcon, Zap } from 'lucide-react';
 import { KIND_LABELS_UK } from '@/components/TransportKindIcon';
-import type { TripPlan } from '@/data/localData';
+import type { TripPlan, TripPlanMode } from '@/data/localData';
 
 interface TripPlanSheetProps {
   plans: TripPlan[];
@@ -8,7 +8,18 @@ interface TripPlanSheetProps {
   onSelect: (index: number) => void;
   /** Підтвердити обраний варіант і почати відстеження живої поїздки. */
   onStartTrip: (index: number) => void;
+  /** Поточний режим "розумних маршрутів". Якщо не передано — перемикач не показується. */
+  mode?: TripPlanMode;
+  onChangeMode?: (mode: TripPlanMode) => void;
 }
+
+const MODE_OPTIONS: { mode: TripPlanMode; label: string }[] = [
+  { mode: 'smart', label: 'Розумний вибір' },
+  { mode: 'fastest', label: 'Найшвидший' },
+  { mode: 'fewestTransfers', label: 'Без пересадок' },
+  { mode: 'metroOnly', label: 'Лише метро' },
+  { mode: 'noLongWalks', label: 'Без довгих переходів' }
+];
 
 function formatWalk(m: number): string {
   return m < 1000 ? `${Math.round(m)} м` : `${(m / 1000).toFixed(1)} км`;
@@ -22,13 +33,41 @@ function formatWalk(m: number): string {
  * орієнтовним часом у дорозі (ходьба + очікування + рух + пересадка),
  * тож перший у списку — справді найшвидший, а не просто "найближчий пішки".
  */
-export function TripPlanSheet({ plans, selectedIndex, onSelect, onStartTrip }: TripPlanSheetProps) {
+export function TripPlanSheet({ plans, selectedIndex, onSelect, onStartTrip, mode, onChangeMode }: TripPlanSheetProps) {
+  const modeSelector = mode && onChangeMode && (
+    <div className="scrollbar-none flex gap-1.5 overflow-x-auto px-2.5 pb-2 pt-1">
+      {MODE_OPTIONS.map((opt) => (
+        <button
+          key={opt.mode}
+          type="button"
+          onClick={() => onChangeMode(opt.mode)}
+          className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors active:scale-[0.97] ${
+            mode === opt.mode
+              ? 'bg-primary text-white shadow-xs'
+              : 'bg-surface-soft text-ink-muted hover:text-ink-text'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+
   if (plans.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 p-6 text-center">
-        <RouteIcon className="h-6 w-6 text-ink-muted" />
-        <p className="text-xs font-bold text-ink-text">Прямих маршрутів не знайдено</p>
-        <p className="text-[11px] text-ink-muted">Спробуйте обрати точки ближче до зупинок громадського транспорту</p>
+      <div>
+        {modeSelector}
+        <div className="flex flex-col items-center justify-center gap-2 p-6 text-center">
+          <RouteIcon className="h-6 w-6 text-ink-muted" />
+          <p className="text-xs font-bold text-ink-text">
+            {mode === 'metroOnly' ? 'Маршруту лише метро сюди не знайдено' : 'Прямих маршрутів не знайдено'}
+          </p>
+          <p className="text-[11px] text-ink-muted">
+            {mode === 'metroOnly'
+              ? 'Спробуйте інший режим — метро тут не покриває обидві точки'
+              : 'Спробуйте обрати точки ближче до зупинок громадського транспорту'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -37,6 +76,7 @@ export function TripPlanSheet({ plans, selectedIndex, onSelect, onStartTrip }: T
 
   return (
     <div className="divide-y divide-border/40 p-2">
+      {modeSelector}
       <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-black uppercase tracking-wider text-ink-muted">
         Варіанти поїздки ({plans.length})
       </p>
