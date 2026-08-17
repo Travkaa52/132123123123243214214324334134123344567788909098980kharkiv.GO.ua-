@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-17T16:00:12.253Z",
+  "updatedAt": "2026-08-17T16:33:16.362Z",
   "items": [
     {
       "id": "kh_metro:2845",
@@ -10,7 +10,7 @@
       "link": "https://t.me/kh_metro/2845",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "4.17K",
+      "views": "4.18K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +23,7 @@
       "link": "https://t.me/kh_metro/2843",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.19K",
+      "views": "5.2K",
       "kind": "alert",
       "lineIds": []
     },
@@ -36,7 +36,7 @@
       "link": "https://t.me/kh_metro/2842",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "5.59K",
+      "views": "5.6K",
       "kind": "info",
       "lineIds": []
     },
