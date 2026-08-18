@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-18T16:00:38.172Z",
+  "updatedAt": "2026-08-18T16:43:34.232Z",
   "items": [
     {
       "id": "kh_metro:2846",
@@ -10,7 +10,7 @@
       "link": "https://t.me/kh_metro/2846",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "1.22K",
+      "views": "1.47K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -25,7 +25,7 @@
       "link": "https://t.me/kh_metro/2845",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "5.26K",
+      "views": "5.41K",
       "kind": "info",
       "lineIds": []
     },
@@ -38,7 +38,7 @@
       "link": "https://t.me/kh_metro/2843",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.87K",
+      "views": "5.95K",
       "kind": "alert",
       "lineIds": []
     },
@@ -51,7 +51,7 @@
       "link": "https://t.me/kh_metro/2842",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "5.81K",
+      "views": "5.82K",
       "kind": "info",
       "lineIds": []
     },
@@ -64,7 +64,7 @@
       "link": "https://t.me/kh_metro/2841",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "6.25K",
+      "views": "6.26K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -94,7 +94,7 @@
       "link": "https://t.me/kh_metro/2839",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "6.36K",
+      "views": "6.44K",
       "kind": "info",
       "lineIds": []
     },
@@ -107,7 +107,7 @@
       "link": "https://t.me/kh_metro/2838",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "7.03K",
+      "views": "7.04K",
       "kind": "info",
       "lineIds": []
     },
@@ -120,7 +120,7 @@
       "link": "https://t.me/kh_metro/2837",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "9.41K",
+      "views": "9.42K",
       "kind": "info",
       "lineIds": []
     },
@@ -159,7 +159,7 @@
       "link": "https://t.me/kh_metro/2826",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "15K",
+      "views": "15.1K",
       "kind": "info",
       "lineIds": []
     }
