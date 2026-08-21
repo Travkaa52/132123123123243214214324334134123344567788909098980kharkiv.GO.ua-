@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-21T10:55:13.804Z",
+  "updatedAt": "2026-08-21T11:18:12.772Z",
   "items": [
+    {
+      "id": "kh_metro:2873",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "Шановні пасажири&#33;\n\nЗ нагоди Дня міста Харкова та Дня Державного прапора України 23 серпня час роботи метрополітену з перевезення пасажирів буде подовжено до 23:00.\n\nІнтервали руху поїздів усіма лініями метрополітену будть складати 10 хвилин.\n\nЗі святами, харків’яни&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-08-21T11:12:36.000Z",
+      "link": "https://t.me/kh_metro/2873",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "1.72K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2872",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2872",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "3.16K",
+      "views": "4.48K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2865",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "7K",
+      "views": "7.21K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2857",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.48K",
+      "views": "3.49K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -51,7 +64,7 @@
       "link": "https://t.me/kh_metro/2850",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.15K",
+      "views": "3.2K",
       "kind": "info",
       "lineIds": []
     }
