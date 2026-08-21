@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-21T09:55:05.161Z",
+  "updatedAt": "2026-08-21T10:20:51.559Z",
   "items": [
+    {
+      "id": "kh_metro:2872",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Палац спорту» тимчасово зачинено пішохідний вихід №8\n\nВихід №8 (у бік проспекту Героїв Харкова) з підвуличного пішохідного переходу на станції «Палац спорту» тимчасово зачинено до 19:00 для користування пасажирів у звʼязку з проведенням ремонтних робіт.\n\nПриносимо вибачення за тимчасові незручності&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-08-21T10:05:35.000Z",
+      "link": "https://t.me/kh_metro/2872",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "1.71K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2865",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2865",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "6.66K",
+      "views": "6.88K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2857",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.37K",
+      "views": "3.42K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -38,7 +51,7 @@
       "link": "https://t.me/kh_metro/2850",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.08K",
+      "views": "3.12K",
       "kind": "info",
       "lineIds": []
     }
