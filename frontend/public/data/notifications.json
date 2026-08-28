@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-08-28T01:30:12.760Z",
+  "updatedAt": "2026-08-28T13:16:58.599Z",
   "items": [
+    {
+      "id": "kh_metro:2889",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Тракторний завод» тимчасово зачинено пішохідний вихід №3  Вихід №3 (у бік Харківського тракторного заводу) з підвуличного пішохідного переходу на станції «Тракторний завод» тимчасово зачинено для користування пасажирів у звʼязку з проведенням…",
+      "date": "2026-08-28T13:09:18.000Z",
+      "link": "https://t.me/kh_metro/2889",
+      "hasMedia": false,
+      "isForwarded": false,
+      "views": "1.2K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2884",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2884",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.78K",
+      "views": "4.3K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2883",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "5.93K",
+      "views": "6.13K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2882",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "18.2K",
+      "views": "18.5K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2874",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.78K",
+      "views": "5.83K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2873",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "27.9K",
+      "views": "28.1K",
       "kind": "info",
       "lineIds": []
     },
