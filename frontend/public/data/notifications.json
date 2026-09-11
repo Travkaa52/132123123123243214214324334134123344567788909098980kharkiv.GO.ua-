@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-09-11T06:16:14.046Z",
+  "updatedAt": "2026-09-11T11:27:24.047Z",
   "items": [
+    {
+      "id": "kh_metro:2918",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "Святковий концерт з нагоди початку нового навчального року відбувся на ст. м. «Історичний музей». \n\nЗахід став частиною проєкту «Разом до Перемоги», створеного з ініціативи міського голови Ігоря Терехова та організованого Департаментом культури.",
+      "date": "2026-09-11T08:30:58.000Z",
+      "link": "https://t.me/kh_metro/2918",
+      "hasMedia": true,
+      "isForwarded": true,
+      "views": "1.82K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2910",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2910",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "3.75K",
+      "views": "4.99K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
@@ -25,7 +38,7 @@
       "link": "https://t.me/kh_metro/2909",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "13.4K",
+      "views": "14.2K",
       "kind": "info",
       "lineIds": []
     },
@@ -38,7 +51,7 @@
       "link": "https://t.me/kh_metro/2908",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "17.4K",
+      "views": "17.6K",
       "kind": "info",
       "lineIds": []
     },
@@ -51,7 +64,7 @@
       "link": "https://t.me/kh_metro/2907",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "31.2K",
+      "views": "31.3K",
       "kind": "alert",
       "lineIds": [
         "route-metro-3"
@@ -66,7 +79,7 @@
       "link": "https://t.me/kh_metro/2897",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.87K",
+      "views": "6.36K",
       "kind": "info",
       "lineIds": []
     }
