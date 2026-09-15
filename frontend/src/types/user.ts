@@ -33,6 +33,12 @@ export interface UserProfile {
 
 export interface AppSettings {
   theme: 'light' | 'dark' | 'amoled' | 'auto';
+  /**
+   * Візуальний "скін" — незалежний від світлої/темної теми вимір дизайну:
+   * glass (рідке скло, поточна естетика), flat (мінімалізм без блюру,
+   * найлегший для GPU/батареї) або bold (контрастні табло-стилізовані картки).
+   */
+  skin: 'glass' | 'flat' | 'bold';
   mapStyle: 'day' | 'night';
   units: 'metric' | 'imperial';
   pushNotificationsEnabled: boolean;

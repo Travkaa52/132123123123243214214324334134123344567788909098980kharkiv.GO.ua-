@@ -30,6 +30,7 @@ export interface AccountSnapshot {
     Pick<
       AppSettings,
       | 'theme'
+      | 'skin'
       | 'mapStyle'
       | 'units'
       | 'language'

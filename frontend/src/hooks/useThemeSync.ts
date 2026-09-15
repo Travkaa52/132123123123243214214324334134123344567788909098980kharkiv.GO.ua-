@@ -29,8 +29,17 @@ function applyTheme(theme: string) {
   root.style.colorScheme = resolved === 'light' ? 'light' : 'dark';
 }
 
+/**
+ * Скін (glass / flat / bold) — незалежний від light/dark вимір, тому
+ * застосовується окремим атрибутом і не резолвиться через matchMedia.
+ */
+function applySkin(skin: string) {
+  document.documentElement.setAttribute('data-skin', skin);
+}
+
 export function useThemeSync() {
   const theme = useSettingsStore((s) => s.theme);
+  const skin = useSettingsStore((s) => s.skin);
 
   useEffect(() => {
     applyTheme(theme);
@@ -44,4 +53,8 @@ export function useThemeSync() {
     media.addEventListener('change', onChange);
     return () => media.removeEventListener('change', onChange);
   }, [theme]);
+
+  useEffect(() => {
+    applySkin(skin);
+  }, [skin]);
 }

@@ -1,0 +1,228 @@
+/**
+ * Kharkiv GO v2.0 — Motion & Animation Definitions
+ * =================================================
+ *  Framer Motion handles runtime animations; these CSS keyframes
+ *  provide fallbacks, shimmer effects, and static animations.
+ */
+
+/* ════════════════════ Page transitions ════════════════════ */
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-enter-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-fast {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ════════════════════ Shimmer ════════════════════ */
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ════════════════════ Pulse ════════════════════ */
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ════════════════════ Spring ════════════════════ */
+
+@keyframes spring-scale {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.92); }
+  80% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+@keyframes gentle-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ════════════════════ Route line ════════════════════ */
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* ════════════════════ Splash ════════════════════ */
+
+@keyframes splash-emblem-in {
+  0% { opacity: 0; transform: scale(0.82) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.04) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes splash-ring {
+  0% { opacity: 0.55; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(1.55); }
+}
+
+@keyframes splash-word-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes splash-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.03); }
+}
+
+/* ════════════════════ Progress ════════════════════ */
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%) scaleX(0.4); }
+  50% { transform: translateX(20%) scaleX(0.7); }
+  100% { transform: translateX(120%) scaleX(0.4); }
+}
+
+/* ════════════════════ Sheet ════════════════════ */
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ════════════════════ Animation utilities ════════════════════ */
+
+@layer utilities {
+  .animate-page-enter { animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-page-enter-scale { animation: page-enter-scale 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-fade-in { animation: fade-in 0.2s ease-out; }
+  .animate-fade-out { animation: fade-out 0.2s ease-out; }
+  .animate-slide-up { animation: slide-up 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-slide-up-fast { animation: slide-up-fast 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-scale-in { animation: scale-in 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-slide-up-fade { animation: slide-up-fade 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-stagger-in { animation: stagger-in 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+  .animate-pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .animate-spring-scale { animation: spring-scale 0.3s ease-out; }
+  .animate-gentle-float { animation: gentle-float 3s ease-in-out infinite; }
+  .animate-dash { animation: dash 1s linear infinite; }
+  .animate-splash-emblem-in { animation: splash-emblem-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-splash-ring-1 { animation: splash-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+  .animate-splash-ring-2 { animation: splash-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.8s; }
+  .animate-splash-ring-3 { animation: splash-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite 1.6s; }
+  .animate-splash-word-in { animation: splash-word-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both; }
+  .animate-splash-out { animation: splash-out 0.45s cubic-bezier(0.4, 0, 1, 1) both; }
+  .animate-progress-indeterminate { animation: progress-indeterminate 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+  .animate-sheet-up { animation: sheet-up 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .animate-marquee { animation: marquee 4s linear infinite; }
+
+  /* Stagger children */
+  .animate-stagger > * { animation-delay: calc(var(--stagger-delay, 0) * 1); }
+}
+
+/* ════════════════════ Reduced motion ════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

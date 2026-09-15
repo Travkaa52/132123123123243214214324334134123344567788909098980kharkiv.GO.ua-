@@ -86,7 +86,7 @@ export function useAccountCloudSync() {
     const schedulePush = () => {
       if (timeout) clearTimeout(timeout);
       timeout = setTimeout(() => {
-        const { theme, mapStyle, units, language, visibleTransportKinds, showStopsOnMap, is3DMode, delayNotificationsEnabled } =
+        const { theme, skin, mapStyle, units, language, visibleTransportKinds, showStopsOnMap, is3DMode, delayNotificationsEnabled } =
           useSettingsStore.getState();
         void pushAccountSnapshot(firebaseUid, {
           favorites: {
@@ -94,7 +94,7 @@ export function useAccountCloudSync() {
             routes: useFavoritesStore.getState().routes
           },
           history: useHistoryStore.getState().entries,
-          settings: { theme, mapStyle, units, language, visibleTransportKinds, showStopsOnMap, is3DMode, delayNotificationsEnabled },
+          settings: { theme, skin, mapStyle, units, language, visibleTransportKinds, showStopsOnMap, is3DMode, delayNotificationsEnabled },
           reminders: useReminderStore.getState().reminders
         });
       }, PUSH_DEBOUNCE_MS);

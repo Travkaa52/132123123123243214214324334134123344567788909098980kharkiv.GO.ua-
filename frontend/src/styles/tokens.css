@@ -227,6 +227,65 @@
   --glass-border-alpha: 0.22;
 }
 
+/* ==========================================================================
+   Skins — незалежний від light/dark вимір дизайну. Перемикається
+   атрибутом data-skin на <html> (див. useThemeSync). Компоненти й далі
+   читають лише --glass-*/--shadow-glass*/--color-border-alpha — самі
+   класи (.glass-card, .glass-panel, .glass-surface) не змінюються.
+   ========================================================================== */
+
+/* glass — поточна естетика "рідкого скла", підкручена до максимуму. Це
+   значення за замовчуванням (:root вище), тут лише явний якір для
+   читабельності каскаду. */
+[data-skin='glass'] {
+  --glass-blur: 26px;
+  --glass-saturate: 1.7;
+}
+
+/* flat — без blur/сатурації: суцільні поверхні, кольоровий лівий акцент
+   замість скла. Найлегший скін по GPU/батареї (немає backdrop-filter),
+   тому це рекомендований варіант для слабких Android-пристроїв. */
+[data-skin='flat'] {
+  --glass-blur: 0px;
+  --glass-saturate: 1;
+  --glass-sheen-strong: 0;
+  --glass-sheen-soft: 0;
+  --glass-tint-top-alpha: 0;
+  --glass-border-alpha: 0.12;
+  --shadow-glass: 0 1px 0 0 rgb(var(--color-border) / var(--color-border-alpha));
+  --shadow-glass-lg: 0 1px 0 0 rgb(var(--color-border) / var(--color-border-alpha));
+  --shadow-glass-dark: 0 1px 0 0 rgb(var(--color-border) / var(--color-border-alpha));
+}
+
+[data-skin='flat'] .glass-card,
+[data-skin='flat'] .glass-panel,
+[data-skin='flat'] .glass-surface {
+  background: rgb(var(--color-surface-raised));
+  border-left: 3px solid rgb(var(--color-primary));
+}
+
+/* bold — щільні картки з насиченими кольоровими плашками статусів,
+   без blur, з різкішими краями. Табло-стилістика. */
+[data-skin='bold'] {
+  --glass-blur: 0px;
+  --glass-saturate: 1;
+  --glass-sheen-strong: 0;
+  --glass-sheen-soft: 0;
+  --glass-tint-top-alpha: 0;
+  --glass-border-alpha: 0;
+  --shadow-glass: none;
+  --shadow-glass-lg: none;
+  --shadow-glass-dark: none;
+}
+
+[data-skin='bold'] .glass-card,
+[data-skin='bold'] .glass-panel,
+[data-skin='bold'] .glass-surface {
+  background: rgb(var(--color-surface-raised));
+  border: none;
+  border-radius: 8px;
+}
+
 /* Base resets & Mobile UX optimizations */
 @layer base {
   * {

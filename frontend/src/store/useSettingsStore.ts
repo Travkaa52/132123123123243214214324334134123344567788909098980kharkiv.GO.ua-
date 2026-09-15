@@ -8,6 +8,7 @@ const ALL_KINDS: TransportKind[] = ['metro', 'tram', 'trolleybus', 'bus'];
 
 interface SettingsState extends AppSettings {
   setTheme: (theme: AppSettings['theme']) => void;
+  setSkin: (skin: AppSettings['skin']) => void;
   setMapStyle: (style: AppSettings['mapStyle']) => void;
   setLanguage: (lang: AppSettings['language']) => void;
   setUnits: (units: AppSettings['units']) => void;
@@ -27,6 +28,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       theme: 'dark',
+      skin: 'glass',
       mapStyle: 'night',
       units: 'metric',
       pushNotificationsEnabled: false,
@@ -49,6 +51,7 @@ export const useSettingsStore = create<SettingsState>()(
               ? 'day'
               : 'night'
         }),
+      setSkin: (skin) => set({ skin }),
       setMapStyle: (mapStyle) => set({ mapStyle }),
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
