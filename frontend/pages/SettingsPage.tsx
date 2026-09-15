@@ -29,6 +29,8 @@ import { TransportKindIcon, KIND_LABELS_UK } from '@/components/TransportKindIco
 import { TRANSPORT_COLORS } from '@/config/map';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useToastStore } from '@/store/useToastStore';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { enableDelayPushSubscription, disableDelayPushSubscription, isPushSubscriptionAvailable } from '@/lib/pushSubscription';
 import type { AppSettings } from '@/types/user';
 import type { TransportKind } from '@/types/transport';
 
@@ -88,6 +90,50 @@ function Row({ label, hint, icon, control, badge }: RowProps) {
         </div>
       </div>
       <div className="shrink-0 pl-2">{control}</div>
+    </div>
+  );
+}
+
+const SKIN_OPTIONS: {
+  value: AppSettings['skin'];
+  label: string;
+  desc: string;
+}[] = [
+  { value: 'glass', label: 'Скло', desc: 'Блюр, м\'які тіні' },
+  { value: 'flat', label: 'Мінімал', desc: 'Без блюру, легше для батареї' },
+  { value: 'bold', label: 'Табло', desc: 'Контрастні плашки' }
+];
+
+function SkinPicker({
+  value,
+  onChange
+}: {
+  value: AppSettings['skin'];
+  onChange: (s: AppSettings['skin']) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2 p-3.5 pt-0">
+      {SKIN_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(opt.value)}
+            className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-center transition-all duration-200 active:scale-[0.97] ${
+              active
+                ? 'border-primary/70 shadow-[0_0_0_1px_rgb(var(--color-primary)/0.35)]'
+                : 'border-border/60 hover:border-border'
+            }`}
+          >
+            <span className={`text-body-sm font-semibold ${active ? 'text-primary' : 'text-ink-text'}`}>
+              {opt.label}
+            </span>
+            <span className="text-[11px] leading-tight text-ink-muted/80">{opt.desc}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -182,6 +228,8 @@ export function SettingsPage() {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTogglingDelayAlerts, setIsTogglingDelayAlerts] = useState(false);
+  const favoriteRoutes = useFavoritesStore((s) => s.routes);
   const [isResetting, setIsResetting] = useState(false);
   const [activeNav, setActiveNav] = useState(QUICK_NAV[0].id);
   const showToast = useToastStore((s) => s.show);
@@ -194,6 +242,30 @@ export function SettingsPage() {
       if (result !== 'granted') return;
     }
     settings.togglePushNotifications();
+  };
+
+  const handleToggleDelayAlerts = async () => {
+    if (isTogglingDelayAlerts) return;
+
+    if (settings.delayNotificationsEnabled) {
+      settings.setDelayNotificationsEnabled(false);
+      void disableDelayPushSubscription();
+      return;
+    }
+
+    setIsTogglingDelayAlerts(true);
+    try {
+      const routeIds = favoriteRoutes.map((r) => r.routeId);
+      const ok = await enableDelayPushSubscription(routeIds);
+      if (ok) {
+        settings.setDelayNotificationsEnabled(true);
+        showToast('Сповіщення про затримки увімкнено.', 'success');
+      } else {
+        showToast('Не вдалося увімкнути сповіщення про затримки.', 'error');
+      }
+    } finally {
+      setIsTogglingDelayAlerts(false);
+    }
   };
 
   const handleClearCache = async () => {
@@ -304,6 +376,7 @@ export function SettingsPage() {
           <div className="px-1 pt-1">
             <ThemePicker value={settings.theme} onChange={settings.setTheme} />
           </div>
+          <SkinPicker value={settings.skin} onChange={settings.setSkin} />
           <Row
             label="Стиль карти"
             icon={<Map className="h-4 w-4" />}
@@ -380,6 +453,25 @@ export function SettingsPage() {
               />
             }
           />
+          {isPushSubscriptionAvailable() && (
+            <Row
+              label="Сповіщення про затримки"
+              icon={<AlertTriangle className="h-4 w-4" />}
+              hint={
+                favoriteRoutes.length === 0
+                  ? 'Додайте маршрути в обране, щоб отримувати сповіщення саме по них'
+                  : `Стежимо за ${favoriteRoutes.length} обраним(и) маршрутом(ами)`
+              }
+              control={
+                <Switch
+                  checked={settings.delayNotificationsEnabled}
+                  onChange={handleToggleDelayAlerts}
+                  disabled={isTogglingDelayAlerts || notifStatus === 'denied'}
+                  label="Сповіщення про затримки"
+                />
+              }
+            />
+          )}
         </Section>
 
         <Section id="sec-map" title="Інтерактивна карта" icon={<MapPin className="h-4 w-4" />}>

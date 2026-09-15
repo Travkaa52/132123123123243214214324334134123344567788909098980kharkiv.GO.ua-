@@ -14,6 +14,8 @@ import {
 import { getStationPhoto } from '@/data/stationPhotos';
 import { TIMETABLES } from '@/liveMetro/timetableData';
 import { realStationId, schematicStationId } from '@/liveMetro/stationIdMap';
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { getMetroDirectionSprite } from '@/config/metroDirectionSprites';
 import {
   getActiveTrains as getSharedActiveTrains,
@@ -108,6 +110,12 @@ export interface SchematicStation {
   opened: string;
   type: 'deep' | 'shallow' | 'single-vault' | 'pylon';
   description?: string;
+  /** Відомі виходи зі станції — орієнтири на поверхні (вулиці, установи,
+   *  зупинки наземного транспорту), куди веде вихід/виходи з вестибюля.
+   *  Дані по кожному конкретному вестибюлю (їх нумерація) офіційно не
+   *  публікуються Харківським метрополітеном, тому тут — перелік реальних
+   *  орієнтирів біля станції, а не вигадані номери виходів. */
+  exits?: string[];
 }
 
 export interface SchematicLine {
@@ -183,6 +191,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'single-vault',
     description: 'Північно-західний термінал. Вихід до ж/м Холодна Гора.',
+    exits: ['Житловий масив Холодна Гора', 'Кінцева зупинка наземного транспорту'],
   },
   {
     id: 'vokzalna',
@@ -194,6 +203,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Інтегрована в Центральний залізничний вокзал Харків-Пасажирський.',
+    exits: ['Центральний залізничний вокзал Харків-Пасажирський', 'Привокзальна площа'],
   },
   {
     id: 'tsentralnyi-rynok',
@@ -205,6 +215,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Центральний ринок, торговий район.',
+    exits: ['Центральний ринок'],
   },
   {
     id: 'maidan-konstytutsii',
@@ -217,6 +228,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Центр міста. Пересадка на Салтівську лінію (Історичний музей).',
+    exits: ['Майдан Конституції', 'Пересадочний вузол на Історичний музей (М2)'],
   },
   {
     id: 'levada',
@@ -228,6 +240,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Вихід до залізничної станції Харків-Левада.',
+    exits: ['Залізнична станція Харків-Левада'],
   },
   {
     id: 'sportyvna',
@@ -240,6 +253,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Пересадка на Олексіївську лінію (Метробудівників).',
+    exits: ['Стадіон «Металіст»', 'Пересадочний вузол на Метробудівників (М3)'],
   },
   {
     id: 'zavodska',
@@ -251,6 +265,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Безпосередньо біля залізничної станції Харків-Слобідський.',
+    exits: ['Залізнична станція Харків-Слобідський'],
   },
   {
     id: 'turboatom',
@@ -262,6 +277,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1975-08-23',
     type: 'deep',
     description: 'Колишня назва — Московський проспект (до 2019).',
+    exits: ['Завод «Турбоатом»', 'Московський проспект'],
   },
   {
     id: 'palats-sportu',
@@ -273,6 +289,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1978-05-11',
     type: 'shallow',
     description: 'Палац спорту, житловий масив.',
+    exits: ['Палац спорту', 'Житловий масив'],
   },
   {
     id: 'armiiska',
@@ -284,6 +301,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1978-05-11',
     type: 'shallow',
     description: 'Колишня назва — Радянської армії (до 2016).',
+    exits: ['Житловий масив вздовж Московського проспекту'],
   },
   {
     id: 'imeni-maselskoho',
@@ -295,6 +313,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1978-05-11',
     type: 'shallow',
     description: 'Колишня назва — Індустріальна (до 2004).',
+    exits: ['Промислова зона Індустріального району'],
   },
   {
     id: 'traktornyi-zavod',
@@ -306,6 +325,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1978-05-11',
     type: 'single-vault',
     description: 'Вихід до Харківського тракторного заводу.',
+    exits: ['Харківський тракторний завод'],
   },
   {
     id: 'industrialna',
@@ -317,6 +337,7 @@ const LINE1_STATIONS: SchematicStation[] = [
     opened: '1978-05-11',
     type: 'shallow',
     description: 'Південно-східний термінал. Колишня назва — Пролетарська (до 2016).',
+    exits: ['Житловий масив Олексіївка/Індустріальний район', 'Кінцева зупинка наземного транспорту'],
   },
 ];
 
@@ -335,6 +356,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1986-10-26',
     type: 'shallow',
     description: 'Північно-східний термінал. Колишня назва — Героїв Праці (до 2024).',
+    exits: ['Житловий масив Салтівка', 'Кінцева зупинка наземного транспорту'],
   },
   {
     id: 'studentska',
@@ -346,6 +368,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1986-10-26',
     type: 'shallow',
     description: 'Університетський район.',
+    exits: ['Студентське містечко'],
   },
   {
     id: 'akademika-pavlova',
@@ -357,6 +380,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1986-10-26',
     type: 'single-vault',
     description: 'Імені Івана Павлова, фізіолога.',
+    exits: ['Вулиця Академіка Павлова'],
   },
   {
     id: 'akademika-barabashova',
@@ -368,6 +392,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1984-08-11',
     type: 'shallow',
     description: 'Ринок Барабашова — найбільший в Україні.',
+    exits: ['Ринок «Барабашова»'],
   },
   {
     id: 'kyivska',
@@ -379,6 +404,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1984-08-11',
     type: 'single-vault',
     description: 'Автобусний хаб у напрямку Києва.',
+    exits: ['Автостанція у напрямку Києва'],
   },
   {
     id: 'yaroslava-mudroho',
@@ -390,6 +416,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1984-08-11',
     type: 'pylon',
     description: 'Колишня назва — Пушкінська (до 2024). Глибина ~35 м.',
+    exits: ['Вулиця Ярослава Мудрого (колишня Пушкінська)'],
   },
   {
     id: 'universytet',
@@ -402,6 +429,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1984-08-11',
     type: 'shallow',
     description: 'Національний університет ім. Каразіна. Пересадка на M3 (Держпром).',
+    exits: ['Харківський національний університет ім. В.Н. Каразіна', 'Пересадочний вузол на Держпром (М3)'],
   },
   {
     id: 'istorychnyi-muzei',
@@ -414,6 +442,7 @@ const LINE2_STATIONS: SchematicStation[] = [
     opened: '1984-08-11',
     type: 'deep',
     description: 'Історичний музей. Пересадка на M1 (Майдан Конституції).',
+    exits: ['Харківський історичний музей', 'Пересадочний вузол на Майдан Конституції (М1)'],
   },
 ];
 
@@ -432,6 +461,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '2016-08-19',
     type: 'shallow',
     description: 'Північний термінал. Відкрита у 2016 році.',
+    exits: ['Житловий масив на півночі Олексіївської лінії', 'Кінцева зупинка наземного транспорту'],
   },
   {
     id: 'oleksiivska',
@@ -443,6 +473,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '2010-12-21',
     type: 'shallow',
     description: 'Житловий масив Олексіївка.',
+    exits: ['Житловий масив Олексіївка'],
   },
   {
     id: '23-serpnia',
@@ -454,6 +485,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '2004-08-21',
     type: 'shallow',
     description: 'День визволення Харкова (23 серпня).',
+    exits: ['Проспект на честь визволення Харкова'],
   },
   {
     id: 'botanichnyi-sad',
@@ -465,6 +497,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '2004-08-21',
     type: 'shallow',
     description: 'Національний ботанічний сад.',
+    exits: ['Національний ботанічний сад ХНУ'],
   },
   {
     id: 'naukova',
@@ -476,6 +509,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '1995-05-06',
     type: 'shallow',
     description: 'Проспект Науки, науковий район.',
+    exits: ['Проспект Науки'],
   },
   {
     id: 'derzhprom',
@@ -488,6 +522,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '1995-05-06',
     type: 'shallow',
     description: 'Площа Свободи — одна з найбільших у світі. Пересадка на M2 (Університет).',
+    exits: ['Площа Свободи', 'Будівля Держпрому', 'Пересадочний вузол на Університет (М2)'],
   },
   {
     id: 'arkhitektora-beketova',
@@ -499,6 +534,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '1995-05-06',
     type: 'shallow',
     description: 'Музей образотворчих мистецтв. Найкоротша ділянка між станціями (до Держпрома).',
+    exits: ['Харківський художній музей'],
   },
   {
     id: 'zakhysnykiv-ukrainy',
@@ -510,6 +546,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '1995-05-06',
     type: 'shallow',
     description: 'Колишня назва — Проспект Гагаріна (до 2022).',
+    exits: ['Вулиця Захисників України (колишній проспект Гагаріна)'],
   },
   {
     id: 'metrobudivnykiv',
@@ -522,6 +559,7 @@ const LINE3_STATIONS: SchematicStation[] = [
     opened: '1995-05-06',
     type: 'shallow',
     description: 'Південний термінал. Пересадка на M1 (Спортивна).',
+    exits: ['Південний житловий масив', 'Пересадочний вузол на Спортивна (М1)'],
   },
 ];
 
@@ -853,7 +891,7 @@ export function LiveMetroPage() {
   // після монтування вже не можна.
   const initialDeepLinkRef = useRef({
     stationId: searchParams.get('station'),
-    tab: searchParams.get('tab') as 'arrivals' | 'timetable' | 'info' | null
+    tab: searchParams.get('tab') as 'arrivals' | 'timetable' | 'exits' | 'info' | null
   });
   const deepLinkedStationId = searchParams.get('station');
   const [transform, setTransform] = useState<Transform>({ x: 60, y: 30, scale: 0.9 });
@@ -1711,14 +1749,22 @@ function StationInfoCard({
   timetable: StationDayTimetableEntry[];
   dayType: LiveMetroDayType;
   nowSec: number;
-  initialTab?: 'arrivals' | 'timetable' | 'info';
+  initialTab?: 'arrivals' | 'timetable' | 'exits' | 'info';
   onClose: () => void;
 }) {
   const photo = getStationPhoto(station.id);
   const [showFullTimetable, setShowFullTimetable] = useState(initialTab === 'timetable');
-  const [activeTab, setActiveTab] = useState<'arrivals' | 'timetable' | 'info'>(initialTab ?? 'arrivals');
+  const [activeTab, setActiveTab] = useState<'arrivals' | 'timetable' | 'exits' | 'info'>(initialTab ?? 'arrivals');
 
   const line = BUILT_LINES.find((l) => l.line.id === station.lineId)?.line;
+
+  // Обране прив'язується до канонічного id зупинки (`stop-metro-<slug>`),
+  // спільного зі списком зупинок і роутером поїздок — так одна й та сама
+  // станція є "улюбленою" і тут, і в списку "Найближчі зупинки"/пошуку.
+  const canonicalStopId = realStationId(station.id);
+  const isFavorite = useFavoritesStore((s) => s.isStopFavorite(canonicalStopId));
+  const addFavoriteStop = useFavoritesStore((s) => s.addStop);
+  const removeFavoriteStop = useFavoritesStore((s) => s.removeStop);
 
   return (
     <InfoCardShell onClose={onClose}>
@@ -1765,6 +1811,12 @@ function StationInfoCard({
                   Пересадка
                 </span>
               ) : null}
+              <FavoriteButton
+                active={isFavorite}
+                onToggle={() => (isFavorite ? removeFavoriteStop(canonicalStopId) : addFavoriteStop(canonicalStopId))}
+                label={isFavorite ? 'Прибрати станцію з обраних' : 'Додати станцію в обрані'}
+                className="ml-auto -mr-1 -mt-1 bg-black/25 backdrop-blur"
+              />
             </div>
             <h2 className="mt-1.5 font-display text-xl font-extrabold leading-tight text-white drop-shadow-sm">
               {station.name}
@@ -1790,6 +1842,7 @@ function StationInfoCard({
           [
             { key: 'arrivals', label: 'Прибуття', icon: Clock },
             { key: 'timetable', label: 'Розклад', icon: CalendarDays },
+            { key: 'exits', label: 'Виходи', icon: DoorOpen },
             { key: 'info', label: 'Інфо', icon: Info },
           ] as const
         ).map((tab) => {
@@ -1869,6 +1922,33 @@ function StationInfoCard({
                 <TimetableBlock key={`${entry.lineId}-${entry.direction}-${i}`} entry={entry} />
               ))}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'exits' && (
+          <div className="flex flex-col gap-2">
+            {station.exits && station.exits.length > 0 ? (
+              station.exits.map((exit, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2.5 rounded-2xl border border-border/8 bg-surface-soft px-3.5 py-2.5 text-[12.5px]"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest/15 text-forest">
+                    <DoorOpen className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="font-medium text-ink-text">{exit}</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <DoorOpen className="h-7 w-7 text-ink-muted opacity-30" />
+                <p className="text-[12.5px] text-ink-muted opacity-60">Дані про виходи уточнюються</p>
+              </div>
+            )}
+            <p className="px-1 text-[10.5px] leading-relaxed text-ink-muted opacity-50">
+              Нумерація конкретних вестибюлів офіційно не публікується метрополітеном — тут орієнтири на поверхні,
+              куди веде вихід(и) зі станції.
+            </p>
           </div>
         )}
 

@@ -24,6 +24,7 @@ import { RouteDetailModal } from '@/components/RouteDetailModal';
 import { TrainWishSprite } from '@/components/TrainWishSprite';
 import { NotificationsBell, NotificationsSection } from '@/components/NotificationsSection';
 import { TransportNewsSection } from '@/components/TransportNewsSection';
+import { AirAlertBanner } from '@/components/AirAlertBanner';
 import { localRoutes, localStops } from '@/data/localData';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useHistoryStore } from '@/store/useHistoryStore';
@@ -100,14 +101,6 @@ export function HomePage() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const formattedDate = useMemo(() => {
-    return currentTime.toLocaleDateString('uk-UA', { 
-      day: 'numeric', 
-      month: 'long', 
-      weekday: 'short' 
-    });
-  }, [currentTime]);
 
   const formattedTimeStr = useMemo(() => {
     return currentTime.toLocaleTimeString('uk-UA', { 
@@ -211,51 +204,49 @@ export function HomePage() {
 
   return (
     <div className="relative min-h-dvh bg-bg pb-32 pt-[max(0.75rem,env(safe-area-inset-top))] text-ink-text overflow-x-hidden font-sans antialiased selection:bg-primary selection:text-white">
-      
-      {/* Ambient background glow */}
-      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-primary/12 blur-[90px]" />
-      <div className="pointer-events-none absolute top-32 -right-16 h-64 w-64 rounded-full bg-gold/8 blur-[80px]" />
+
+      {/* Ambient glow — единственный источник цветового акцента на фоне.
+          Раньше было два независимых glow (primary + gold) — два акцента
+          конкурируют за внимание. Один — направляет взгляд. */}
+      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full bg-primary/10 blur-[100px]" />
 
       <div className="relative z-10 mx-auto max-w-md px-4 space-y-5">
-        
-        {/* 1. UPPER HEADER */}
-        <header className="flex items-center justify-between pt-2 pb-1 animate-in fade-in slide-in-from-top-2 duration-500">
+
+        {/* 1. HEADER — редизайн: убран "PRO"-бейдж (шум без функции), время
+            перенесено под настройки одной строкой вместо отдельного блока,
+            логотип не залит primary-градиентом (это тоже акцент, а у нас
+            он уже один — ambient glow), а обведён тонкой рамкой на
+            surface-raised — так на экране остаётся ровно один цветной
+            элемент: сам ambient glow за текстом приветствия. */}
+        <header className="flex items-center justify-between pt-2 pb-1 animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 shrink-0 rounded-[18px] bg-gradient-to-br from-primary to-forest-dark flex items-center justify-center text-white shadow-lg shadow-primary/25 font-black text-lg tracking-tighter ring-1 ring-white/10">
+            <div className="w-11 h-11 shrink-0 rounded-2xl bg-surface-raised border border-border/50 flex items-center justify-center text-primary font-black text-sm tracking-tighter">
               GO
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-[13px] tracking-tight text-ink-muted">
-                  Kharkiv <span className="text-primary font-extrabold">GO</span>
-                </span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold bg-primary/10 text-primary rounded-full border border-primary/20">
-                  PRO
-                </span>
-              </div>
-              <h1 className="font-display text-xl font-black text-ink-text mt-0.5 tracking-tight truncate max-w-[210px]">
-                {greeting}, {displayName} 👋
+              <span className="text-body-sm font-medium text-ink-muted/80">
+                Kharkiv GO · {formattedTimeStr}
+              </span>
+              <h1 className="font-display text-xl font-black text-ink-text mt-0.5 tracking-tight truncate max-w-[220px]">
+                {greeting}, {displayName}
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden xs:flex flex-col items-end text-right mr-0.5">
-              <span className="text-sm font-extrabold text-ink-text tabular-nums">{formattedTimeStr}</span>
-              <span className="text-[10px] font-semibold text-ink-muted capitalize">{formattedDate}</span>
-            </div>
-            
             <NotificationsBell />
 
-            <Link 
+            <Link
               to="/profile"
               aria-label="Налаштування"
-              className="p-2.5 rounded-[16px] bg-surface-raised border border-border/40 hover:bg-surface-soft transition-all active:scale-90 text-ink-text shadow-sm"
+              className="p-2.5 rounded-2xl bg-surface-raised border border-border/50 hover:bg-surface-soft transition-colors duration-200 active:scale-90 text-ink-text"
             >
               <Settings size={19} />
             </Link>
           </div>
         </header>
+
+        <AirAlertBanner />
 
         {/* 2. ADVANCED REAL-TIME SEARCH BAR */}
         <div className="relative z-30 animate-in fade-in slide-in-from-top-1 duration-500 delay-75 fill-mode-both">

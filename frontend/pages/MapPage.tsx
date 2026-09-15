@@ -21,8 +21,9 @@ import { MapSearchSuggestions } from '@/components/MapSearchSuggestions';
 import { GpsButton } from '@/components/GpsButton';
 import { MapModeButton } from '@/components/MapModeButton';
 import { TransportLayersPanel } from '@/components/TransportLayersPanel';
+import { AirAlertBanner } from '@/components/AirAlertBanner';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import { localRoutes, localStops, type TripPlan, type StopItem } from '@/data/localData';
+import { localRoutes, localStops, type TripPlan, type TripPlanMode, type StopItem } from '@/data/localData';
 import { getRouteBounds } from '@/lib/mapLayers';
 import { refineTripPlansWithOSM } from '@/lib/tripPlanRefine';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -61,6 +62,12 @@ export function MapPage() {
   const [toPoint, setToPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
   const [tripPlans, setTripPlans] = useState<TripPlan[] | null>(null);
+  // "Розумні маршрути" — режим побудови/фільтрації варіантів поїздки, який
+  // користувач обирає у шторці варіантів (найшвидший / без пересадок /
+  // лише метро / без довгих піших переходів). Живе окремо від tripPlans,
+  // бо зміна режиму перебудовує список наново (metroOnly — це взагалі
+  // окремий пошук з обмеженим пулом маршрутів, не просто фільтр).
+  const [tripPlanMode, setTripPlanMode] = useState<TripPlanMode>('smart');
   const [isRefiningTrip, setIsRefiningTrip] = useState(false);
   const refineRequestIdRef = useRef(0);
   const [selectedPlanIndex, setSelectedPlanIndex] = useState<number | null>(null);
@@ -224,48 +231,63 @@ export function MapPage() {
     setSelectedPlanIndex(null);
   }, [fromPoint, toPoint, fromQuery, toQuery]);
 
-  const handleBuildTrip = useCallback(() => {
-    if (!fromPoint || !toPoint) return;
-    clearSelection();
-    // Побудова нового маршруту скасовує попередню активну поїздку (якщо
-    // була) — інакше на карті одночасно "боролись" би два різні маршрути.
-    setActiveTrip(null);
-    saveActiveTrip(null);
-    const plans = localRoutes.buildTripPlans(fromPoint.lat, fromPoint.lng, toPoint.lat, toPoint.lng);
-    setTripPlans(plans);
-    setSelectedPlanIndex(plans.length > 0 ? 0 : null);
-    setIsTripSheetOpen(true);
+  const handleBuildTrip = useCallback(
+    (mode: TripPlanMode = tripPlanMode) => {
+      if (!fromPoint || !toPoint) return;
+      clearSelection();
+      // Побудова нового маршруту скасовує попередню активну поїздку (якщо
+      // була) — інакше на карті одночасно "боролись" би два різні маршрути.
+      setActiveTrip(null);
+      saveActiveTrip(null);
+      const plans = localRoutes.buildTripPlansForMode(fromPoint.lat, fromPoint.lng, toPoint.lat, toPoint.lng, mode);
+      setTripPlans(plans);
+      setSelectedPlanIndex(plans.length > 0 ? 0 : null);
+      setIsTripSheetOpen(true);
 
-    if (map) {
-      map.fitBounds(
-        [
-          [Math.min(fromPoint.lng, toPoint.lng), Math.min(fromPoint.lat, toPoint.lat)],
-          [Math.max(fromPoint.lng, toPoint.lng), Math.max(fromPoint.lat, toPoint.lat)]
-        ],
-        { padding: { top: 160, bottom: 320, left: 60, right: 60 }, duration: 700, maxZoom: 15 }
-      );
-    }
+      if (map) {
+        map.fitBounds(
+          [
+            [Math.min(fromPoint.lng, toPoint.lng), Math.min(fromPoint.lat, toPoint.lat)],
+            [Math.max(fromPoint.lng, toPoint.lng), Math.max(fromPoint.lat, toPoint.lat)]
+          ],
+          { padding: { top: 160, bottom: 320, left: 60, right: 60 }, duration: 700, maxZoom: 15 }
+        );
+      }
 
-    // Перший показ — миттєвий (побудований по прямій відстані). Одразу
-    // після цього запускаємо другий, уточнюючий прохід через OpenStreetMap
-    // (реальна пішохідна мережа вулиць), який тихо підправляє цифри ходьби
-    // і, за потреби, переставляє варіанти місцями — без блокування UI.
-    if (plans.length > 0) {
-      const requestId = ++refineRequestIdRef.current;
-      setIsRefiningTrip(true);
-      refineTripPlansWithOSM(plans, fromPoint, toPoint)
-        .then((refined) => {
-          // Ігноруємо застарілу відповідь, якщо користувач встиг побудувати
-          // ще один маршрут, поки цей запит ще виконувався.
-          if (refineRequestIdRef.current !== requestId) return;
-          setTripPlans(refined);
-          setSelectedPlanIndex(refined.length > 0 ? 0 : null);
-        })
-        .finally(() => {
-          if (refineRequestIdRef.current === requestId) setIsRefiningTrip(false);
-        });
-    }
-  }, [fromPoint, toPoint, map, clearSelection]);
+      // Перший показ — миттєвий (побудований по прямій відстані). Одразу
+      // після цього запускаємо другий, уточнюючий прохід через OpenStreetMap
+      // (реальна пішохідна мережа вулиць), який тихо підправляє цифри ходьби
+      // і, за потреби, переставляє варіанти місцями — без блокування UI.
+      if (plans.length > 0) {
+        const requestId = ++refineRequestIdRef.current;
+        setIsRefiningTrip(true);
+        refineTripPlansWithOSM(plans, fromPoint, toPoint, mode)
+          .then((refined) => {
+            // Ігноруємо застарілу відповідь, якщо користувач встиг побудувати
+            // ще один маршрут, поки цей запит ще виконувався.
+            if (refineRequestIdRef.current !== requestId) return;
+            setTripPlans(refined);
+            setSelectedPlanIndex(refined.length > 0 ? 0 : null);
+          })
+          .finally(() => {
+            if (refineRequestIdRef.current === requestId) setIsRefiningTrip(false);
+          });
+      }
+    },
+    [fromPoint, toPoint, map, clearSelection, tripPlanMode]
+  );
+
+  // Перемикання режиму в шторці варіантів ("Найшвидший" / "Без пересадок" /
+  // "Лише метро" / "Без довгих переходів") — перебудовує маршрут наново з
+  // новим режимом, якщо точки вже задані; інакше просто запам'ятовує вибір
+  // на наступну побудову.
+  const handleChangeTripPlanMode = useCallback(
+    (mode: TripPlanMode) => {
+      setTripPlanMode(mode);
+      if (fromPoint && toPoint) handleBuildTrip(mode);
+    },
+    [fromPoint, toPoint, handleBuildTrip]
+  );
 
   const selectedTripPlan = useMemo(() => {
     if (activeTrip) return activeTrip.plan;
@@ -495,6 +517,10 @@ export function MapPage() {
       {/* 2. ВЕРХНЯ ПАНЕЛЬ: побудова маршруту "Звідки -> Куди" */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2.5 p-4 pt-[max(1rem,env(safe-area-inset-top))] will-change-transform">
 
+        <div className="pointer-events-auto">
+          <AirAlertBanner />
+        </div>
+
         <div className="pointer-events-auto relative rounded-[24px] border border-border/40 bg-surface/95 shadow-xl shadow-black/10 backdrop-blur-xl">
           <div className="flex items-stretch">
             <div className="flex flex-col items-center pl-4 pt-4 pb-4">
@@ -608,7 +634,7 @@ export function MapPage() {
           {fromPoint && toPoint && (
             <div className="border-t border-border/40 p-2.5">
               <button
-                onClick={handleBuildTrip}
+                onClick={() => handleBuildTrip()}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.98] hover:brightness-105"
               >
                 <RouteIcon size={15} />
@@ -706,6 +732,8 @@ export function MapPage() {
                 selectedIndex={selectedPlanIndex}
                 onSelect={handleSelectTripOption}
                 onStartTrip={handleStartTrip}
+                mode={tripPlanMode}
+                onChangeMode={handleChangeTripPlanMode}
               />
             </div>
           </div>
