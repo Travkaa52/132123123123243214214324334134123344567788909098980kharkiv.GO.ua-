@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-09-16T01:43:21.613Z",
+  "updatedAt": "2026-09-16T06:48:50.724Z",
   "items": [
+    {
+      "id": "kh_metro:2935",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Метробудівників» тимчасово зачинено пішохідний вихід №2\n  \nСьогодні, 16 вересня, вихід №2 (у бік вулиці Дмитра Коцюбайла) з підвуличного пішохідного переходу на станції «Метробудівників» тимчасово зачинено до 10:00 для користування пасажирів у звʼязку з виконанням ремонтних робіт. \n\nПриносимо вибачення за тимчасові незручності&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-09-16T05:57:06.000Z",
+      "link": "https://t.me/kh_metro/2935",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "3.36K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2927",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2927",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "4.05K",
+      "views": "4.38K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2926",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "27.4K",
+      "views": "27.7K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2918",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "6.73K",
+      "views": "6.98K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2910",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "8.59K",
+      "views": "8.68K",
       "kind": "info",
       "lineIds": [
         "route-metro-2"
