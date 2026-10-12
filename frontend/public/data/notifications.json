@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-10-12T01:21:07.954Z",
+  "updatedAt": "2026-10-12T07:36:34.006Z",
   "items": [
+    {
+      "id": "kh_metro:2969",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Університет» тимчасово зачинено пішохідний вихід №5\n\nВихід №5 з підвуличного пішохідного переходу на станції «Університет» (у бік ХНУ ім. В.Н. Каразіна) тимчасово зачинено до четверга, 15 жовтня, для користування пасажирів у звʼязку з проведенням ремонтних робіт.\n\nПриносимо вибачення за тимчасові незручності&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-10-12T06:59:50.000Z",
+      "link": "https://t.me/kh_metro/2969",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "1.1K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2968",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2968",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "26.8K",
+      "views": "28.1K",
       "kind": "alert",
       "lineIds": [
         "route-metro-3"
@@ -25,7 +38,7 @@
       "link": "https://t.me/kh_metro/2959",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "4.16K",
+      "views": "4.37K",
       "kind": "info",
       "lineIds": []
     },
@@ -38,7 +51,7 @@
       "link": "https://t.me/kh_metro/2949",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.68K",
+      "views": "5.91K",
       "kind": "info",
       "lineIds": []
     }
