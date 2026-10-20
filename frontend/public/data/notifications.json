@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-10-20T06:39:39.392Z",
+  "updatedAt": "2026-10-20T12:09:18.972Z",
   "items": [
+    {
+      "id": "kh_metro:2982",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Академіка Барабашова» тимчасово зачинено пішохідний вихід №3    Сьогодні, 20 жовтня, вихід №3 (у бік Торгівельного комплексу) з підвуличного пішохідного переходу на станції «Академіка Барабашова» тимчасово зачинено до 16:00 для користування пасажирів…",
+      "date": "2026-10-20T08:42:37.000Z",
+      "link": "https://t.me/kh_metro/2982",
+      "hasMedia": false,
+      "isForwarded": false,
+      "views": "6.34K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2981",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2981",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "3.16K",
+      "views": "8.66K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2971",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "5.39K",
+      "views": "6.49K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2970",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "5.46K",
+      "views": "5.99K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2969",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "19.4K",
+      "views": "19.9K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2968",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "34.2K",
+      "views": "34.3K",
       "kind": "alert",
       "lineIds": [
         "route-metro-3"
@@ -77,7 +90,7 @@
       "link": "https://t.me/kh_metro/2959",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "5.86K",
+      "views": "5.9K",
       "kind": "info",
       "lineIds": []
     }
