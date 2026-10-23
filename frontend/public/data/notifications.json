@@ -1,6 +1,19 @@
 {
-  "updatedAt": "2026-10-23T01:55:58.556Z",
+  "updatedAt": "2026-10-23T06:49:44.768Z",
   "items": [
+    {
+      "id": "kh_metro:2984",
+      "channel": "kh_metro",
+      "channelTitle": "Харківський метрополітен 🚇",
+      "text": "❌ На станції «Університет» тимчасово зачинено пішохідний вихід №5\n\nСьогодні, 23 жовтня, вихід №5 з підвуличного пішохідного переходу на станції «Університет» (у бік ХНУ ім. В.Н. Каразіна) тимчасово зачинено до 15:00 для користування пасажирів у звʼязку з проведенням ремонтних робіт.\n\nПриносимо вибачення за тимчасові незручності&#33;\n\nОфіційний сайт | Facebook |  Instagram",
+      "date": "2026-10-23T05:49:04.000Z",
+      "link": "https://t.me/kh_metro/2984",
+      "hasMedia": true,
+      "isForwarded": false,
+      "views": "5.89K",
+      "kind": "info",
+      "lineIds": []
+    },
     {
       "id": "kh_metro:2983",
       "channel": "kh_metro",
@@ -10,7 +23,7 @@
       "link": "https://t.me/kh_metro/2983",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "9.75K",
+      "views": "11.3K",
       "kind": "info",
       "lineIds": []
     },
@@ -23,7 +36,7 @@
       "link": "https://t.me/kh_metro/2982",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "14.5K",
+      "views": "14.8K",
       "kind": "info",
       "lineIds": []
     },
@@ -36,7 +49,7 @@
       "link": "https://t.me/kh_metro/2981",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "14.8K",
+      "views": "15.1K",
       "kind": "info",
       "lineIds": []
     },
@@ -49,7 +62,7 @@
       "link": "https://t.me/kh_metro/2971",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "7.74K",
+      "views": "7.91K",
       "kind": "info",
       "lineIds": []
     },
@@ -62,7 +75,7 @@
       "link": "https://t.me/kh_metro/2970",
       "hasMedia": false,
       "isForwarded": false,
-      "views": "6.58K",
+      "views": "6.67K",
       "kind": "info",
       "lineIds": []
     },
@@ -75,7 +88,7 @@
       "link": "https://t.me/kh_metro/2969",
       "hasMedia": true,
       "isForwarded": false,
-      "views": "20.7K",
+      "views": "20.8K",
       "kind": "info",
       "lineIds": []
     },
@@ -103,7 +116,7 @@
       "link": "https://t.me/kh_metro/2959",
       "hasMedia": true,
       "isForwarded": true,
-      "views": "6.07K",
+      "views": "6.12K",
       "kind": "info",
       "lineIds": []
     }
